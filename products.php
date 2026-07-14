@@ -1,0 +1,3 @@
+<?php require_once __DIR__.'/includes/header.php'; $products=db()->query('SELECT * FROM products WHERE status=1 ORDER BY name')->fetchAll(); ?>
+<h2>All Products</h2><div class='grid'><?php foreach($products as $p): ?><article class='card'><img src='<?=e($p['image']?:'/assets/img/logo.jpg')?>'><h4><?=e($p['name'])?></h4><p><?=money((float)$p['sale_price'])?></p><form method='post' action='/api/cart.php'><input type='hidden' name='product_id' value='<?=$p['id']?>'><button class='btn'>Add to cart</button></form></article><?php endforeach; ?></div>
+<?php require_once __DIR__.'/includes/footer.php'; ?>
