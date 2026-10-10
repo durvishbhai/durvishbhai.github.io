@@ -1,0 +1,21 @@
+# Front controller routing (Apache / LiteSpeed on Hostinger & cPanel)
+Options -Indexes -MultiViews
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Serve real files (assets) directly, everything else goes through index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Never expose dotfiles or editor/backup leftovers
+<FilesMatch "(^\.|~$|\.(bak|old|orig|sql|log|env|ini|sh|md|lock|json)$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

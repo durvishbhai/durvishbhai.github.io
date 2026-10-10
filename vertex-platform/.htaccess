@@ -1,0 +1,11 @@
+# Safety net: if the domain's document root points at the project root instead of public/,
+# route everything into public/ so app/, config/, storage/, database/ and .env are never served.
+# Preferred setup is still to point the document root at public/ (see docs/DEPLOYMENT.md).
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^$ public/ [L]
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
