@@ -15,6 +15,14 @@ final class RequestTest extends TestCase
         Config::set('app.trusted_proxies', []);
     }
 
+    public function testPageNumbersAreAlwaysBoundedPositiveIntegers(): void
+    {
+        foreach (['' => 1, '0' => 1, '-5' => 1, 'abc' => 1, '7' => 7, '1e9' => 1, '99999999999999999999' => 1, '1234567' => 1, '999999' => 999999, ' 3' => 3, '2.5' => 1] as $in => $out) {
+            $this->assertSame($out, (new Request('GET', '/', ['page' => (string) $in]))->page(), "page={$in}");
+        }
+        $this->assertSame(1, (new Request('GET', '/'))->page());
+    }
+
     public function testForwardedForIsIgnoredFromUntrustedClients(): void
     {
         Config::set('app.trusted_proxies', []);

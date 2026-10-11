@@ -141,6 +141,21 @@ final class EndToEndWorkflowTest extends DatabaseTestCase
         $this->assertNull(TicketAccess::role($this->dev, TicketAccess::find($sup['public_id'])));
         $this->assertSame('staff', TicketAccess::role($this->manager, TicketAccess::find($sup['public_id'])));
 
+        // ---- even the Owner (who holds every permission key) cannot act AS a client: ownership is checked per record
+        $owner = $this->makeUser('owner@x.test', ['super_admin']);
+        $this->assertTrue(\Vertex\Services\Gate::can('revisions.respond_cost', $owner));
+        $cr2 = RevisionAccess::findChange($cr['public_id']);
+        foreach ([fn () => ChangeRequestService::clientDecide($owner, $cr2, 'approve', ''),
+            fn () => ClientApprovalService::respond($owner, DeliverablePolicy::find($d['public_id']), $v['public_id'], 'approved', 'x', bin2hex(random_bytes(16))),
+            fn () => TicketService::createBug($owner, ['project' => $project['public_id']], [], false, '', false)] as $i => $act) {
+            try {
+                $act();
+                $this->fail("owner action #{$i} should have been refused");
+            } catch (\Vertex\Core\HttpException | \Vertex\Core\ValidationException $e) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
         // ---- the other client sees none of it, in any module
         $this->assertSame([$this->bravo['public_id']], array_column(ProjectPolicy::visibleTo($this->client2)['rows'], 'public_id'), 'client2 only sees their own project');
         $this->assertNull(TicketAccess::role($this->client2, TicketAccess::find($bug['public_id'])));
