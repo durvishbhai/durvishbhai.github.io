@@ -322,3 +322,21 @@ tr.diff th, tr.diff td { background: rgba(201, 162, 75, 0.1); }
 fieldset.field { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
 fieldset.field label { display: block; margin-top: 8px; }
 form.is-busy { opacity: 0.7; pointer-events: none; }
+
+/* Support Centre, tickets, warranty (Phase 5) */
+.thread { display: grid; gap: 12px; margin: 12px 0 18px; }
+.msg { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; background: rgba(255, 255, 255, 0.02); max-width: 78ch; }
+.msg header { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 4px; }
+.msg p { margin: 0 0 6px; }
+.msg-client { border-left: 3px solid var(--blue); }
+.msg-staff { border-left: 3px solid var(--gold); }
+.file-line { margin: 2px 0; }
+.badge-tk-open, .badge-tk-reopened, .badge-tk-assigned { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.5); }
+.badge-tk-in_progress, .badge-tk-triaged, .badge-tk-confirmed { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-tk-need_more_information, .badge-tk-awaiting_client_response, .badge-tk-client_verification, .badge-tk-awaiting_internal_team { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-tk-fixed, .badge-tk-resolved, .badge-tk-closed { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-tk-rejected, .badge-tk-unable_to_reproduce { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.badge-w-active { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-w-scheduled, .badge-w-pending_confirmation { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-w-expired, .badge-w-suspended { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.badge-w-not_applicable { color: var(--text-dim); }

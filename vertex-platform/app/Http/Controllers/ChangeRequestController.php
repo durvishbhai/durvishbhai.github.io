@@ -27,7 +27,7 @@ final class ChangeRequestController extends Controller
         $r = $this->page('pages/change-request', [
             'title' => $c['reference'], 'c' => $c, 'role' => $role, 'base' => $base,
             'canDecide' => $role === 'client' && $c['status'] === 'pending_client' && Gate::can('revisions.respond_cost', $uid) && (int) $c['revision_requested_by'] === $uid,
-            'canStaff' => $role === 'staff' && Gate::can('revisions.classify', $uid),
+            'canStaff' => $role === 'staff' && Gate::can($c['ticket_id'] !== null ? 'tickets.propose_change' : 'revisions.classify', $uid),
         ]);
         Session::forget('_old');
 

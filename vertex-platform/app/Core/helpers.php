@@ -110,6 +110,19 @@ if (!function_exists('local_time')) {
     }
 }
 
+if (!function_exists('local_date')) {
+    /** A calendar date (Y-m-d) for display. Dates are not instants, so no time zone conversion is applied. */
+    function local_date(?string $ymd, string $format = 'd M Y'): string
+    {
+        if ($ymd === null || $ymd === '') {
+            return '—';
+        }
+        $d = \DateTimeImmutable::createFromFormat('!Y-m-d', $ymd);
+
+        return $d === false ? $ymd : $d->format($format);
+    }
+}
+
 if (!function_exists('status_label')) {
     function status_label(string $status): string
     {

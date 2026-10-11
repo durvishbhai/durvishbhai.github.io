@@ -6,7 +6,8 @@ $url = '/changes/' . $c['public_id'];
 $v = static fn (string $k, string $d = ''): string => old($k, $d);
 ?>
 <div class="page-head"><div><p class="eyebrow">Additional work proposal</p><h1><?= e($c['reference']) ?></h1></div>
-    <?php if ($c['revision_public_id']) : ?><a class="btn btn-ghost" href="/revisions/<?= e($c['revision_public_id']) ?>">&larr; <?= e($c['revision_reference']) ?></a><?php endif; ?></div>
+    <?php if ($c['revision_public_id']) : ?><a class="btn btn-ghost" href="/revisions/<?= e($c['revision_public_id']) ?>">&larr; <?= e($c['revision_reference']) ?></a><?php endif; ?>
+    <?php if ($c['ticket_public_id']) : ?><a class="btn btn-ghost" href="/tickets/<?= e($c['ticket_public_id']) ?>">&larr; <?= e($c['ticket_reference']) ?></a><?php endif; ?></div>
 <div class="panel<?= $c['status'] === 'pending_client' ? ' panel-attention' : '' ?>">
     <p>Status: <span class="badge badge-pr-<?= e($c['status']) ?>"><?= e(status_label((string) $c['status'])) ?></span></p>
     <h2><?= e($c['title']) ?></h2>

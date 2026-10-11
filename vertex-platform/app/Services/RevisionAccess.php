@@ -124,8 +124,9 @@ final class RevisionAccess
 
         return Database::one(
             'SELECT c.*, p.public_id AS project_public_id, p.code AS project_code, p.title AS project_title, p.status AS project_status, p.archived_at AS project_archived_at,
-                    r.public_id AS revision_public_id, r.reference AS revision_reference, r.status AS revision_status, r.requested_by AS revision_requested_by, pu.name AS proposed_by_name
-               FROM change_requests c JOIN projects p ON p.id = c.project_id LEFT JOIN revision_requests r ON r.id = c.revision_request_id LEFT JOIN users pu ON pu.id = c.proposed_by
+                    r.public_id AS revision_public_id, r.reference AS revision_reference, r.status AS revision_status, COALESCE(r.requested_by, t.requester_id) AS revision_requested_by, pu.name AS proposed_by_name,
+                    t.public_id AS ticket_public_id, t.reference AS ticket_reference
+               FROM change_requests c JOIN projects p ON p.id = c.project_id LEFT JOIN revision_requests r ON r.id = c.revision_request_id LEFT JOIN tickets t ON t.id = c.ticket_id LEFT JOIN users pu ON pu.id = c.proposed_by
               WHERE c.public_id = ?',
             [$publicId],
         );
@@ -145,6 +146,15 @@ final class RevisionAccess
             return null;
         }
         $level = ProjectPolicy::level($userId, $project);
+        if ($c['ticket_id'] !== null) { // a proposal for a chargeable BUG follows the ticket's access rules, not the revision rules
+            $t = TicketAccess::findById((int) $c['ticket_id']);
+            $role = $t === null ? null : TicketAccess::role($userId, $t);
+            if ($role === 'staff' && Gate::can('tickets.propose_change', $userId)) {
+                return 'staff';
+            }
+
+            return $role === 'client' && $c['status'] !== 'draft' && Gate::can('revisions.respond_cost', $userId) && (int) $t['requester_id'] === $userId ? 'client' : null;
+        }
         if (in_array($level, ['all', 'assigned'], true) && Gate::can('revisions.manage', $userId)) {
             return 'staff';
         }

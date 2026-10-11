@@ -69,7 +69,7 @@ abstract class DatabaseTestCase extends TestCase
             }
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['notifications', 'client_approvals', 'revision_status_history', 'revision_notes', 'revision_files', 'change_requests', 'revision_requests', 'revision_policies',
+        foreach (['ticket_reads', 'ticket_activity', 'ticket_files', 'ticket_notes', 'ticket_messages', 'bug_reports', 'tickets', 'warranty_history', 'project_warranties', 'warranty_terms', 'notifications', 'client_approvals', 'revision_status_history', 'revision_notes', 'revision_files', 'change_requests', 'revision_requests', 'revision_policies',
             'deliverable_reviews', 'deliverable_versions', 'deliverables', 'stored_files', 'price_change_requests', 'price_revisions', 'task_time_entries', 'task_comments', 'task_dependencies', 'tasks', 'milestones', 'project_notes', 'project_activity', 'enquiry_followups', 'enquiry_activity', 'attachments', 'enquiries', 'client_notes', 'project_assignments', 'projects', 'referrals', 'clients', 'reference_sequences', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
             $pdo->exec("TRUNCATE TABLE {$t}");
         }

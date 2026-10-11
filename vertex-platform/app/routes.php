@@ -29,6 +29,9 @@ use Vertex\Http\Controllers\ChangeRequestController;
 use Vertex\Http\Controllers\RevisionController;
 use Vertex\Http\Controllers\DeliverableController;
 use Vertex\Http\Controllers\TeamController;
+use Vertex\Http\Controllers\SupportController;
+use Vertex\Http\Controllers\TicketController;
+use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
 
 /*
@@ -132,6 +135,34 @@ return static function (Router $router): void {
     $router->post('/revisions/{revision}/notes', [RevisionController::class, 'note'], ['auth', 'can:revisions.manage']);
     $router->post('/revisions/{revision}/response', [RevisionController::class, 'response'], ['auth', 'can:revisions.manage']);
     $router->get('/revisions/{revision}/files/{file}', [RevisionController::class, 'file'], ['auth', 'can:revisions.manage,revisions.request']);
+    // Support Centre: bug reports, support tickets, warranty (Phase 5). `can:` is the first gate only; TicketAccess decides per ticket (404).
+    $tk = ['auth', 'can:tickets.view_own,tickets.view_all,tickets.view_assigned,tickets.view_technical'];
+    $router->get('/support', [SupportController::class, 'home'], ['auth', 'can:tickets.view_own,support.dashboard']);
+    $router->get('/support/bugs/new', [SupportController::class, 'bugForm'], ['auth', 'can:bugs.report']);
+    $router->post('/support/bugs', [SupportController::class, 'bugStore'], ['auth', 'can:bugs.report']);
+    $router->get('/support/tickets/new', [SupportController::class, 'ticketForm'], ['auth', 'can:tickets.create']);
+    $router->post('/support/tickets', [SupportController::class, 'ticketStore'], ['auth', 'can:tickets.create']);
+    $router->get('/support/warranty', [SupportController::class, 'warranty'], ['auth', 'can:warranty.view_own']);
+    $router->get('/support/dashboard', [TicketController::class, 'dashboard'], ['auth', 'can:support.dashboard']);
+    $router->get('/tickets', [TicketController::class, 'index'], $tk);
+    $router->get('/tickets/{ticket}', [TicketController::class, 'show'], $tk);
+    $router->post('/tickets/{ticket}/draft', [TicketController::class, 'draft'], ['auth', 'can:bugs.report']);
+    $router->post('/tickets/{ticket}/reply', [TicketController::class, 'reply'], ['auth', 'can:tickets.reply_own,tickets.reply']);
+    $router->post('/tickets/{ticket}/status', [TicketController::class, 'status'], $tk);
+    $router->post('/tickets/{ticket}/assign', [TicketController::class, 'assign'], ['auth', 'can:tickets.assign']);
+    $router->post('/tickets/{ticket}/severity', [TicketController::class, 'severity'], ['auth', 'can:bugs.manage']);
+    $router->post('/tickets/{ticket}/priority', [TicketController::class, 'priority'], ['auth', 'can:bugs.manage,tickets.update_status']);
+    $router->post('/tickets/{ticket}/escalate', [TicketController::class, 'escalate'], ['auth', 'can:tickets.escalate']);
+    $router->post('/tickets/{ticket}/notes', [TicketController::class, 'note'], ['auth', 'can:tickets.note']);
+    $router->post('/tickets/{ticket}/eligibility', [TicketController::class, 'eligibility'], ['auth', 'can:bugs.review_eligibility']);
+    $router->post('/tickets/{ticket}/propose-change', [TicketController::class, 'proposeChange'], ['auth', 'can:tickets.propose_change']);
+    $router->get('/tickets/{ticket}/files/{file}', [TicketController::class, 'file'], $tk);
+    $router->get('/warranties', [WarrantyController::class, 'report'], ['auth', 'can:warranty.view']);
+    $router->post('/warranties/terms', [WarrantyController::class, 'saveTerms'], ['auth', 'can:warranty.manage']);
+    $router->get('/projects/{project}/warranty', [WarrantyController::class, 'project'], ['auth', 'can:warranty.view,warranty.view_own', 'project']);
+    $router->post('/projects/{project}/warranty', [WarrantyController::class, 'save'], ['auth', 'can:warranty.manage', 'project']);
+    $router->post('/projects/{project}/warranty/suspend', [WarrantyController::class, 'suspend'], ['auth', 'can:warranty.manage', 'project']);
+
     $router->get('/changes/{change}', [ChangeRequestController::class, 'show'], ['auth', 'can:revisions.manage,revisions.respond_cost']);
     $router->post('/changes/{change}', [ChangeRequestController::class, 'update'], ['auth', 'can:revisions.classify']);
     $router->post('/changes/{change}/send', [ChangeRequestController::class, 'send'], ['auth', 'can:revisions.classify']);

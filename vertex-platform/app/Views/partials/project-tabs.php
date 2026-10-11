@@ -19,6 +19,9 @@ $tabs['timeline'] = [$base . '/timeline', 'Timeline'];
 if (\Vertex\Services\PriceChangeService::canView($uid, $project)) {
     $tabs['pricing'] = [$base . '/pricing', 'Pricing'];
 }
+if (($staff && Gate::can('warranty.view', $uid)) || ($level === 'own' && Gate::can('warranty.view_own', $uid))) {
+    $tabs['warranty'] = [$base . '/warranty', 'Warranty'];
+}
 ?>
 <nav class="tabs" aria-label="Project sections">
     <?php foreach ($tabs as $key => [$href, $label]) : ?>
