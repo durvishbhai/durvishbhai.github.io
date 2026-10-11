@@ -21,10 +21,9 @@
 
 ## Known gaps (tracked, not hidden)
 
-- No 2FA, password reset, email verification or password-strength policy beyond length ≥ 12 in the console admin command (Phase 1).
-- Anonymous visits create a session file (the public pages start the session). Phase 1: start sessions lazily for authenticated/form routes only, to avoid session-file growth on shared hosting.
+- No 2FA. (Password reset, email verification, password policy and lazy sessions were added in Phase 1.)
 - `audit_logs` hash chain detects tampering but cannot *prevent* a DB-privileged attacker from rewriting the entire chain; mitigate with periodic off-server export of the latest hash (Phase 9).
-- Rate limiting covers login only; add for password reset, contact/referral forms, chat, uploads (Phase 1+).
+- Rate limiting now covers login, step-up password checks, registration, password reset and verification resend; still to add: contact/referral forms, chat, uploads.
 - Not tested on a real Hostinger account (PHP selector, `.htaccess` behaviour under LiteSpeed, file permissions).
 - No SAST/dependency scanning pipeline yet (`composer audit` is available; add to CI).
 

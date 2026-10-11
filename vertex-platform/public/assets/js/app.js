@@ -20,6 +20,15 @@
         });
     }
 
+    // Confirmation dialogs for sensitive forms. Progressive enhancement ONLY: the server independently requires the
+    // actor's password for every sensitive action, so disabling JS does not bypass anything.
+    document.addEventListener('submit', function (e) {
+        var msg = e.target && e.target.getAttribute && e.target.getAttribute('data-confirm');
+        if (msg && !window.confirm(msg)) {
+            e.preventDefault();
+        }
+    });
+
     // Scroll reveal (content stays visible if IntersectionObserver is unavailable)
     var items = document.querySelectorAll('.reveal');
     if (!('IntersectionObserver' in window)) {

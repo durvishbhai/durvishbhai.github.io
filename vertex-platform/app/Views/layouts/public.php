@@ -17,7 +17,10 @@ $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name
 <body class="site">
 <a class="skip-link" href="#main">Skip to content</a>
 <?= \Vertex\Core\View::partial('site-header') ?>
-<main id="main"><?= $content ?></main>
+<main id="main">
+    <div class="container flash-wrap"><?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?></div>
+    <?= $content ?>
+</main>
 <?= \Vertex\Core\View::partial('site-footer') ?>
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </body>

@@ -64,8 +64,11 @@ Any Throwable → ErrorHandler: logged with a reference id; users see a generic 
 - **Payout request:** `REQUESTED → APPROVED | REJECTED → PAID` (Admin records manual payment details). Separate from client payments.
 - **Renewal:** `UPCOMING → ADMIN_APPROVAL_PENDING → APPROVED → INVOICED → PAID → RENEWED`; `RENEWED` requires a provider-confirmation record (reference + who recorded it).
 
+## Phase 1 additions
+User/Role/Project services (`UserService`, `RoleService`, `ProjectPolicy`, `ProjectAssignmentService`), `TokenService`, `RateLimiter`, `Mailer` (PHPMailer), controller base with step-up confirmation, `project`/`can`/`auth`/`guest`/`nosession` route middleware, lazy sessions for anonymous visitors. See `09-PHASE1-ACCOUNTS-RBAC.md`.
+
 ## Phase 0 implementation status
 
 Implemented and tested: config/env, PDO, error handling, router + middleware, sessions, CSRF, validation, views/layout/branding, auth (login/logout/throttle), RBAC (roles, permissions, gate, route guard), audit hash chain, migrations, console, health endpoint.
 
-**Not implemented (do not treat as done):** user management UI, password reset, email, 2FA, CMS, projects, pricing, quotations, invoices, payments, payouts, referrals, chat, warranty, appointments, renewals, legal pages, cookie consent, backups, reports.
+**Not implemented as of Phase 0 (users, reset, email were delivered in Phase 1):** user management UI, password reset, email, 2FA, CMS, projects, pricing, quotations, invoices, payments, payouts, referrals, chat, warranty, appointments, renewals, legal pages, cookie consent, backups, reports.

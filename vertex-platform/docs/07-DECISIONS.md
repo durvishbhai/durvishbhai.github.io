@@ -27,6 +27,19 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-19 | Language(s), time zone for display (currently Asia/Kolkata), working hours for appointments | Appointments, notifications | Phase 7 |
 | D-20 | Who are the first Admin(s)? Admin must have 2FA from day one? | Bootstrap & policy | Phase 1 |
 
+## Decisions taken in Phase 1 (please confirm or change)
+
+| ID | Decision I made | Why / how to change |
+|---|---|---|
+| D-21 | The brief's "Manager / Salaried Staff" is **one** role (Phase 0 had separate Manager and Staff; merged by migration). | Matches the 10-role list. Splitting again is a config + migration change. |
+| D-22 | Phase 0 `admin` became **Super Admin / Owner**; **Administrator** is a new, lower role that cannot change sensitive grants, settings, other Administrators or the Owner. | "Only explicitly authorized administrators may ... change sensitive permissions." Adjust defaults in `config/permissions.php` or in the role editor. |
+| D-23 | The Owner role can only be created from the console; Administrators can only be created by the Owner. | Prevents privilege minting via the UI. |
+| D-24 | Public registration creates **clients only**, is **off by default**, and requires working email. | Who may self-register is a business decision (D-18). |
+| D-25 | Staff accounts are invited by email (they set their own password); admins never choose or see passwords. If email is not configured, use `user:set-password`. | Security; needs SMTP (D-03). |
+| D-26 | Finance Staff default = view finance, view all invoices/payments/payouts/commissions, draft/edit invoices, **record** payments; **no** approvals, issuing/voiding, or project access. | Edit in the role editor (sensitive items need the Owner). |
+| D-27 | Roles that require a phone number: Client, Freelancer, Video Editor, Website Developer, Referral Partner. | `phone_required` in config. |
+| D-28 | Step-up: re-entering your own password is required for role changes, permission changes, deactivation/reactivation and archiving. | Server-enforced. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

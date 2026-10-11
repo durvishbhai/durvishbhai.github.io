@@ -47,7 +47,7 @@ final class Session
         $uaHash = hash('sha256', $request->userAgent());
         if (isset($_SESSION['_meta'])) {
             $m = $_SESSION['_meta'];
-            $idle = ((int) ($cfg['idle_minutes'] ?? 60)) * 60;
+            $idle = $cfg['idle_seconds'] ?? ((int) ($cfg['idle_minutes'] ?? 60)) * 60;
             $abs = ((int) ($cfg['absolute_minutes'] ?? 720)) * 60;
             if ($now - $m['last'] > $idle || $now - $m['created'] > $abs || !hash_equals($m['ua'], $uaHash)) {
                 self::destroy();

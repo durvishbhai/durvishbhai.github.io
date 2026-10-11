@@ -6,7 +6,6 @@ namespace Vertex\Services;
 
 use Vertex\Core\Config;
 use Vertex\Core\Csrf;
-use Vertex\Core\Database;
 use Vertex\Core\Request;
 use Vertex\Core\Session;
 use Vertex\Repositories\UserRepository;
@@ -15,7 +14,9 @@ use Vertex\Repositories\UserRepository;
  * Session authentication.
  *  - Passwords: password_hash(PASSWORD_DEFAULT) (bcrypt/argon2 as supported), transparently rehashed on login.
  *  - Throttling per email+IP and per IP; generic failure message (no account enumeration; dummy hash on unknown email).
- *  - Session is bound to the current password hash via HMAC, so changing a password invalidates other sessions.
+ *  - The session is bound to HMAC(password_hash | session_version). A password change, deactivation, archive or any
+ *    session_version bump invalidates every existing session on the very next request.
+ *  - Account status is re-read from the database on every request, so deactivation is immediate.
  *  - Session ID and CSRF token are regenerated on login and logout.
  */
 final class Auth
@@ -24,6 +25,7 @@ final class Auth
     public const INVALID = 'invalid';
     public const LOCKED = 'locked';
     public const INACTIVE = 'inactive';
+    public const PENDING = 'pending';
 
     /** @var array<string,mixed>|null|false false = not resolved yet */
     private static array|null|false $user = false;
@@ -48,7 +50,7 @@ final class Auth
             return self::$user = null;
         }
         $user = (new UserRepository())->findById($id);
-        if ($user === null || $user['status'] !== 'active' || !hash_equals(self::fingerprint((string) $user['password_hash']), (string) Session::get('auth_fp', ''))) {
+        if ($user === null || $user['status'] !== 'active' || !hash_equals(self::fingerprint($user), (string) Session::get('auth_fp', ''))) {
             self::forget();
 
             return self::$user = null;
@@ -57,7 +59,7 @@ final class Auth
         return self::$user = $user;
     }
 
-    /** @return self::OK|self::INVALID|self::LOCKED|self::INACTIVE */
+    /** @return self::OK|self::INVALID|self::LOCKED|self::INACTIVE|self::PENDING */
     public static function attempt(string $email, string $password, Request $request): string
     {
         $email = mb_strtolower(trim($email));
@@ -84,9 +86,9 @@ final class Auth
         }
         if ($user['status'] !== 'active') {
             $throttle->record($email, $ip, false);
-            Audit::record('auth.login.inactive', 'user', (int) $user['id'], [], [], ['status' => $user['status']], null, $ip, $request->userAgent());
+            Audit::record('auth.login.blocked', 'user', (int) $user['id'], [], [], ['status' => $user['status']], null, $ip, $request->userAgent());
 
-            return self::INACTIVE;
+            return $user['status'] === 'pending' ? self::PENDING : self::INACTIVE;
         }
 
         if (password_needs_rehash((string) $user['password_hash'], PASSWORD_DEFAULT)) {
@@ -108,9 +110,46 @@ final class Auth
         Session::regenerate();
         Csrf::rotate();
         Session::put('auth_user_id', (int) $user['id']);
-        Session::put('auth_fp', self::fingerprint((string) $user['password_hash']));
+        Session::put('auth_fp', self::fingerprint($user));
         self::$user = $user;
         Gate::flush();
+    }
+
+    /** Re-binds the current session after the user's own password change (their other sessions stay invalid). */
+    public static function refresh(): void
+    {
+        $id = Session::get('auth_user_id');
+        if (is_int($id)) {
+            $user = (new UserRepository())->findById($id);
+            if ($user !== null) {
+                Session::regenerate();
+                Session::put('auth_fp', self::fingerprint($user));
+                self::$user = $user;
+            }
+        }
+    }
+
+    /**
+     * Step-up check for sensitive actions: is $password the current password of $userId?
+     * Rate limited (5 / 10 min per user); failures are audited. The password is never logged.
+     */
+    public static function verifyPassword(int $userId, string $password): bool
+    {
+        if (RateLimiter::tooMany('stepup_user', (string) $userId)) {
+            Audit::record('auth.stepup.locked', 'user', $userId, [], [], [], $userId);
+
+            return false;
+        }
+        $user = (new UserRepository())->findById($userId);
+        $ok = $user !== null && password_verify($password, (string) $user['password_hash']);
+        if (!$ok) {
+            RateLimiter::hit('stepup_user', (string) $userId);
+            Audit::record('auth.stepup.failed', 'user', $userId, [], [], [], $userId);
+        } else {
+            RateLimiter::clear('stepup_user', (string) $userId);
+        }
+
+        return $ok;
     }
 
     public static function logout(): void
@@ -135,13 +174,14 @@ final class Auth
         self::$user = null;
     }
 
-    private static function fingerprint(string $passwordHash): string
+    /** @param array<string,mixed> $user */
+    private static function fingerprint(array $user): string
     {
         $key = (string) Config::get('app.key', '');
         if ($key === '') {
             throw new \RuntimeException('APP_KEY is not set. Run: php bin/console.php key:generate');
         }
 
-        return hash_hmac('sha256', $passwordHash, $key);
+        return hash_hmac('sha256', $user['password_hash'] . '|' . $user['session_version'], $key);
     }
 }

@@ -102,6 +102,13 @@ final class Request
         return $remote;
     }
 
+    public function cookie(string $name): ?string
+    {
+        $v = $_COOKIE[$name] ?? null;
+
+        return is_string($v) ? $v : null;
+    }
+
     public function userAgent(): string
     {
         return substr((string) ($this->server['HTTP_USER_AGENT'] ?? ''), 0, 255);

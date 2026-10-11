@@ -77,3 +77,35 @@ if (!function_exists('uuid_hex')) {
         return bin2hex(random_bytes(16));
     }
 }
+
+if (!function_exists('can')) {
+    /** Template convenience only. The server re-checks every action; hiding a link is not security. */
+    function can(string $permission): bool
+    {
+        return \Vertex\Services\Gate::can($permission);
+    }
+}
+
+if (!function_exists('local_time')) {
+    /** Formats a UTC database timestamp in the signed-in user's time zone (falls back to the app time zone). */
+    function local_time(?string $utc, string $format = 'd M Y, H:i'): string
+    {
+        if ($utc === null || $utc === '') {
+            return '—';
+        }
+        $user = \Vertex\Services\Auth::user();
+        $tz = (string) ($user['timezone'] ?? '') ?: (string) config('app.timezone', 'UTC');
+        try {
+            return (new \DateTimeImmutable($utc, new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone($tz))->format($format);
+        } catch (\Exception) {
+            return $utc . ' UTC';
+        }
+    }
+}
+
+if (!function_exists('status_label')) {
+    function status_label(string $status): string
+    {
+        return ucfirst(str_replace('_', ' ', $status));
+    }
+}

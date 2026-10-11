@@ -11,7 +11,8 @@
         "ext-mbstring": "*",
         "ext-openssl": "*",
         "ext-pdo": "*",
-        "ext-pdo_mysql": "*"
+        "ext-pdo_mysql": "*",
+        "phpmailer/phpmailer": "^6.9"
     },
     "require-dev": {
         "phpunit/phpunit": "^11.0"

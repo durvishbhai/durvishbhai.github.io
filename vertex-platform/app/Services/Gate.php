@@ -8,16 +8,19 @@ use Vertex\Core\Database;
 use Vertex\Core\HttpException;
 
 /**
- * Authorization by permission key. A user's permissions are the union of the permissions of the roles they hold.
- * There is no super-user bypass: Admin passes only because the permission is explicitly granted to Admin.
+ * Authorization by permission key. A user's permissions are the union of the permissions of the roles they hold,
+ * read from the database on every request (so role/permission changes and deactivation apply immediately).
+ * There is no super-user bypass: Super Admin passes only because every permission is explicitly granted to it.
  *
- * Row-level rules ("is this user assigned to THIS project?") are NOT answered here; they live in per-module policy
- * classes (Phase 2+) and must be called in addition to Gate::can() for any scoped permission.
+ * Row-level rules ("is this user assigned to THIS project?") are not answered here; see ProjectPolicy.
  */
 final class Gate
 {
     /** @var array<int,array<string,true>> */
     private static array $cache = [];
+
+    /** @var array<int,int> */
+    private static array $levels = [];
 
     public static function can(string $permission, ?int $userId = null): bool
     {
@@ -66,6 +69,20 @@ final class Gate
         return array_map(static fn (array $r): string => (string) $r['slug'], $rows);
     }
 
+    /** Highest role level the user holds (0 = no role). */
+    public static function level(int $userId): int
+    {
+        if (!isset(self::$levels[$userId])) {
+            $row = Database::one(
+                'SELECT COALESCE(MAX(r.level), 0) AS lvl FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = ?',
+                [$userId],
+            );
+            self::$levels[$userId] = (int) $row['lvl'];
+        }
+
+        return self::$levels[$userId];
+    }
+
     /** @return array<string,true> */
     public static function permissionsFor(int $userId): array
     {
@@ -91,5 +108,6 @@ final class Gate
     public static function flush(): void
     {
         self::$cache = [];
+        self::$levels = [];
     }
 }

@@ -9,9 +9,11 @@ declare(strict_types=1);
  *   key:generate              Print a new APP_KEY (paste into .env)
  *   migrate                   Apply pending database migrations
  *   migrate:status            List migrations and detect drift
- *   permissions:sync          Sync roles/permissions from config/permissions.php into the database
+ *   permissions:sync          Add new permissions/roles from config; keeps UI edits. Add --reset-roles to restore config defaults
  *   permissions:matrix        Print the role/permission matrix as Markdown (generated from config; no DB needed)
- *   user:create-admin         Create the first Admin (--email=, --name=; password is prompted, never an argument)
+ *   user:create-super-admin   Create the first Super Admin/Owner (--email=, --name=; password is prompted, never an argument)
+ *   user:set-password         Set a user's password and activate a pending account (--email=; prompted)
+ *   db:seed-dev               Insert FICTIONAL development data (APP_ENV=local only; prints a generated password once)
  *   audit:verify              Verify the audit-log hash chain
  */
 
@@ -25,6 +27,8 @@ use Vertex\Core\Config;
 use Vertex\Core\Database;
 use Vertex\Repositories\UserRepository;
 use Vertex\Services\Audit;
+use Vertex\Services\DevSeeder;
+use Vertex\Services\PasswordPolicy;
 use Vertex\Services\Migrator;
 use Vertex\Services\PermissionSync;
 
@@ -110,8 +114,15 @@ switch ($command) {
         break;
 
     case 'permissions:sync':
-        $r = PermissionSync::run();
-        out("Synced {$r['roles']} roles, {$r['permissions']} permissions, {$r['grants']} grants.");
+        $reset = in_array('--reset-roles', $argv, true);
+        if ($reset) {
+            fwrite(STDOUT, "This restores the config default grants for every non-locked system role, discarding edits made in the admin UI.\nType RESET to continue: ");
+            if (trim((string) fgets(STDIN)) !== 'RESET') {
+                fail('Aborted.');
+            }
+        }
+        $r = PermissionSync::run($reset);
+        out("Synced {$r['roles']} roles, {$r['permissions']} permissions ({$r['new_permissions']} new), {$r['grants']} grants in total." . ($reset ? ' Role defaults restored.' : ''));
         break;
 
     case 'permissions:matrix':
@@ -128,26 +139,65 @@ switch ($command) {
         }
         break;
 
-    case 'user:create-admin':
+    case 'user:create-super-admin':
+    case 'user:create-admin': // Phase 0 name, kept as an alias
         $email = mb_strtolower(trim($options['email'] ?? ''));
         $name = trim($options['name'] ?? '');
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '') {
-            fail('Usage: php bin/console.php user:create-admin --email=you@example.com --name="Full Name"');
+            fail('Usage: php bin/console.php user:create-super-admin --email=you@example.com --name="Full Name"');
         }
         $repo = new UserRepository();
         if ($repo->findByEmail($email) !== null) {
             fail("A user with {$email} already exists.");
         }
+        $existing = (int) Database::one("SELECT COUNT(*) AS c FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE r.slug = 'super_admin'")['c'];
+        if ($existing > 0 && !in_array('--additional', $argv, true)) {
+            fail('A Super Admin already exists. Pass --additional only if you really need another owner account.');
+        }
         $password = prompt_hidden('Password (min 12 chars): ');
-        if (mb_strlen($password) < 12) {
-            fail('Password must be at least 12 characters.');
+        $problems = PasswordPolicy::check($password, $email, $name);
+        if ($problems !== []) {
+            fail(implode("\n", $problems));
         }
         if (!hash_equals($password, prompt_hidden('Repeat password: '))) {
             fail('Passwords do not match.');
         }
-        $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), 'active', ['admin']);
-        Audit::record('user.created', 'user', $id, [], ['email' => $email, 'roles' => ['admin']], ['via' => 'console'], null, 'cli');
-        out("Admin created (id {$id}).");
+        $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), 'active', ['super_admin'], null, null, true);
+        Audit::record('user.created', 'user', $id, [], ['email' => $email, 'roles' => ['super_admin'], 'status' => 'active'], ['via' => 'console'], null, 'cli');
+        out("Super Admin created (id {$id}). Sign in, then change nothing else here: manage everyone else in the admin UI.");
+        break;
+
+    case 'user:set-password':
+        $email = mb_strtolower(trim($options['email'] ?? ''));
+        $repo = new UserRepository();
+        $user = $repo->findByEmail($email);
+        if ($user === null) {
+            fail('No user with that email.');
+        }
+        if (in_array($user['status'], ['deactivated', 'archived'], true)) {
+            fail("Account is {$user['status']}; reactivate it in the admin UI first.");
+        }
+        $password = prompt_hidden('New password (min 12 chars): ');
+        $problems = PasswordPolicy::check($password, $email, (string) $user['name']);
+        if ($problems !== []) {
+            fail(implode("\n", $problems));
+        }
+        if (!hash_equals($password, prompt_hidden('Repeat password: '))) {
+            fail('Passwords do not match.');
+        }
+        Database::transaction(static function () use ($repo, $user, $password): void {
+            $repo->setPassword((int) $user['id'], password_hash($password, PASSWORD_DEFAULT));
+            Database::run("UPDATE users SET status = IF(status = 'pending', 'active', status) WHERE id = ?", [$user['id']]);
+            Audit::record('user.password_set_console', 'user', (int) $user['id'], [], [], ['via' => 'console'], null, 'cli');
+        });
+        out('Password set; all existing sessions for this user were signed out.');
+        break;
+
+    case 'db:seed-dev':
+        $r = DevSeeder::run();
+        out("Seeded fictional data: {$r['created']} users, {$r['projects']} projects (existing rows were left alone).");
+        out('All seeded users are @example.test and share this one-time password (not stored anywhere):');
+        out('  ' . $r['password']);
         break;
 
     case 'audit:verify':

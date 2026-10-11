@@ -1,24 +1,25 @@
 # Vertex Integrated Solutions — platform
 
-Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phase 0 — foundation only.** See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
+Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phase 1 — foundation + accounts, RBAC, project-access model, audit, admin UI.** Business modules (projects CRUD, pricing, billing, payments, payouts, ...) are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
 
 > This folder lives inside a GitHub Pages repository only so the existing site (`../index.html`, `../CNAME`) stays untouched. Read `docs/01-INSPECTION.md` (exposure risk) before deploying; a private repository is recommended.
 
 ## Requirements
 
-PHP ≥ 8.2 with `pdo_mysql`, `mbstring`, `openssl`, `json`, `ctype`, `fileinfo`; MySQL 8 / MariaDB 10.6+; Composer (dev tooling only). Later phases add `gd`, `intl`, `zip`, `curl`.
+PHP ≥ 8.2 with `pdo_mysql`, `mbstring`, `openssl`, `json`, `ctype`, `fileinfo`; MySQL 8 / MariaDB 10.6+; Composer (PHPMailer is a runtime dependency since Phase 1: upload `vendor/` if the host has no Composer; PHPUnit is dev only). Later phases add `gd`, `intl`, `zip`, `curl`.
 
 ## Local setup
 
 ```bash
 cd vertex-platform
-composer install                       # installs PHPUnit (dev only); the app has no runtime packages
+composer install                       # PHPMailer (runtime) + PHPUnit (dev)
 cp .env.example .env                   # then edit: DB_*, APP_URL, APP_ENV=local, APP_DEBUG=true
 php bin/console.php key:generate       # paste the APP_KEY line into .env
 php bin/console.php doctor             # checks PHP, extensions, folders, config, DB
 php bin/console.php migrate
 php bin/console.php permissions:sync
-php bin/console.php user:create-admin --email=you@example.com --name="Your Name"   # prompts for password
+php bin/console.php user:create-super-admin --email=you@example.com --name="Your Name"   # hidden password prompt
+php bin/console.php db:seed-dev        # optional, APP_ENV=local only: fictional users/projects (prints a one-time password)
 composer serve                         # http://127.0.0.1:8000  (development server only)
 ```
 
@@ -34,7 +35,7 @@ Integration tests drop every table in the configured test database and refuse an
 
 ## Console
 
-`php bin/console.php help` — `doctor`, `key:generate`, `migrate`, `migrate:status`, `permissions:sync`, `permissions:matrix`, `user:create-admin`, `audit:verify`.
+`php bin/console.php help` — `doctor`, `key:generate`, `migrate`, `migrate:status`, `permissions:sync [--reset-roles]`, `permissions:matrix`, `user:create-super-admin`, `user:set-password`, `db:seed-dev`, `audit:verify`.
 
 ## Documentation
 
@@ -48,6 +49,7 @@ Integration tests drop every table in the configured test database and refuse an
 | `docs/06-SECURITY-AND-TESTING.md` | Security controls, gaps, test strategy |
 | `docs/07-DECISIONS.md` | Unresolved business decisions and integrations |
 | `docs/08-DEPLOYMENT.md` | Hostinger/cPanel deployment |
+| `docs/09-PHASE1-ACCOUNTS-RBAC.md` | Phase 1: migrations, env vars, first Super Admin, rollback, test results, gaps |
 
 ## Conventions
 

@@ -87,7 +87,8 @@ final class Router
                 continue;
             }
             $params = array_filter($m, 'is_string', ARRAY_FILTER_USE_KEY);
-            $request->attributes['route'] = ['pattern' => $route['pattern'], 'csrf' => $route['csrf']];
+            $request->attributes['route'] = ['pattern' => $route['pattern'], 'csrf' => $route['csrf'], 'middleware' => $route['middleware']];
+            $request->attributes['params'] = $params;
 
             $pipeline = array_merge($this->global, $this->resolve($route['middleware']));
             $core = fn (Request $r): Response => $this->invoke($route['handler'], $r, $params);

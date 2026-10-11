@@ -11,7 +11,7 @@ use Vertex\Core\Validator;
 use Vertex\Core\View;
 use Vertex\Services\Auth;
 
-final class AuthController
+final class AuthController extends Controller
 {
     /** @param array<string,string> $params */
     public function showLogin(Request $request, array $params = []): Response
@@ -19,6 +19,7 @@ final class AuthController
         $html = View::render('pages/login', [
             'title' => 'Sign in',
             'errors' => Session::pullFlash('errors', []),
+            'notice' => Session::pullFlash('notice'),
         ]);
         Session::forget('_old');
 
@@ -30,16 +31,19 @@ final class AuthController
     {
         $v = Validator::make($request->body, ['email' => 'required|email', 'password' => 'required|max:200']);
         if ($v->fails()) {
-            return $this->back($request->string('email'), ['Enter your email address and password.']);
+            return $this->back('/login', ['Enter your email address and password.'], ['email' => $request->string('email')]);
         }
 
         $result = Auth::attempt((string) $v->validated()['email'], (string) $request->body['password'], $request);
+        $old = ['email' => $request->string('email')];
 
         return match ($result) {
             Auth::OK => Response::redirect($this->intended()),
-            Auth::LOCKED => $this->back($request->string('email'), ['Too many failed attempts. Please wait a few minutes and try again.']),
-            // Same message for wrong password, unknown email and suspended account: no account enumeration.
-            default => $this->back($request->string('email'), ['Those credentials did not work.']),
+            Auth::LOCKED => $this->back('/login', ['Too many failed attempts. Please wait a few minutes and try again.'], $old),
+            // Only reached after the correct password was supplied, so this does not reveal accounts to guessers.
+            Auth::PENDING => $this->back('/login', ['Your account is not active yet. Confirm your email address using the link we sent you, or ask an administrator.'], $old),
+            // Same message for wrong password and unknown email: no account enumeration.
+            default => $this->back('/login', ['Those credentials did not work.'], $old),
         };
     }
 
@@ -47,15 +51,6 @@ final class AuthController
     public function logout(Request $request, array $params = []): Response
     {
         Auth::logout();
-
-        return Response::redirect('/login');
-    }
-
-    /** @param list<string> $errors */
-    private function back(string $email, array $errors): Response
-    {
-        Session::flash('errors', $errors);
-        Session::put('_old', ['email' => $email]);
 
         return Response::redirect('/login');
     }
