@@ -55,6 +55,20 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-37 | A reviewer cannot approve their own task; tasks default to "needs review". Reasons are mandatory for Blocked/Changes Requested. | `config/workflow.php` (`task_transitions`). |
 | D-38 | Public forms use CSRF + honeypot + per-IP rate limit + explicit consent; no CAPTCHA. If spam becomes a problem add one (needs a provider choice). | Open. |
 
+## Decisions taken in Phase 3 (please confirm or change)
+
+| ID | Decision I made | Why / how to change |
+|---|---|---|
+| D-39 | **No revision allowance is assumed.** Revision policies ship empty; staff classify manually with a reason. A numeric allowance, when entered, is enforced only as "contradicting it needs an administrator override". | The brief forbids inventing a universal allowance. `/admin/revision-policies`. |
+| D-40 | The uploader **cannot approve their own upload internally** (QA needs a second person). Switch with `DELIVERABLE_ALLOW_SELF_APPROVAL=true` for very small teams. | Separation of duties. |
+| D-41 | Workers may upload drafts and see drafts on their projects, but **cannot** review, publish, withdraw or archive. Managers review/archive/classify; administrators publish too (managers also hold publish from Phase 0 defaults). | Role editor. |
+| D-42 | Clients see **only published** versions; an earlier published version stays visible/downloadable as history; withdrawn versions disappear. "Awaiting internal review" is **not** shown to clients (it would reveal unpublished work). | Brief item 6 vs item 3 conflict resolved in favour of not leaking drafts. |
+| D-43 | A client approval is per exact version, **final** once given; after a rejection they may still approve later. A client can still file a revision request on an approved version. | Say if approved versions should be locked against revision requests. |
+| D-44 | **Change requests do not modify `price_revisions` or the approved baseline.** An approved change request is consent only; Phase 4 turns it into a quotation revision/invoice. | Keeps the original approved price untouched and avoids inventing invoicing rules. |
+| D-45 | Chargeable proposals can only be sent by classifiers (`revisions.classify`); only the client decides; declining returns the revision to Potentially Chargeable; reductions/credits are not modelled. | `config/workflow.php`. |
+| D-46 | Files are **download-only** (`attachment`); no inline preview or streaming. 50 MB default limit (configurable), zip allowed as "source files" and never extracted. | Security first; add previews later behind a sandbox/CDN decision. |
+| D-47 | Notifications are in-app only; the dedupe key makes retries safe. Email delivery needs D-03 (SMTP). | |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

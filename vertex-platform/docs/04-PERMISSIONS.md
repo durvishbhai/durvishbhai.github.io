@@ -21,6 +21,8 @@ Generated from `config/permissions.php` with `php bin/console.php permissions:ma
 12. **The client decides price changes.** `pricing.respond_change` is held by the Client role only; no staff role (including Administrator) can approve a priority price change on a client's behalf.
 13. **Workers see no money**: no `pricing.*`, no budget, no internal project notes (`projects.notes_internal`) by default. Grant them in the role editor if the business wants it.
 
+14. **Phase 3 additions.** Deliverables: `DeliverablePolicy` (staff need `deliverables.view`; `deliverables.view_drafts` is what lets anyone see unpublished work; clients and staff without it see only what was published). Uploading (`deliverables.upload`), internal QA (`deliverables.review`), publishing (`deliverables.publish`) and archiving (`deliverables.archive`) are separate permissions; **workers can upload but never publish, review or archive by default.** Files: `files.download` plus the same visibility rule on every download. Revisions: `RevisionAccess` (staff: `revisions.manage` + project access; client: only requests they submitted). Classifying as chargeable and proposing cost is `revisions.classify` (manager/administrator); overriding a classification and editing revision policies are `revisions.override` / `revisions.policy` (administrator, sensitive). **Only the client** holds `deliverables.respond` (approve/reject) and `revisions.respond_cost` (approve extra cost): no staff role, including Administrator, can accept on a client's behalf. Referral partners hold none of these.
+
 Users can hold several roles; permissions are the union.
 
 ## Default matrix
@@ -81,7 +83,11 @@ Users can hold several roles; permissions are the union.
 | `files.manage` — Delete or replace files | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `deliverables.view` — View deliverables | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
 | `deliverables.upload` — Upload deliverables | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
-| `deliverables.publish` — Publish deliverables to the client | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `deliverables.publish` — Publish deliverables to the client and choose the client-facing version | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `deliverables.view_drafts` — View draft, in-review and approved-but-unpublished deliverables on accessible projects | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
+| `deliverables.review` — Approve internally or send back deliverables in QA review | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `deliverables.archive` — Archive and restore deliverables | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `deliverables.respond` — Approve, reject or request revisions on own published deliverables (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
 | **Website** | | | | | | | | | | |
 | `cms.view` — View website content | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `cms.edit` — Edit draft website content | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
@@ -125,8 +131,12 @@ Users can hold several roles; permissions are the union.
 | `referrals.decide` — Approve or reject referral applications | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Support** | | | | | | | | | | |
 | `chat.use` — Use project chat on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
-| `revisions.request` — Request a revision (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
+| `revisions.request` — Request a revision (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
 | `revisions.manage` — Triage and resolve revisions | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `revisions.classify` — Classify revisions as included or potentially chargeable and propose extra cost | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `revisions.override` — Override a revision classification (audited) | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `revisions.policy` — Manage revision policies and terms | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `revisions.respond_cost` — Approve or decline a proposed additional cost on own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
 | `bugs.report` — Report a bug (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `bugs.manage` — Triage and resolve bugs | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
 | `warranty.view_own` — View own warranty status (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |

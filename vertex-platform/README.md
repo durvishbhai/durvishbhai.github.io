@@ -1,6 +1,6 @@
 # Vertex Integrated Solutions — platform
 
-Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phase 2 — CRM, clients, projects, tasks/Kanban, milestones, deadlines and the priority-pricing foundation, on top of the Phase 1 accounts/RBAC/audit.** Quotations, invoices, payments, payouts, commissions, support and the CMS are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
+Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phase 3 — deliverables with versions, secure private file storage, internal QA, client approvals, revision requests with an included-vs-chargeable policy foundation and in-app notifications, on top of Phase 2 (CRM, projects, tasks/Kanban, pricing foundation) and Phase 1 (accounts, RBAC, audit).** Quotations, invoices, payments, payouts, commissions, chat and the CMS are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
 
 > This folder lives inside a GitHub Pages repository only so the existing site (`../index.html`, `../CNAME`) stays untouched. Read `docs/01-INSPECTION.md` (exposure risk) before deploying; a private repository is recommended.
 
@@ -50,6 +50,7 @@ Integration tests drop every table in the configured test database and refuse an
 | `docs/07-DECISIONS.md` | Unresolved business decisions and integrations |
 | `docs/08-DEPLOYMENT.md` | Hostinger/cPanel deployment |
 | `docs/09-PHASE1-ACCOUNTS-RBAC.md` | Phase 1: migrations, env vars, first Super Admin, rollback, test results, gaps |
+| `docs/11-PHASE3-DELIVERABLES-REVISIONS.md` | Phase 3: file storage and configuration, security controls, workflows, manual test checklist, limitations |
 | `docs/10-PHASE2-CRM-PROJECTS-TASKS.md` | Phase 2: features, pricing protection, migrations, upgrade steps, manual test checklist, known limitations |
 
 ## Conventions

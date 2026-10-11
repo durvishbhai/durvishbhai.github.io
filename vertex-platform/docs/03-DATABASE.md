@@ -170,3 +170,31 @@ erDiagram
 ```
 
 Integrity rules: the FKs from pricing/financial and history tables (`price_revisions`, `price_change_requests`, `project_activity`, `milestones`, `tasks`, notes, comments, time entries) to `projects`/`clients` are `RESTRICT`, so deleting a project can never cascade through financial history (the app never deletes projects; it archives). Non-financial exceptions: Phase 1 `project_assignments` cascades, `enquiries.converted_project_id` is `SET NULL`; `task_dependencies` has `CHECK (task_id <> depends_on_task_id)` and the service rejects cycles under a project row lock; unique keys on `enquiries.reference`, `projects.code`, `public_id` columns, `(project_id, revision_no)`, one *current* pricing rule per (service, priority) via a nullable `current_flag`; money is `BIGINT` paise, rates are basis points; everything is archived (`archived_at`) rather than deleted; `price_revisions` is append-only (no code path updates or deletes it, enforced by a source-scanning test).
+
+
+## Phase 3 tables (BUILT: migration 0008)
+
+```mermaid
+erDiagram
+    projects ||--o{ deliverables : has
+    tasks |o--o{ deliverables : "optional"
+    milestones |o--o{ deliverables : "optional"
+    deliverables ||--o{ deliverable_versions : "V1, V2, ... (append-only)"
+    deliverables |o--o| deliverable_versions : "published_version_id"
+    stored_files ||--o{ deliverable_versions : "file_id (or external_url)"
+    deliverable_versions ||--o{ deliverable_reviews : "internal QA"
+    deliverable_versions ||--o{ client_approvals : "exact version"
+    deliverables ||--o{ revision_requests : receives
+    deliverable_versions ||--o{ revision_requests : "version reviewed"
+    revision_requests ||--o{ revision_status_history : logs
+    revision_requests ||--o{ revision_notes : "internal"
+    revision_requests ||--o{ revision_files : attaches
+    stored_files ||--o{ revision_files : stores
+    revision_requests ||--o{ change_requests : "extra-cost proposals"
+    revision_requests |o--o{ client_approvals : "revision_requested"
+    projects ||--o{ change_requests : has
+    projects ||--o{ revision_policies : "optional project terms"
+    users ||--o{ notifications : receives
+```
+
+Rules: every foreign key above is `RESTRICT` (or `SET NULL` for optional user/task/milestone links); `deliverable_versions` has `UNIQUE (deliverable_id, version_no)` and `CHECK (file_id IS NOT NULL OR external_url IS NOT NULL)`; one current policy per scope via `current_flag`; `UNIQUE (user_id, dedupe_key)` on notifications and `UNIQUE (user_id, submit_token)` on client approvals/`(requested_by, submit_token)` on revisions make retries idempotent; stored paths are unique random strings.
