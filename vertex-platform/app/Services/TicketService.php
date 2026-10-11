@@ -398,7 +398,7 @@ final class TicketService
         if ($userPublicId !== null && $userPublicId !== '') {
             $u = preg_match('/^[a-f0-9]{32}$/', $userPublicId) ? Database::one("SELECT id FROM users WHERE public_id = ? AND status = 'active'", [$userPublicId]) : null;
             $candidate = $u === null ? null : (int) $u['id'];
-            if ($candidate === null || !in_array(TicketAccess::role($candidate, $t), ['staff', 'worker'], true) || !Gate::canAny(['tickets.reply', 'tickets.note', 'bugs.fix', 'tickets.update_status'], $candidate)) {
+            if ($candidate === null || !TicketAccess::canBeAssigned($candidate, $t)) {
                 throw new ValidationException(['Choose someone who is allowed to work on this ticket.']);
             }
             $new = $candidate;

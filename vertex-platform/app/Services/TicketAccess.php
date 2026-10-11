@@ -22,7 +22,7 @@ use Vertex\Core\Logger;
 final class TicketAccess
 {
     private const SELECT = 'SELECT t.*, c.public_id AS client_public_id, c.contact_name AS client_name, c.company_name, c.user_id AS client_user_id,
-                                   p.public_id AS project_public_id, p.code AS project_code, p.title AS project_title, p.status AS project_status, p.service_category AS project_service,
+                                   p.public_id AS project_public_id, p.code AS project_code, p.title AS project_title, p.status AS project_status, p.archived_at AS project_archived_at, p.service_category AS project_service,
                                    au.name AS assignee_name, au.public_id AS assignee_public_id, ru.name AS requester_name,
                                    b.affected_url, b.steps_to_reproduce, b.expected_behaviour, b.actual_behaviour, b.browser_details, b.device_details, b.captured_user_agent,
                                    b.warranty_snapshot_json, b.eligibility, b.eligibility_reason, b.eligibility_terms, b.considerations_json, b.quotation_required,
@@ -69,6 +69,24 @@ final class TicketAccess
         }
 
         return null;
+    }
+
+    /**
+     * May this person be given the ticket? They must be able to work tickets: either they already can open it (staff on the project,
+     * a worker on its project for a technical category) or they hold `tickets.view_assigned`, which the assignment itself satisfies.
+     *
+     * @param array<string,mixed> $t
+     */
+    public static function canBeAssigned(int $userId, array $t): bool
+    {
+        if (Database::one("SELECT 1 AS x FROM users WHERE id = ? AND status = 'active'", [$userId]) === null || !Gate::canAny(['tickets.reply', 'tickets.note', 'bugs.fix', 'tickets.update_status'], $userId)) {
+            return false;
+        }
+        if ($t['client_user_id'] !== null && (int) $t['client_user_id'] === $userId) {
+            return false;
+        }
+
+        return in_array(self::role($userId, $t), ['staff', 'worker'], true) || Gate::can('tickets.view_assigned', $userId);
     }
 
     /** @param array<string,mixed> $t */

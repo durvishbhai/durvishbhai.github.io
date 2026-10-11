@@ -294,7 +294,7 @@ final class TicketQuery
     {
         $out = [];
         foreach (Database::all("SELECT id, public_id, name FROM users WHERE status = 'active' ORDER BY name LIMIT 500") as $u) {
-            if (in_array(TicketAccess::role((int) $u['id'], $t), ['staff', 'worker'], true) && Gate::canAny(['tickets.reply', 'tickets.note', 'bugs.fix', 'tickets.update_status'], (int) $u['id'])) {
+            if (TicketAccess::canBeAssigned((int) $u['id'], $t)) {
                 $out[] = ['public_id' => $u['public_id'], 'name' => $u['name']];
             }
         }
