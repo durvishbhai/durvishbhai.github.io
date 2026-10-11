@@ -167,6 +167,18 @@ final class TaskServiceTest extends DatabaseTestCase
         $this->expectInvalid(fn () => $this->task(['assignee' => $this->publicId($this->dev2)]), 'member of this project');
     }
 
+    public function testCreatingWithAnAssigneeNeedsTheAssignPermissionEvenForTaskCreators(): void
+    {
+        // A custom role set-up: may create tasks but may NOT assign them. The assignee field must not become a back door.
+        Database::run("DELETE rp FROM role_permissions rp JOIN roles r ON r.id = rp.role_id AND r.slug = 'manager' JOIN permissions p ON p.id = rp.permission_id AND p.perm_key = 'tasks.assign'");
+        Gate::flush();
+        $this->expect403(fn () => $this->task(['assignee' => $this->publicId($this->dev)]), 'creating with an assignee needs tasks.assign');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM tasks')['c'], 'nothing was created by the refused attempt');
+        $t = $this->task(['title' => 'Unassigned is fine']);
+        $this->assertNull($t['assignee_id']);
+        $this->expect403(fn () => TaskService::assign($this->manager, $t, $this->publicId($this->dev)), 'nor can they assign afterwards');
+    }
+
     // ---- status machine ---------------------------------------------------------------------------------------------------
 
     public function testEveryStatusPairMatchesTheConfiguredMachineForAnAdministrator(): void

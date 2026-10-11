@@ -13,7 +13,9 @@ if ($staff && Gate::can('tasks.view', $uid)) {
     $tabs['tasks'] = [$base . '/tasks', 'Tasks'];
 }
 $tabs['timeline'] = [$base . '/timeline', 'Timeline'];
-$tabs['pricing'] = [$base . '/pricing', 'Pricing'];
+if (\Vertex\Services\PriceChangeService::canView($uid, $project)) {
+    $tabs['pricing'] = [$base . '/pricing', 'Pricing'];
+}
 ?>
 <nav class="tabs" aria-label="Project sections">
     <?php foreach ($tabs as $key => [$href, $label]) : ?>

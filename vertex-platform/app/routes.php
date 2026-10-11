@@ -20,8 +20,10 @@ use Vertex\Http\Controllers\HealthController;
 use Vertex\Http\Controllers\HomeController;
 use Vertex\Http\Controllers\MilestoneController;
 use Vertex\Http\Controllers\PasswordController;
+use Vertex\Http\Controllers\PricingController;
 use Vertex\Http\Controllers\ProjectController;
 use Vertex\Http\Controllers\TaskController;
+use Vertex\Http\Controllers\TeamController;
 use Vertex\Http\Controllers\RegistrationController;
 
 /*
@@ -86,9 +88,17 @@ return static function (Router $router): void {
     $router->post('/projects/{project}/milestones/{milestone}/status', [MilestoneController::class, 'status'], ['auth', 'can:milestones.edit,milestones.approve', 'project']);
     $router->post('/projects/{project}/milestones/{milestone}/archive', [MilestoneController::class, 'archive'], ['auth', 'can:milestones.edit', 'project']);
 
+    // Priority pricing: project price history and priority-change proposals. The client decides; staff only propose.
+    $router->get('/projects/{project}/pricing', [PricingController::class, 'project'], $p);
+    $router->post('/projects/{project}/priority', [PricingController::class, 'priority'], ['auth', 'can:projects.set_priority', 'project']);
+    $router->post('/projects/{project}/pricing/baseline', [PricingController::class, 'baseline'], ['auth', 'can:projects.record_approval', 'project']);
+    $router->post('/projects/{project}/pricing/requests/{req}/decision', [PricingController::class, 'decide'], ['auth', 'can:pricing.respond_change', 'project']);
+    $router->post('/projects/{project}/pricing/requests/{req}/withdraw', [PricingController::class, 'withdraw'], ['auth', 'can:pricing.request_change', 'project']);
+
     // Tasks, Kanban board, deadlines. Staff only (TaskPolicy keeps clients out even if a role were misconfigured).
     $router->get('/projects/{project}/tasks', [TaskController::class, 'projectTasks'], $p);
     $router->post('/projects/{project}/tasks', [TaskController::class, 'store'], ['auth', 'can:tasks.create', 'project']);
+    $router->get('/team', [TeamController::class, 'index'], ['auth', 'can:projects.view_all']);
     $tk = ['auth', 'can:tasks.view'];
     $router->get('/tasks', [TaskController::class, 'index'], $tk);
     $router->get('/board', [TaskController::class, 'board'], $tk);
@@ -172,6 +182,9 @@ return static function (Router $router): void {
 
         $r->get('/crm-stages', [CrmStageController::class, 'index'], ['can:crm.configure']);
         $r->post('/crm-stages', [CrmStageController::class, 'update'], ['can:crm.configure']);
+
+        $r->get('/pricing', [PricingController::class, 'rules'], ['can:pricing.view']);
+        $r->post('/pricing', [PricingController::class, 'saveRule'], ['can:pricing.manage']);
 
         $r->get('/audit', [AuditController::class, 'index'], ['can:audit.view']);
         $r->post('/audit/verify', [AuditController::class, 'verify'], ['can:audit.view']);

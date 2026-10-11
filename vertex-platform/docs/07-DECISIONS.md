@@ -40,6 +40,21 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-27 | Roles that require a phone number: Client, Freelancer, Video Editor, Website Developer, Referral Partner. | `phone_required` in config. |
 | D-28 | Step-up: re-entering your own password is required for role changes, permission changes, deactivation/reactivation and archiving. | Server-enforced. |
 
+## Decisions taken in Phase 2 (please confirm or change)
+
+| ID | Decision I made | Why / how to change |
+|---|---|---|
+| D-29 | CRM stage **names/order** are configurable in the database; **Won/Lost meaning is fixed by `kind`**. Lost needs a reason; nothing sets Won automatically. | `/admin/crm-stages`. |
+| D-30 | Managers see enquiries/clients **assigned to them or linked to their projects**, not the whole pipeline; Administrators/Owner see all. Managers can work enquiries (notes, stages, mark Won) but only Administrators convert/archive. | `enquiries.view_all` / `convert` in the role editor. |
+| D-31 | Budget ranges (under ₹25k … above ₹5L) and service list (website, video, domain/hosting, other) are **form labels only**, not prices. | `config/workflow.php`. Please supply the real ranges/services. |
+| D-32 | A project gets its code `VIS-YYYY-NNNN`; legacy Phase 1 projects got `VIS-YYYY-Lnnnn`. Project status machine and "awaiting payment → ready to start" as a **manual, audited override** until payment records exist (Phase 5). | `config/workflow.php`. |
+| D-33 | **No priority surcharge rates are invented.** All four priorities ship as "no surcharge"; an authorized Administrator sets rates (percentage of base or fixed ₹) per priority, optionally per service, with versions + audit. | `/admin/pricing`. Related to D-08. |
+| D-34 | Workers do not see budget, pricing or **internal** project notes by default; managers do. Workers see all tasks of the projects they are assigned to, and may change only their own. | Role editor. |
+| D-35 | The **client** approves price changes in the portal; staff cannot approve on their behalf, and a priority change that alters the priority charge never takes effect before approval. Reductions also need approval. | Needs your policy for verbal/e-mail approvals. |
+| D-36 | Clients no longer hold `tasks.view`: tasks are internal working items. Clients see client-visible milestones, notes and the timeline. | Migration `0006` removes the grant from the Client role. |
+| D-37 | A reviewer cannot approve their own task; tasks default to "needs review". Reasons are mandatory for Blocked/Changes Requested. | `config/workflow.php` (`task_transitions`). |
+| D-38 | Public forms use CSRF + honeypot + per-IP rate limit + explicit consent; no CAPTCHA. If spam becomes a problem add one (needs a provider choice). | Open. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

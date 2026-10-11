@@ -138,3 +138,35 @@ erDiagram
 ## Foundation tables (built)
 
 `roles`, `permissions`, `role_permissions`, `users`, `user_roles`, `login_attempts`, `audit_logs`, plus the migrator's own `schema_migrations`.
+
+
+## Phase 2 tables (BUILT: migrations 0005–0007)
+
+```mermaid
+erDiagram
+    crm_stages ||--o{ enquiries : "current stage"
+    enquiries ||--o{ enquiry_activity : "timeline / stage history"
+    enquiries ||--o{ enquiry_followups : reminders
+    enquiries ||--o{ attachments : "parent_type=enquiry"
+    enquiries }o--o| clients : "linked / converted"
+    enquiries }o--o| projects : "converted_project_id"
+    users ||--o| clients : "portal login (optional)"
+    clients ||--o{ client_notes : "restricted notes"
+    clients ||--o{ projects : owns
+    projects ||--o{ project_assignments : "Admin-made"
+    projects ||--o{ project_activity : timeline
+    projects ||--o{ project_notes : "internal / client_visible / feedback"
+    projects ||--o{ milestones : has
+    projects ||--o{ tasks : has
+    milestones ||--o{ tasks : groups
+    tasks ||--o{ task_dependencies : "waits on (same project)"
+    tasks ||--o{ task_comments : has
+    tasks ||--o{ task_time_entries : logs
+    tasks ||--o{ attachments : "parent_type=task"
+    priority_pricing_rules ||--o{ price_change_requests : "snapshotted in JSON"
+    projects ||--o{ price_revisions : "append-only"
+    projects ||--o{ price_change_requests : proposals
+    price_change_requests ||--o| price_revisions : "applied_revision_id"
+```
+
+Integrity rules: the FKs from pricing/financial and history tables (`price_revisions`, `price_change_requests`, `project_activity`, `milestones`, `tasks`, notes, comments, time entries) to `projects`/`clients` are `RESTRICT`, so deleting a project can never cascade through financial history (the app never deletes projects; it archives). Non-financial exceptions: Phase 1 `project_assignments` cascades, `enquiries.converted_project_id` is `SET NULL`; `task_dependencies` has `CHECK (task_id <> depends_on_task_id)` and the service rejects cycles under a project row lock; unique keys on `enquiries.reference`, `projects.code`, `public_id` columns, `(project_id, revision_no)`, one *current* pricing rule per (service, priority) via a nullable `current_flag`; money is `BIGINT` paise, rates are basis points; everything is archived (`archived_at`) rather than deleted; `price_revisions` is append-only (no code path updates or deletes it, enforced by a source-scanning test).

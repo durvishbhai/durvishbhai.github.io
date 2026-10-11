@@ -16,6 +16,11 @@ Generated from `config/permissions.php` with `php bin/console.php permissions:ma
 8. Scoped permissions (`*.view_assigned`, `*.view_own`) open a feature; **per-record access is enforced by `ProjectPolicy`** (assigned / own / all), returning 404 for anything else.
 9. Referral Partners and Finance Staff hold no project permissions at all.
 
+10. **Phase 2 additions.** Enquiries: `EnquiryPolicy` (all / assigned / own-submitted for referral partners) · Clients: `ClientPolicy` (all / assigned-via-project / own) · Tasks: `TaskPolicy` (staff-level access to the task's project AND `tasks.view`; clients never reach tasks) · Pricing: `PriceChangeService::canView` (staff holding a pricing permission, or the owning client).
+11. **Managers cannot assign people to projects** (`projects.assign` is Administrator/Owner only), cannot create projects or record approved quotations. They *can* assign **tasks** to existing project members (`tasks.assign`). Workers can never assign tasks, even to themselves.
+12. **The client decides price changes.** `pricing.respond_change` is held by the Client role only; no staff role (including Administrator) can approve a priority price change on a client's behalf.
+13. **Workers see no money**: no `pricing.*`, no budget, no internal project notes (`projects.notes_internal`) by default. Grant them in the role editor if the business wants it.
+
 Users can hold several roles; permissions are the union.
 
 ## Default matrix
@@ -46,18 +51,31 @@ Users can hold several roles; permissions are the union.
 | `projects.view_assigned` — View projects the user is assigned to | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  |  |
 | `projects.view_own` — View projects owned by the client | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `projects.create` — Create projects | ✔ | ✔ |  |  |  |  |  |  |  |  |
-| `projects.edit` — Edit project details | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `projects.edit` — Edit project details | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `projects.update_status` — Change project status | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `projects.archive` — Archive projects | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `projects.assign` — Assign and unassign team members on projects | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `projects.complete` — Confirm project completion (and reopen) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `projects.set_priority` — Change project priority | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `projects.notes_internal` — View and add internal project notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `projects.notes_client` — Post client-visible project notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `projects.give_feedback` — Give feedback on own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `projects.record_approval` — Record the approved quotation baseline of a project | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Delivery** | | | | | | | | | | |
 | `milestones.view` — View milestones on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
 | `milestones.create` — Create milestones directly | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `milestones.edit` — Edit milestones and change their status | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `milestones.propose` — Propose milestones for approval | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
 | `milestones.approve` — Approve or reject proposed milestones | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
-| `tasks.view` — View tasks on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
-| `tasks.manage` — Create and assign tasks | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
-| `tasks.update_assigned` — Update tasks assigned to the user | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
+| `tasks.view` — View tasks on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  |  |
+| `tasks.create` — Create tasks on accessible projects | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tasks.edit` — Edit tasks and move them between any statuses | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tasks.assign` — Assign tasks to project team members | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tasks.review` — Review tasks (approve or request changes) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tasks.archive` — Archive tasks | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tasks.comment` — Comment on accessible tasks | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  |  |
+| `tasks.log_time` — Log time on tasks assigned to the user | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
+| `tasks.update_assigned` — Update status of tasks assigned to the user | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
 | `files.upload` — Upload files to accessible projects | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  | ✔ |
 | `files.download` — Download files on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
 | `files.manage` — Delete or replace files | ✔ | ✔ |  |  |  |  |  |  |  |  |
@@ -76,6 +94,8 @@ Users can hold several roles; permissions are the union.
 | `quotes.view` — View quotations | ✔ | ✔ | ✔ |  |  |  |  |  |  | ✔ |
 | `quotes.create` — Draft quotations | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `quotes.send` — Send quotations to clients | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `pricing.request_change` — Propose a price change (e.g. from a priority change) for client approval | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `pricing.respond_change` — Approve or reject a proposed price change on own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
 | **Finance** | | | | | | | | | | |
 | `finance.view` — View financial data | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `invoices.view_all` — View all invoices | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
@@ -115,6 +135,32 @@ Users can hold several roles; permissions are the union.
 | `requirements.view` — View submitted requirements | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
 | `appointments.book` — Book an appointment (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `appointments.manage` — Manage appointments | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| **Crm** | | | | | | | | | | |
+| `enquiries.view_all` — View every enquiry | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `enquiries.view_assigned` — View enquiries the user owns | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.view_own` — View enquiries the user submitted (referral partner) | ✔ |  |  |  |  |  |  |  | ✔ |  |
+| `enquiries.create` — Create enquiries manually | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.edit` — Edit enquiry details and attachments | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.assign` — Assign an internal owner to an enquiry | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `enquiries.move_stage` — Move enquiries between open pipeline stages and to Lost | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.mark_won` — Mark an enquiry Won (explicit, confirmed action) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.reopen` — Reopen a Won/Lost enquiry that was not converted | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `enquiries.convert` — Convert a Won enquiry into a client and draft project | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `enquiries.notes` — Add notes, contact history and follow-ups | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `enquiries.archive` — Archive enquiries | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `enquiries.submit_referral` — Submit referral enquiries (referral partner) | ✔ |  |  |  |  |  |  |  | ✔ |  |
+| `crm.configure` — Configure CRM pipeline stages | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| **Clients** | | | | | | | | | | |
+| `clients.view_all` — View every client record | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.view_assigned` — View clients of projects the user is assigned to | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `clients.view_own` — View own client record (client portal) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `clients.create` — Create client records | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.edit` — Edit client records | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.archive` — Archive clients | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.merge` — Merge duplicate client records | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.invite` — Invite a client to the portal | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `clients.notes_view` — View restricted client notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `clients.notes_add` — Add restricted client notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | **Renewals** | | | | | | | | | | |
 | `renewals.view` — View domain/hosting renewals | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `renewals.manage` — Create and edit renewal records | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |

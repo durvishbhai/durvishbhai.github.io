@@ -288,3 +288,16 @@ textarea:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 3px
 .reason-input { min-width: 260px; }
 .plain-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 18px; margin-bottom: 14px; }
+
+/* ---- Pricing ---- */
+.detail-list { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: 8px 18px; margin: 0 0 12px; }
+.detail-list dt { color: var(--text-dim); }
+.detail-list dd { margin: 0; }
+.panel-attention { border-color: rgba(201, 162, 75, 0.6); }
+.badge-pr-approved { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-pr-rejected, .badge-pr-withdrawn { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.badge-pr-superseded { color: var(--text-dim); }
+@media (max-width: 640px) { .detail-list { grid-template-columns: 1fr; gap: 2px; } .detail-list dd { margin-bottom: 10px; } }
+.portal-main, .container-wide { min-width: 0; }
+.board { max-width: 100%; position: relative; } /* position: contains the .sr-only labels so they cannot widen the page */
+.toolbar .field .check { flex-direction: row; align-items: center; min-height: 44px; }

@@ -90,6 +90,57 @@ final class DevSeeder
             );
         }
 
+        self::seedDelivery($ids);
+
         return ['password' => $password, 'created' => $created, 'projects' => $projects];
+    }
+
+    /**
+     * Fictional CRM enquiries, milestones and tasks so the pipeline, board and deadline pages have something to show.
+     * Idempotent: skipped when the demo data already exists. Every name is marked fictional; dates are relative to today.
+     *
+     * @param array<string,int> $ids user ids by seed key
+     */
+    private static function seedDelivery(array $ids): void
+    {
+        if (Database::one("SELECT 1 AS x FROM enquiries WHERE contact_name LIKE '%(fictional)%'") === null) {
+            foreach ([
+                ['Nina Prospect (fictional)', 'nina.prospect@example.test', 'Fictional Bakery Co', 'website_development', 'A brochure website with an online ordering form for a fictional bakery.', '25k_100k'],
+                ['Omar Lead (fictional)', 'omar.lead@example.test', 'Fictional Fitness Studio', 'video_editing', 'Weekly short-form video editing for a fictional fitness studio.', 'under_25k'],
+                ['Rhea Inquirer (fictional)', 'rhea.inquirer@example.test', null, 'domain_hosting', 'Move a fictional personal portfolio to new hosting.', 'not_sure'],
+            ] as [$name, $email, $company, $service, $desc, $budget]) {
+                EnquiryService::create($ids['manager'], 'manual', [
+                    'contact_name' => $name, 'email' => $email, 'company_name' => $company, 'service' => $service, 'description' => $desc, 'budget_range' => $budget, 'priority' => 'normal',
+                ]);
+            }
+        }
+        $site = Database::one("SELECT * FROM projects WHERE title = 'Fictional Brand Website'");
+        if ($site === null || Database::one('SELECT 1 AS x FROM tasks WHERE project_id = ?', [$site['id']]) !== null) {
+            return;
+        }
+        $project = ProjectPolicy::find((string) $site['public_id']);
+        $pub = static fn (string $k): string => (string) Database::one('SELECT public_id FROM users WHERE id = ?', [$ids[$k]])['public_id'];
+        $day = static fn (int $offset): string => AppTime::todayPlus($offset);
+        Database::run('UPDATE projects SET target_date = ?, start_date = ? WHERE id = ?', [$day(21), $day(-14), $site['id']]);
+        $m1 = MilestoneService::create($ids['admin'], $project, ['title' => 'Design approved', 'target_date' => $day(-2), 'visibility' => 'client']);
+        $m2 = MilestoneService::create($ids['admin'], $project, ['title' => 'Staging site ready', 'target_date' => $day(10), 'visibility' => 'client']);
+        $tasks = [];
+        foreach ([
+            ['Wireframes for all pages', 'completed', 'developer', -10, 'normal', $m1['public_id']],
+            ['Build homepage', 'in_progress', 'developer', 3, 'high', $m2['public_id']],
+            ['Contact form with validation', 'to_do', 'developer', 6, 'normal', $m2['public_id']],
+            ['Write launch checklist', 'backlog', null, null, 'low', ''],
+            ['Fix navigation on mobile', 'blocked', 'developer', -1, 'urgent', $m2['public_id']],
+            ['Review hero section', 'in_review', 'developer', 2, 'normal', $m2['public_id']],
+        ] as [$title, $status, $who, $due, $prio, $ms]) {
+            $t = TaskService::create($ids['admin'], $project, [
+                'title' => $title, 'priority' => $prio, 'milestone' => $ms, 'due_date' => $due === null ? '' : $day($due),
+                'assignee' => $who === null ? '' : $pub($who), 'status' => 'to_do', 'review_required' => '1',
+            ]);
+            $tasks[$title] = $t['id'];
+            // Demo rows are placed directly in their status; real changes always go through TaskService::transition().
+            Database::run('UPDATE tasks SET status = ?, completed_at = IF(? = \'completed\', UTC_TIMESTAMP(), NULL), review_status = IF(? = \'in_review\', \'pending\', IF(? = \'completed\', \'approved\', \'not_required\')) WHERE id = ?', [$status, $status, $status, $status, $t['id']]);
+        }
+        Database::run('INSERT INTO task_dependencies (task_id, depends_on_task_id, created_by, created_at) VALUES (?, ?, ?, UTC_TIMESTAMP())', [$tasks['Contact form with validation'], $tasks['Build homepage'], $ids['admin']]);
     }
 }

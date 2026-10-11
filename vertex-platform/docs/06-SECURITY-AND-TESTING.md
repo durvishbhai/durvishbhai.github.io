@@ -19,11 +19,26 @@
 | Clickjacking / MIME / referrer | `X-Frame-Options: DENY` + `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, HSTS in production | header check |
 | Secrets in repo | `.env` gitignored; `.env.example` only; no keys in code | `git status`/scan before commit |
 
+## Controls added in Phase 2, and how each is verified
+
+| Threat | Control | Verified by |
+|---|---|---|
+| IDOR on enquiries/clients/projects/tasks/milestones/attachments | Per-record policies (`EnquiryPolicy`, `ClientPolicy`, `ProjectPolicy`, `TaskPolicy`) used by routes, services, list queries, JSON endpoints and downloads; missing and forbidden both 404; random public ids | `ProjectTaskHttpTest::testGuessingProjectAndTaskUrls…`, `ClientHttpTest`, `CrmHttpTest`, `TaskServiceTest::testTaskVisibilityFollowsProjectAssignmentExactly` |
+| Cross-project object swap | Child records are always resolved *within* the project of the URL (`findInProject`) | `testMilestoneIdsCannotBeSwappedAcrossProjects`, dependency cross-project test |
+| Worker privilege creep | Workers move only their own tasks; cannot assign, edit, archive, add dependencies, or see budget/pricing | `TaskServiceTest` (assignee/review/assign tests), `ProjectTaskHttpTest` |
+| Drag-and-drop bypass | The Kanban endpoint uses the same `TaskService::transition()`; CSRF header required; role + dependency + state checks on the server | `testDragAndDropEndpointValidatesEveryMoveOnTheServer`; browser run |
+| Race / stale writes | Row locks (`FOR UPDATE`) on task status, project priority and the price request; stale views rejected | stale-status, stale-proposal tests |
+| Silent price change | Approved baseline written once; changes only via client-approved append-only revisions; source-scan test forbids updates/deletes of price history | `PricingTest` (23 tests incl. mutation-checked) |
+| Upload abuse | Extension + sniffed MIME allow-list, 5 MB, random names outside web root, per-user rate limit, authorized download only | `CrmHttpTest`, `testTaskAttachmentsAreAuthorizedByTheTaskPolicy` |
+| Public form abuse | CSRF, honeypot, per-IP rate limit, consent, aggregated validation, no data echoed unescaped | `CrmHttpTest` |
+| Bad data / injection | Prepared statements; LIKE escaping; all text via `FieldRules` (control chars stripped, `< >` rejected in titles); output via `e()` | search-injection and XSS tests |
+| Closure variable bugs (silent wrong-scope) | `ClosureScopeTest` statically checks every `function () use (...)` for undeclared variables | mutation-verified |
+
 ## Known gaps (tracked, not hidden)
 
 - No 2FA. (Password reset, email verification, password policy and lazy sessions were added in Phase 1.)
 - `audit_logs` hash chain detects tampering but cannot *prevent* a DB-privileged attacker from rewriting the entire chain; mitigate with periodic off-server export of the latest hash (Phase 9).
-- Rate limiting now covers login, step-up password checks, registration, password reset and verification resend; still to add: contact/referral forms, chat, uploads.
+- Rate limiting now covers login, step-up password checks, registration, password reset and verification resend, the public enquiry forms and attachment uploads; still to add: chat. No CAPTCHA (D-38).
 - Not tested on a real Hostinger account (PHP selector, `.htaccess` behaviour under LiteSpeed, file permissions).
 - No SAST/dependency scanning pipeline yet (`composer audit` is available; add to CI).
 
