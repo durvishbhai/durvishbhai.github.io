@@ -49,7 +49,9 @@ $v = static fn (string $k): string => old($k);
     <?php if ($t['status'] === 'client_verification') : ?><p>Our team marked this as fixed. Nothing is closed until you confirm. If it still does not work, tell us what you see and reopen it.</p><?php endif; ?>
     <form method="post" action="<?= e($base) ?>/status" class="form-grid" novalidate><?= csrf_field() ?>
         <div class="field"><label for="ms">What would you like to do?</label><select id="ms" name="status"><?php foreach ($moves as $c => $l) : ?><option value="<?= e($c) ?>"><?= e(match (true) {
-            $c === 'closed' => $t['status'] === 'closed' ? 'Reopen' : 'Confirm it is fixed and close', default => $l . ($c === 'open' || $c === 'reopened' ? ' (reopen)' : '') }) ?></option><?php endforeach; ?></select></div>
+            $c === 'closed' => 'Confirm it is fixed and close',
+            in_array($c, ['open', 'reopened'], true) => 'Reopen this ' . ($bug ? 'report' : 'ticket'),
+            default => $l }) ?></option><?php endforeach; ?></select></div>
         <div class="field"><label for="mn">Explanation (required when reopening: tell us what you still see)</label><textarea id="mn" name="note" rows="3" maxlength="3000"><?= e($v('note')) ?></textarea></div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Send</button></div></form></div>
 <?php endif; ?>
