@@ -8,8 +8,9 @@
                 with a secure client portal for milestones, files, invoices and support in one place.
             </p>
             <div class="hero-actions">
-                <a class="btn btn-primary" href="/login">Client &amp; team sign in</a>
-                <a class="btn btn-ghost" href="#services">What we do</a>
+                <a class="btn btn-primary" href="/request-quote">Request a quote</a>
+                <a class="btn btn-ghost" href="/login">Client &amp; team sign in</a>
+                
             </div>
         </div>
         <div class="hero-art reveal" aria-hidden="true">

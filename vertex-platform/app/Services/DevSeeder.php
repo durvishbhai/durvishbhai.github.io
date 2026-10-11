@@ -52,7 +52,11 @@ final class DevSeeder
             }
             $ids[$local] = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), 'active', $roles, null, $phone, true);
             if (in_array('client', $roles, true)) {
-                Database::run('INSERT IGNORE INTO clients (public_id, user_id, company_name, created_at, updated_at) VALUES (?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())', [uuid_hex(), $ids[$local], $name . ' Studio (fictional)']);
+                Database::run(
+                    "INSERT IGNORE INTO clients (public_id, user_id, client_type, contact_name, email, phone, phone_digits, company_name, company_norm, status, created_at, updated_at)
+                     VALUES (?, ?, 'business', ?, ?, ?, RIGHT(REGEXP_REPLACE(?, '[^0-9]', ''), 10), ?, LOWER(?), 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                    [uuid_hex(), $ids[$local], $name, $email, $phone, (string) $phone, $name . ' Studio (fictional)', $name . ' Studio (fictional)'],
+                );
             }
             Audit::record('user.created', 'user', $ids[$local], [], ['email' => $email, 'roles' => $roles, 'status' => 'active'], ['via' => 'dev-seeder'], null, 'cli');
             $created++;
@@ -60,13 +64,13 @@ final class DevSeeder
 
         $projects = 0;
         $client = static fn (string $k): int => (int) Database::one('SELECT id FROM clients WHERE user_id = ?', [$ids[$k]])['id'];
-        foreach ([['client1', 'Fictional Brand Website', 'active'], ['client1', 'Fictional Launch Video', 'active'], ['client2', 'Fictional Shop Redesign', 'active']] as [$owner, $title, $status]) {
+        foreach ([['client1', 'Fictional Brand Website', 'in_progress'], ['client1', 'Fictional Launch Video', 'in_progress'], ['client2', 'Fictional Shop Redesign', 'in_progress']] as [$owner, $title, $status]) {
             if (Database::one('SELECT 1 AS x FROM projects WHERE title = ?', [$title]) !== null) {
                 continue;
             }
             Database::run(
-                'INSERT INTO projects (public_id, client_id, title, status, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
-                [uuid_hex(), $client($owner), $title, $status, $ids['admin']],
+                'INSERT INTO projects (public_id, code, client_id, title, status, created_by, status_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+                [uuid_hex(), CrmReference::next('project'), $client($owner), $title, $status, $ids['admin']],
             );
             $projects++;
         }

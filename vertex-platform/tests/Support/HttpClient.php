@@ -86,6 +86,65 @@ final class HttpClient
         return $this->request('POST', $path, $form);
     }
 
+    /**
+     * Multipart upload with a CSRF token. $files maps field name => [path, filename, mime].
+     *
+     * @param array<string,mixed> $form
+     * @param array<string,array{0:string,1:string,2:string}> $files
+     * @return array{status:int,body:string,location:?string}
+     */
+    public function upload(string $path, array $form, array $files, ?string $formPage = null): array
+    {
+        $form['_token'] = $this->token($formPage ?? $this->formPage);
+        foreach ($files as $field => [$file, $name, $mime]) {
+            $form[$field] = new \CURLFile($file, $mime, $name);
+        }
+        $ch = curl_init($this->base . $path);
+        $headers = [];
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $form,
+            CURLOPT_COOKIEJAR => $this->jar, CURLOPT_COOKIEFILE => $this->jar, CURLOPT_TIMEOUT => 30, CURLOPT_USERAGENT => 'vertex-phpunit',
+            CURLOPT_HEADERFUNCTION => static function ($c, string $line) use (&$headers): int {
+                $headers[] = trim($line);
+
+                return strlen($line);
+            },
+        ]);
+        $body = (string) curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        $location = null;
+        foreach ($headers as $h) {
+            if (stripos($h, 'location:') === 0) {
+                $location = trim(substr($h, 9));
+            }
+        }
+
+        return ['status' => $status, 'body' => $body, 'location' => $location];
+    }
+
+    /** Raw response headers of a GET (for Content-Disposition etc.). @return array<string,string> lower-cased names */
+    public function headersOf(string $path): array
+    {
+        $ch = curl_init($this->base . $path);
+        $headers = [];
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_COOKIEJAR => $this->jar, CURLOPT_COOKIEFILE => $this->jar, CURLOPT_USERAGENT => 'vertex-phpunit',
+            CURLOPT_HEADERFUNCTION => static function ($c, string $line) use (&$headers): int {
+                if (str_contains($line, ':')) {
+                    [$k, $v] = explode(':', $line, 2);
+                    $headers[strtolower(trim($k))] = trim($v);
+                }
+
+                return strlen($line);
+            },
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+
+        return $headers;
+    }
+
     /** @param array<string,mixed> $form @return array{status:int,body:string,location:?string} */
     public function postNoToken(string $path, array $form = []): array
     {

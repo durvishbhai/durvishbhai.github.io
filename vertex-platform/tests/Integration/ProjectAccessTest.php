@@ -49,7 +49,7 @@ final class ProjectAccessTest extends DatabaseTestCase
     /** @return list<string> titles */
     private function visible(int $user): array
     {
-        return array_column(ProjectPolicy::visibleTo($user), 'title');
+        return array_column(ProjectPolicy::visibleTo($user)['rows'], 'title');
     }
 
     public function testClientsSeeOnlyTheirOwnProjects(): void

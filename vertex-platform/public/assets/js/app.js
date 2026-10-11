@@ -29,6 +29,11 @@
         }
     });
 
+    // Progress bars: widths come from data-pct (inline styles are blocked by the CSP).
+    document.querySelectorAll('[data-pct]').forEach(function (el) {
+        el.style.width = Math.max(0, Math.min(100, parseInt(el.getAttribute('data-pct'), 10) || 0)) + '%';
+    });
+
     // Scroll reveal (content stays visible if IntersectionObserver is unavailable)
     var items = document.querySelectorAll('.reveal');
     if (!('IntersectionObserver' in window)) {

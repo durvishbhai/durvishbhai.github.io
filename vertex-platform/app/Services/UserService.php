@@ -245,9 +245,16 @@ final class UserService
             throw new ValidationException(['A user with that email address already exists.']);
         }
 
-        $id = Database::transaction(function () use ($repo, $actorId, $name, $email, $phone, $roles): int {
+        $link = (int) ($in['link_client_id'] ?? 0); // set only by ClientService::invite(), never from request data
+        $id = Database::transaction(function () use ($repo, $actorId, $name, $email, $phone, $roles, $link): int {
             $id = $repo->create($name, $email, password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), 'pending', $roles, $actorId, $phone);
-            if (in_array('client', $roles, true)) {
+            if ($link > 0) {
+                // Attach this login to an EXISTING client record instead of creating a second one.
+                $n = Database::run('UPDATE clients SET user_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ? AND user_id IS NULL', [$id, $link])->rowCount();
+                if ($n !== 1) {
+                    throw new ValidationException(['That client record already has a portal login.']);
+                }
+            } elseif (in_array('client', $roles, true)) {
                 self::ensureClientProfile($id);
             }
             Audit::record('user.created', 'user', $id, [], ['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => 'pending'], [], $actorId);
@@ -482,8 +489,11 @@ final class UserService
 
     private static function ensureClientProfile(int $userId): void
     {
+        // One client record per portal user. Contact details are copied from the user so the record is complete.
         Database::run(
-            'INSERT IGNORE INTO clients (public_id, user_id, created_at, updated_at) VALUES (?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+            "INSERT IGNORE INTO clients (public_id, user_id, client_type, contact_name, email, phone, phone_digits, status, created_at, updated_at)
+             SELECT ?, u.id, 'individual', u.name, u.email, u.phone, RIGHT(REGEXP_REPLACE(COALESCE(u.phone, ''), '[^0-9]', ''), 10), 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP()
+               FROM users u WHERE u.id = ?",
             [uuid_hex(), $userId],
         );
     }

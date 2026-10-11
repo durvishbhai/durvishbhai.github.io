@@ -20,5 +20,7 @@ return [
         'verify_resend_email' => [3, 3600],
         'stepup_user' => [5, 600],
         'token_ip' => [30, 3600],
+        'public_form_ip' => [5, 3600],
+        'attachment_user' => [30, 3600],
     ],
 ];

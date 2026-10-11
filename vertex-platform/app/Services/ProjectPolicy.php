@@ -9,17 +9,16 @@ use Vertex\Core\HttpException;
 use Vertex\Core\Logger;
 
 /**
- * Row-level access to projects (and, through them, every project-scoped record: files, tasks, chat, ...).
+ * Row-level access to projects and, through them, every project-scoped record (tasks, milestones, notes, files, ...).
  *
- * A user may see a project when ALL of these hold:
- *   1. their account is active, AND
- *   2. one of:
- *        - they hold `projects.view_all`;
- *        - they hold `projects.view_assigned` and have a non-revoked assignment to the project;
- *        - they hold `projects.view_own` and the project belongs to their client profile.
+ * Access LEVEL of a user to a project (null = none):
+ *   'all'      account active AND holds `projects.view_all`
+ *   'assigned' active AND holds `projects.view_assigned` AND has a non-revoked assignment
+ *   'own'      active AND holds `projects.view_own` AND the project belongs to their client profile
  *
- * Project-scoped routes use `project` middleware / ProjectPolicy::requireView(). Inaccessible AND non-existent projects
- * both produce 404, so project identifiers cannot be probed. Identifiers in URLs are random public ids.
+ * Archived projects are visible only at level 'all'. Staff abilities (tasks, milestones, notes ...) additionally need
+ * level 'all' or 'assigned': a client never gets staff abilities even if a role was misconfigured to hold them.
+ * Unknown and inaccessible projects both yield 404 so identifiers cannot be probed; URLs use random public ids.
  */
 final class ProjectPolicy
 {
@@ -31,27 +30,67 @@ final class ProjectPolicy
         }
 
         return Database::one(
-            'SELECT p.*, c.user_id AS client_user_id, c.company_name, cu.name AS client_name
-               FROM projects p JOIN clients c ON c.id = p.client_id JOIN users cu ON cu.id = c.user_id
+            'SELECT p.*, c.user_id AS client_user_id, c.public_id AS client_public_id, c.company_name, c.contact_name AS client_name
+               FROM projects p JOIN clients c ON c.id = p.client_id
               WHERE p.public_id = ?',
             [$publicId],
         );
     }
 
-    /** @param array<string,mixed> $project a row from find() */
-    public static function canView(int $userId, array $project): bool
+    /** @return array<string,mixed>|null */
+    public static function findById(int $id): ?array
+    {
+        $row = Database::one('SELECT public_id FROM projects WHERE id = ?', [$id]);
+
+        return $row === null ? null : self::find((string) $row['public_id']);
+    }
+
+    /** @param array<string,mixed> $project a row from find() @return 'all'|'assigned'|'own'|null */
+    public static function level(int $userId, array $project): ?string
     {
         if (!self::isActive($userId)) {
-            return false;
+            return null;
         }
+        $archived = $project['archived_at'] !== null;
         if (Gate::can('projects.view_all', $userId)) {
-            return true;
+            return 'all';
+        }
+        if ($archived) {
+            return null;
         }
         if (Gate::can('projects.view_assigned', $userId) && self::isAssigned($userId, (int) $project['id'])) {
-            return true;
+            return 'assigned';
+        }
+        if (Gate::can('projects.view_own', $userId) && $project['client_user_id'] !== null && (int) $project['client_user_id'] === $userId) {
+            return 'own';
         }
 
-        return Gate::can('projects.view_own', $userId) && (int) $project['client_user_id'] === $userId;
+        return null;
+    }
+
+    /** @param array<string,mixed> $project */
+    public static function canView(int $userId, array $project): bool
+    {
+        return self::level($userId, $project) !== null;
+    }
+
+    /**
+     * Permission AND staff-level access to the project (level 'all' or 'assigned').
+     *
+     * @param array<string,mixed> $project
+     */
+    public static function canStaff(int $userId, array $project, string $permission): bool
+    {
+        return in_array(self::level($userId, $project), ['all', 'assigned'], true) && Gate::can($permission, $userId);
+    }
+
+    /** @param array<string,mixed> $project */
+    public static function authorizeStaff(int $userId, array $project, string $permission): void
+    {
+        if (!self::canStaff($userId, $project, $permission)) {
+            Logger::security('Project ability denied', ['user' => $userId, 'project' => (int) $project['id'], 'permission' => $permission]);
+            throw new HttpException(403);
+        }
     }
 
     /** @return array<string,mixed> the project; throws 404 when missing or not visible to the user */
@@ -77,19 +116,18 @@ final class ProjectPolicy
     }
 
     /**
-     * Projects visible to the user (same rules as canView, expressed in SQL).
+     * SQL fragment + params restricting `projects p` (joined with `clients c`) to what the user may see.
+     * Returns null when the user can see nothing. Same rules as level().
      *
-     * @return list<array<string,mixed>>
+     * @return array{0:string,1:list<mixed>}|null
      */
-    public static function visibleTo(int $userId): array
+    public static function scopeSql(int $userId): ?array
     {
         if (!self::isActive($userId)) {
-            return [];
+            return null;
         }
-        $base = 'SELECT p.public_id, p.title, p.status, p.created_at, c.company_name, cu.name AS client_name
-                   FROM projects p JOIN clients c ON c.id = p.client_id JOIN users cu ON cu.id = c.user_id';
         if (Gate::can('projects.view_all', $userId)) {
-            return Database::all($base . ' ORDER BY p.created_at DESC, p.id DESC');
+            return ['1=1', []];
         }
         $or = [];
         $params = [];
@@ -102,16 +140,65 @@ final class ProjectPolicy
             $params[] = $userId;
         }
         if ($or === []) {
-            return [];
+            return null;
         }
 
-        return Database::all($base . ' WHERE (' . implode(' OR ', $or) . ') ORDER BY p.created_at DESC, p.id DESC', $params);
+        // Non-admins never see archived projects.
+        return ['(' . implode(' OR ', $or) . ') AND p.archived_at IS NULL', $params];
+    }
+
+    /**
+     * @param array{q?:string,status?:string,priority?:string,service?:string,client?:string,archived?:bool} $filters
+     * @return array{rows:list<array<string,mixed>>,total:int}
+     */
+    public static function visibleTo(int $userId, array $filters = [], int $page = 1, int $perPage = 20): array
+    {
+        $scope = self::scopeSql($userId);
+        if ($scope === null) {
+            return ['rows' => [], 'total' => 0];
+        }
+        [$where, $params] = $scope;
+        $where = [$where];
+        $q = trim((string) ($filters['q'] ?? ''));
+        if ($q !== '') {
+            $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q) . '%';
+            $where[] = '(p.title LIKE ? OR p.code LIKE ? OR c.contact_name LIKE ? OR c.company_name LIKE ?)';
+            array_push($params, $like, $like, $like, $like);
+        }
+        foreach (['status' => 'p.status', 'priority' => 'p.priority', 'service' => 'p.service_category'] as $key => $col) {
+            if (($filters[$key] ?? '') !== '') {
+                $where[] = "{$col} = ?";
+                $params[] = $filters[$key];
+            }
+        }
+        if (($filters['client'] ?? '') !== '') {
+            $where[] = 'c.public_id = ?';
+            $params[] = $filters['client'];
+        }
+        // Archived projects only when explicitly asked for AND the user could see them at all (view_all).
+        if (!empty($filters['archived'])) {
+            $where[] = 'p.archived_at IS NOT NULL';
+        } else {
+            $where[] = 'p.archived_at IS NULL';
+        }
+        $w = implode(' AND ', $where);
+        $base = "FROM projects p JOIN clients c ON c.id = p.client_id WHERE {$w}";
+        $total = (int) Database::one("SELECT COUNT(*) AS c {$base}", $params)['c'];
+        $offset = max(0, ($page - 1) * $perPage);
+        $rows = Database::all(
+            "SELECT p.id, p.public_id, p.code, p.title, p.status, p.priority, p.service_category, p.start_date, p.target_date, p.created_at, p.archived_at,
+                    c.public_id AS client_public_id, c.company_name, c.contact_name AS client_name,
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.archived_at IS NULL AND t.status <> 'cancelled') AS task_total,
+                    (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND t.archived_at IS NULL AND t.status = 'completed') AS task_done
+               {$base} ORDER BY p.created_at DESC, p.id DESC LIMIT {$perPage} OFFSET {$offset}",
+            $params,
+        );
+
+        return ['rows' => $rows, 'total' => $total];
     }
 
     private static function isActive(int $userId): bool
     {
-        $row = Database::one("SELECT 1 AS x FROM users WHERE id = ? AND status = 'active'", [$userId]);
-
-        return $row !== null;
+        return Database::one("SELECT 1 AS x FROM users WHERE id = ? AND status = 'active'", [$userId]) !== null;
     }
 }

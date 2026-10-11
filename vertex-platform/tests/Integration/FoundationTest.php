@@ -37,11 +37,11 @@ final class FoundationTest extends DatabaseTestCase
 
     public function testForeignKeysAndUniqueConstraintsExist(): void
     {
-        $fks = (int) Database::one(
-            "SELECT COUNT(*) c FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE()",
-        )['c'];
-        // role_permissions 2, user_roles 3, users 1, auth_tokens 1, clients 1, projects 2, project_assignments 4, referrals 2
-        $this->assertSame(16, $fks);
+        $have = array_column(Database::all('SELECT CONSTRAINT_NAME n FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA = DATABASE()'), 'n');
+        foreach (['fk_rp_role', 'fk_ur_user', 'fk_users_deactivated_by', 'fk_auth_tokens_user', 'fk_clients_user', 'fk_projects_client', 'fk_pa_project', 'fk_pa_assigned_by'] as $fk) {
+            $this->assertContains($fk, $have, "{$fk} missing");
+        }
+        $this->assertGreaterThanOrEqual(16, count($have), 'foreign keys only ever grow');
         foreach ([['users', 'uq_users_email'], ['users', 'uq_users_public_id'], ['project_assignments', 'uq_assignment_project_user'], ['auth_tokens', 'uq_auth_tokens_hash'], ['clients', 'uq_clients_user']] as [$t, $idx]) {
             $this->assertNotNull(Database::one('SELECT 1 AS x FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?', [$t, $idx]), "{$t}.{$idx} missing");
         }

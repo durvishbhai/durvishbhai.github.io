@@ -40,6 +40,12 @@ final class View
             throw new RuntimeException("View not found: {$view}");
         }
 
+        foreach (['data', 'file'] as $reserved) {
+            if (array_key_exists($reserved, $data)) {
+                throw new RuntimeException("View variable '{$reserved}' is reserved by the renderer; choose another name.");
+            }
+        }
+
         return (static function () use ($file, $data): string {
             extract($data, EXTR_SKIP);
             ob_start();

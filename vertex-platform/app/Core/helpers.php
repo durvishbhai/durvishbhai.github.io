@@ -54,6 +54,13 @@ if (!function_exists('csrf_field')) {
     }
 }
 
+if (!function_exists('csrf_token')) {
+    function csrf_token(): string
+    {
+        return Csrf::token();
+    }
+}
+
 if (!function_exists('flash')) {
     function flash(string $key): mixed
     {
@@ -107,5 +114,18 @@ if (!function_exists('status_label')) {
     function status_label(string $status): string
     {
         return ucfirst(str_replace('_', ' ', $status));
+    }
+}
+
+if (!function_exists('format_minutes')) {
+    /** 90 -> "1h 30m". */
+    function format_minutes(int|string|null $minutes): string
+    {
+        $m = (int) $minutes;
+        if ($m <= 0) {
+            return '0m';
+        }
+
+        return ($m >= 60 ? intdiv($m, 60) . 'h' . ($m % 60 > 0 ? ' ' . ($m % 60) . 'm' : '') : $m . 'm');
     }
 }

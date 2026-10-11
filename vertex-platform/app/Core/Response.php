@@ -31,6 +31,20 @@ final class Response
         return new self($status, '', ['Location' => $to]);
     }
 
+    /** Forces a download (never inline) of a stored file. */
+    public static function download(string $path, string $name, string $mime): self
+    {
+        $safe = (string) preg_replace('/[^A-Za-z0-9._ -]/', '_', $name);
+
+        return new self(200, (string) file_get_contents($path), [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => "attachment; filename=\"{$safe}\"; filename*=UTF-8''" . rawurlencode($name),
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+            'Content-Length' => (string) filesize($path),
+        ]);
+    }
+
     public function withHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;

@@ -62,7 +62,7 @@ abstract class DatabaseTestCase extends TestCase
     {
         $pdo = Database::connection();
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['project_assignments', 'projects', 'referrals', 'clients', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
+        foreach (['price_change_requests', 'price_revisions', 'task_time_entries', 'task_comments', 'task_dependencies', 'tasks', 'milestones', 'project_notes', 'project_activity', 'enquiry_followups', 'enquiry_activity', 'attachments', 'enquiries', 'client_notes', 'project_assignments', 'projects', 'referrals', 'clients', 'reference_sequences', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
             $pdo->exec("TRUNCATE TABLE {$t}");
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
@@ -77,10 +77,35 @@ abstract class DatabaseTestCase extends TestCase
     {
         $id = (new UserRepository())->create('User ' . $email, $email, password_hash($password, PASSWORD_DEFAULT), $status, $roles, null, $phone, $status === 'active');
         if (in_array('client', $roles, true)) {
-            Database::run('INSERT INTO clients (public_id, user_id, created_at, updated_at) VALUES (?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())', [uuid_hex(), $id]);
+            $this->makeClientRecord($id, 'User ' . $email, $email);
         }
 
         return $id;
+    }
+
+    /** Creates the client profile row for a portal user. @return int client id */
+    protected function makeClientRecord(int $userId, string $name, string $email, ?string $company = null): int
+    {
+        Database::run(
+            "INSERT INTO clients (public_id, user_id, client_type, contact_name, email, company_name, company_norm, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [uuid_hex(), $userId, $company ? 'business' : 'individual', $name, $email, $company, $company ? mb_strtolower($company) : null],
+        );
+
+        return Database::insertId();
+    }
+
+    /** Creates a client WITHOUT a portal login. @return array{id:int,public_id:string} */
+    protected function makeLooseClient(string $name, string $email, ?string $company = null, ?string $phone = null): array
+    {
+        $pub = uuid_hex();
+        Database::run(
+            "INSERT INTO clients (public_id, user_id, client_type, contact_name, email, phone, phone_digits, company_name, company_norm, status, created_at, updated_at)
+             VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $company ? 'business' : 'individual', $name, $email, $phone, $phone === null ? null : substr(preg_replace('/\D/', '', $phone), -10), $company, $company ? mb_strtolower($company) : null],
+        );
+
+        return ['id' => Database::insertId(), 'public_id' => $pub];
     }
 
     /** Creates a project owned by the given CLIENT user. @return array{id:int,public_id:string} */
@@ -89,8 +114,8 @@ abstract class DatabaseTestCase extends TestCase
         $client = Database::one('SELECT id FROM clients WHERE user_id = ?', [$clientUserId]);
         $pub = uuid_hex();
         Database::run(
-            "INSERT INTO projects (public_id, client_id, title, status, created_at, updated_at) VALUES (?, ?, ?, 'active', UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$pub, $client['id'], $title],
+            "INSERT INTO projects (public_id, code, client_id, title, status, status_changed_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'in_progress', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, \Vertex\Services\CrmReference::next('project'), $client['id'], $title],
         );
 
         return ['id' => Database::insertId(), 'public_id' => $pub];

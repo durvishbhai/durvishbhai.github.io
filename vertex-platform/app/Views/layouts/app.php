@@ -8,7 +8,14 @@ $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name
 $path = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 $nav = [
     ['/dashboard', 'Dashboard', true],
+    ['/crm', 'CRM', can('enquiries.view_all') || can('enquiries.view_assigned')],
+    ['/clients', 'Clients', can('clients.view_all') || can('clients.view_assigned')],
+    ['/my/company', 'My company', can('clients.view_own')],
+    ['/partner/referrals', 'My referrals', can('enquiries.view_own')],
     ['/projects', 'Projects', can('projects.view_all') || can('projects.view_assigned') || can('projects.view_own')],
+    ['/tasks', 'Tasks', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
+    ['/board', 'Board', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
+    ['/deadlines', 'Deadlines', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
     ['/admin/users', 'Users', can('users.view')],
     ['/admin/roles', 'Roles', can('roles.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
@@ -22,6 +29,7 @@ $nav = [
     <title><?= e($pageTitle) ?></title>
     <meta name="theme-color" content="#05070d">
     <meta name="robots" content="noindex,nofollow">
+    <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 </head>
