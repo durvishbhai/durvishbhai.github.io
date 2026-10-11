@@ -10,7 +10,7 @@ use Vertex\Core\Env;
  *    administrator and may differ when the contract says so.
  *  - sla is EMPTY: no response/resolution target is promised or tracked until a separately approved SLA is configured. When filled
  *    in, targets are INTERNAL (dashboards only) and are never shown to clients.
- *      'sla' => ['critical' => ['first_response_hours' => 4, 'resolution_hours' => 48], 'high' => [...], ...]
+ *      'sla' => ['first_response_hours' => 4]   // tickets with no staff reply that long are counted as "past target" on the dashboard
  */
 return [
     'warranty_default_months' => max(1, (int) Env::get('WARRANTY_DEFAULT_MONTHS', 6)),

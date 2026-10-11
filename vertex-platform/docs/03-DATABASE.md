@@ -198,3 +198,27 @@ erDiagram
 ```
 
 Rules: every foreign key above is `RESTRICT` (or `SET NULL` for optional user/task/milestone links); `deliverable_versions` has `UNIQUE (deliverable_id, version_no)` and `CHECK (file_id IS NOT NULL OR external_url IS NOT NULL)`; one current policy per scope via `current_flag`; `UNIQUE (user_id, dedupe_key)` on notifications and `UNIQUE (user_id, submit_token)` on client approvals/`(requested_by, submit_token)` on revisions make retries idempotent; stored paths are unique random strings.
+
+
+## Phase 5: support tickets and warranty (migration 0009)
+
+```mermaid
+erDiagram
+    clients ||--o{ tickets : owns
+    projects |o--o{ tickets : "optional"
+    users |o--o{ tickets : "requester / assignee"
+    tickets ||--o| bug_reports : "kind = bug"
+    tickets ||--o{ ticket_messages : "client-visible conversation"
+    tickets ||--o{ ticket_notes : "staff-only notes"
+    tickets ||--o{ ticket_files : attaches
+    stored_files ||--o{ ticket_files : stores
+    ticket_messages |o--o{ ticket_files : "optional"
+    tickets ||--o{ ticket_activity : "history"
+    tickets ||--o{ ticket_reads : "unread markers"
+    tickets |o--o{ change_requests : "chargeable bug proposal"
+    projects ||--o| project_warranties : "recorded warranty"
+    warranty_terms ||--o{ project_warranties : "terms version"
+    projects ||--o{ warranty_history : "append-only"
+```
+
+Rules: every foreign key is `RESTRICT` (or `SET NULL` for optional user links; `ticket_reads.user_id` cascades with the user); `UNIQUE (requester_id, submit_token)` and `UNIQUE (author_id, submit_token)` make retried form posts idempotent; one warranty row per project (`UNIQUE project_id`); one current terms version (`current_flag`); warranty status is not stored, it is derived from the recorded dates and today's date; `ticket_notes` and `ticket_messages` are different tables so no conversation query can return an internal note.

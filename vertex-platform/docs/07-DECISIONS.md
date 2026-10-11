@@ -69,6 +69,23 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-46 | Files are **download-only** (`attachment`); no inline preview or streaming. 50 MB default limit (configurable), zip allowed as "source files" and never extracted. | Security first; add previews later behind a sandbox/CDN decision. |
 | D-47 | Notifications are in-app only; the dedupe key makes retries safe. Email delivery needs D-03 (SMTP). | |
 
+## Decisions taken in Phase 5 (please confirm or change)
+
+| ID | Decision I made | Why / how to change |
+|---|---|---|
+| D-48 | **The warranty start date is never inferred.** It is a recorded date plus a recorded basis; project status, approvals and publications are shown to administrators as hints only. No record on a website project = Pending Confirmation. | The brief forbids guessing the start date. |
+| D-49 | **End date = same calendar day N months later, clamped to month end, and that day is covered.** `WARRANTY_END_DAY_BEFORE=true` flips it to "the day before". | Contracts differ; confirm the wording of your agreement. |
+| D-50 | Warranty status is **derived on every read** from the recorded facts and today's date in the app time zone: no cron, nothing to go stale. | Expiry *reminders* need the Phase 7 scheduler. |
+| D-51 | `warranty.manage` and `warranty.override` are **Administrator-only and sensitive**; Managers/Support lost the Phase 0 default `warranty.manage` (migration 0009). Managers can view warranties and decide per-issue eligibility. | Role editor. |
+| D-52 | **Covering an issue the warranty did not cover, and changing an earlier decision, are overrides** (administrator, flagged, audited). Not covered / potentially chargeable are ordinary reviewer decisions. | The brief: only authorised admins override sensitive eligibility decisions. |
+| D-53 | One `tickets` table with `kind` (bug or support) and two workflows; client-visible messages and internal notes are separate tables; staff names are replaced by "Vertex support team" for clients. | Keeps internal data physically separate from client queries. |
+| D-54 | **Workers** see only technical categories (bug report, technical support, project query, domain/hosting) on projects they are assigned to; they cannot reply to clients or see cost proposals. | `config/workflow.php -> ticket_technical_categories`. |
+| D-55 | A client may reopen a closed ticket within **30 days** (`CLIENT_REOPEN_DAYS`); later they open a new ticket. Staff may always reopen. | Prevents resurrecting old threads while never blocking staff. |
+| D-56 | **No SLA / response-time promise.** `support.sla` ships empty; "overdue" exists only if a first-response target is configured. | The brief: no SLA promises unless configured. |
+| D-57 | A *potentially chargeable* bug **cannot start work** until a cost proposal is approved by the client. The proposal reuses `change_requests`; there is still no quotation/invoice integration (consent record only). | Keeps the client-approval rule without inventing billing. |
+| D-58 | Nothing closes automatically: replies and uploads never change a status except returning "Need more information"/"Awaiting client response" to the team. | The brief. |
+| D-59 | Assignment is allowed to anyone who can work tickets (`tickets.reply/note/bugs.fix/update_status`) and either can already open the ticket or holds `tickets.view_assigned` (the assignment grants access). Clients, partners and workers on other projects cannot be assigned. | `TicketAccess::canBeAssigned`. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

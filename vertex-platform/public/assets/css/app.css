@@ -340,3 +340,7 @@ form.is-busy { opacity: 0.7; pointer-events: none; }
 .badge-w-scheduled, .badge-w-pending_confirmation { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
 .badge-w-expired, .badge-w-suspended { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
 .badge-w-not_applicable { color: var(--text-dim); }
+.field .check { display: flex; flex-direction: row; align-items: baseline; gap: 10px; color: var(--text); margin-bottom: 2px; }
+.field .check input { width: auto; flex: none; }
+fieldset.field { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+fieldset.field legend { color: var(--text-dim); font-size: 0.85rem; padding: 0 6px; }

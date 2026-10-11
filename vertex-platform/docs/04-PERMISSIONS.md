@@ -23,6 +23,8 @@ Generated from `config/permissions.php` with `php bin/console.php permissions:ma
 
 14. **Phase 3 additions.** Deliverables: `DeliverablePolicy` (staff need `deliverables.view`; `deliverables.view_drafts` is what lets anyone see unpublished work; clients and staff without it see only what was published). Uploading (`deliverables.upload`), internal QA (`deliverables.review`), publishing (`deliverables.publish`) and archiving (`deliverables.archive`) are separate permissions; **workers can upload but never publish, review or archive by default.** Files: `files.download` plus the same visibility rule on every download. Revisions: `RevisionAccess` (staff: `revisions.manage` + project access; client: only requests they submitted). Classifying as chargeable and proposing cost is `revisions.classify` (manager/administrator); overriding a classification and editing revision policies are `revisions.override` / `revisions.policy` (administrator, sensitive). **Only the client** holds `deliverables.respond` (approve/reject) and `revisions.respond_cost` (approve extra cost): no staff role, including Administrator, can accept on a client's behalf. Referral partners hold none of these.
 
+15. **Phase 5 additions.** Tickets and bug reports: `TicketAccess` (client: own client record only, drafts only for their author; staff: `tickets.view_all`, or `tickets.view_assigned` for tickets assigned to them and tickets on projects they are assigned to; workers: `tickets.view_technical`, technical categories on assigned projects only, never billing, payment or account-access tickets, never reply to clients). The client moves a ticket only to confirm a fix, reopen it or close their own resolved ticket; triage, confirm, in-progress and fixed are staff or assigned-developer moves (`bugs.manage`, `bugs.fix`). **`warranty.manage` (contractual warranty settings) and `warranty.override` (override a recorded eligibility decision) are Administrator-only and sensitive**; the earlier default grant of `warranty.manage` to Manager and Support was removed by migration 0009. Managers and Support can *view* warranty terms and dates (`warranty.view`) and decide per-issue eligibility (`bugs.review_eligibility`, Manager only); changing an earlier decision, or covering an issue the warranty did not cover when it was reported, needs `warranty.override`. Proposing a chargeable change is `tickets.propose_change` (Manager and Administrator); only the client approves it (`revisions.respond_cost`). Administrators hold none of the client-only ticket permissions.
+
 Users can hold several roles; permissions are the union.
 
 ## Default matrix
@@ -137,10 +139,28 @@ Users can hold several roles; permissions are the union.
 | `revisions.override` — Override a revision classification (audited) | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `revisions.policy` — Manage revision policies and terms | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `revisions.respond_cost` — Approve or decline a proposed additional cost on own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
-| `bugs.report` — Report a bug (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
-| `bugs.manage` — Triage and resolve bugs | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
-| `warranty.view_own` — View own warranty status (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
-| `warranty.manage` — Manage warranty records | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `bugs.report` — Report a bug (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `bugs.manage` — Triage bug reports: triage, confirm, request information, reject, change severity/priority | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `bugs.fix` — Mark assigned bug fixes in progress and fixed | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ |  |  |
+| `bugs.review_eligibility` — Decide the warranty eligibility of a bug report | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tickets.create` — Create support tickets (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `tickets.view_own` — View own support tickets and bug reports (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `tickets.reply_own` — Reply to, confirm or reopen own tickets (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `tickets.view_all` — View every ticket and bug report | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `tickets.view_assigned` — View tickets on assigned projects and tickets assigned to the user | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `tickets.view_technical` — View technical tickets and bug reports on assigned projects (no billing/account tickets) | ✔ | ✔ |  |  |  | ✔ | ✔ | ✔ |  |  |
+| `tickets.reply` — Reply to clients on tickets | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `tickets.note` — Add internal notes and technical findings | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  |  |
+| `tickets.assign` — Assign and reassign tickets | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `tickets.update_status` — Move tickets through their status workflow | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `tickets.close` — Close and reopen tickets | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `tickets.escalate` — Escalate a ticket | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `tickets.propose_change` — Propose a chargeable change for a ticket (client approval still required) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `support.dashboard` — View the support dashboards and warranty reports | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `warranty.view_own` — View own warranty status (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `warranty.view` — View recorded warranty terms and dates (staff) | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
+| `warranty.manage` — Configure contractual warranty settings (duration, start date, terms, suspension) | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `warranty.override` — Override a recorded warranty eligibility decision (audited) | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `requirements.submit` — Submit a requirements form (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `requirements.view` — View submitted requirements | ✔ | ✔ | ✔ |  | ✔ |  |  |  |  |  |
 | `appointments.book` — Book an appointment (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |

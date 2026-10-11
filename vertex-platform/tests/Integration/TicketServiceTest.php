@@ -749,6 +749,26 @@ final class TicketServiceTest extends DatabaseTestCase
         $this->assertStringContainsString('covered', $a['after_json']);
     }
 
+    public function testDatesConfirmedLaterCanCoverAnEarlierReportWithoutAnOverride(): void
+    {
+        $t = $this->bug(); // reported while the start date was unconfirmed
+        $this->assertSame('submitted_for_assessment', $t['eligibility']);
+        WarrantyService::record($this->admin, $this->alphaRow(), ['eligibility' => 'eligible', 'months' => '6', 'start_date' => AppTime::todayPlus(-3), 'start_basis' => 'client_acceptance']);
+        $this->decide($this->manager, $this->fresh($t));
+        $r = $this->fresh($t);
+        $this->assertSame(['covered', 0], [$r['eligibility'], (int) $r['eligibility_overridden']], 'the recorded period includes the day it was reported');
+        // a report that pre-dates the warranty start is still outside the period: override needed
+        $u = $this->bug(['title' => 'Reported before the start']);
+        Database::run("UPDATE tickets SET submitted_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) WHERE id = ?", [$u['id']]);
+        Database::run("UPDATE bug_reports SET warranty_snapshot_json = '{\"status\":\"pending_confirmation\"}' WHERE ticket_id = ?", [$u['id']]);
+        $this->expectThrows(fn () => $this->decide($this->manager, $this->fresh($u)), ValidationException::class);
+        // a suspended warranty covers nothing without an override
+        WarrantyService::setSuspended($this->admin, $this->alphaRow(), true, 'Unpaid balance per agreement');
+        $v = $this->bug(['title' => 'Reported while suspended']);
+        Database::run("UPDATE bug_reports SET warranty_snapshot_json = '{\"status\":\"suspended\"}' WHERE ticket_id = ?", [$v['id']]);
+        $this->expectThrows(fn () => $this->decide($this->manager, $this->fresh($v)), ValidationException::class);
+    }
+
     public function testOnlyAuthorisedStaffMayReviewEligibility(): void
     {
         $t = $this->bug();

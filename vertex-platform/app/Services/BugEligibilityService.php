@@ -63,8 +63,7 @@ final class BugEligibilityService
         $considerations = array_keys($considerations);
         $quotation = $decision === 'potentially_chargeable' || !empty($in['quotation_required']);
 
-        $snapshot = json_decode((string) $t['warranty_snapshot_json'], true);
-        $activeAtSubmission = is_array($snapshot) && ($snapshot['status'] ?? null) === 'active';
+        $activeAtSubmission = self::periodCoveredSubmission($t);
         $previous = $t['eligibility'];
         $isFinal = in_array($previous, self::DECISIONS, true);
         $override = ($decision === 'covered' && !$activeAtSubmission) || ($isFinal && $previous !== $decision);
@@ -98,6 +97,28 @@ final class BugEligibilityService
             Notifier::send([(int) $t['client_user_id']], 'ticket.eligibility', 'Warranty review of your bug report', "{$t['reference']}: " . Config::get("workflow.bug_eligibility.{$decision}"),
                 '/tickets/' . $t['public_id'], $t['project_id'] === null ? null : (int) $t['project_id'], 'ticket', (int) $t['id'], "ticket:{$t['id']}:eligibility:{$n}");
         });
+    }
+
+    /**
+     * Did the recorded warranty period include the day the bug was reported? True when the warranty was Active at that moment, or when
+     * the dates were confirmed LATER and the recorded period (not suspended) includes the submission day in the application time zone.
+     *
+     * @param array<string,mixed> $t
+     */
+    public static function periodCoveredSubmission(array $t): bool
+    {
+        $snapshot = json_decode((string) $t['warranty_snapshot_json'], true);
+        if (is_array($snapshot) && ($snapshot['status'] ?? null) === 'active') {
+            return true;
+        }
+        $project = $t['project_id'] === null ? null : ProjectPolicy::findById((int) $t['project_id']);
+        $w = $project === null ? null : WarrantyService::forProject($project)['row'];
+        if ($w === null || $w['eligibility'] !== 'eligible' || (int) $w['suspended'] === 1 || $w['start_date'] === null || $w['end_date'] === null || ($t['submitted_at'] ?? null) === null) {
+            return false;
+        }
+        $day = (new \DateTimeImmutable((string) $t['submitted_at'], new \DateTimeZone('UTC')))->setTimezone(AppTime::zone())->format('Y-m-d');
+
+        return $day >= $w['start_date'] && $day <= $w['end_date'];
     }
 
     /** What the CLIENT may be told about the review: the outcome, the explanation and the terms relied on. Never reviewer identity or internal considerations. @param array<string,mixed> $t @return array<string,mixed> */
