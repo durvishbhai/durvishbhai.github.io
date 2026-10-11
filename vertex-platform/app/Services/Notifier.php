@@ -61,6 +61,18 @@ final class Notifier
         return array_map(static fn (array $r): int => (int) $r['id'], $rows);
     }
 
+    /** Every active user holding $permission (for events that have no project, e.g. a billing ticket). @return list<int> */
+    public static function withPermission(string $permission): array
+    {
+        $rows = Database::all(
+            "SELECT DISTINCT u.id FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN role_permissions rp ON rp.role_id = ur.role_id
+               JOIN permissions p ON p.id = rp.permission_id AND p.perm_key = ? WHERE u.status = 'active'",
+            [$permission],
+        );
+
+        return array_map(static fn (array $r): int => (int) $r['id'], $rows);
+    }
+
     /** The portal login of the project's client, if the client has one. @return list<int> */
     public static function clientOf(int $projectId): array
     {

@@ -119,6 +119,86 @@ return [
 
     'due_soon_days' => 7,
 
+    // ---- Phase 5: support tickets, bug reports, warranty ------------------------------------------------------------------------
+
+    'ticket_categories' => [
+        'bug_report' => 'Bug Report', 'technical_support' => 'Technical Support', 'project_query' => 'Project Query', 'billing' => 'Billing',
+        'payment' => 'Payment', 'account_access' => 'Account Access', 'domain_hosting' => 'Domain and Hosting', 'general_enquiry' => 'General Enquiry', 'other' => 'Other',
+    ],
+    /** Categories a worker (tickets.view_technical) may ever see: never billing, payment or account-access tickets. */
+    'ticket_technical_categories' => ['bug_report', 'technical_support', 'project_query', 'domain_hosting'],
+
+    // SEVERITY (how bad the problem is) and PRIORITY (how urgently staff schedule it) are separate fields.
+    'bug_severities' => [
+        'low' => 'Low: minor visual or non-critical issue', 'normal' => 'Normal: standard functional issue',
+        'high' => 'High: significant feature disruption', 'critical' => 'Critical: major outage or severe business impact',
+    ],
+    'bug_severity_short' => ['low' => 'Low', 'normal' => 'Normal', 'high' => 'High', 'critical' => 'Critical'],
+
+    'bug_statuses' => [
+        'draft' => 'Draft', 'open' => 'Open', 'triaged' => 'Triaged', 'confirmed' => 'Confirmed', 'in_progress' => 'In Progress', 'fixed' => 'Fixed',
+        'client_verification' => 'Client Verification', 'closed' => 'Closed', 'need_more_information' => 'Need More Information',
+        'unable_to_reproduce' => 'Unable to Reproduce', 'rejected' => 'Rejected with Explanation',
+    ],
+    'support_statuses' => [
+        'open' => 'Open', 'assigned' => 'Assigned', 'in_progress' => 'In Progress', 'awaiting_client_response' => 'Awaiting Client Response',
+        'awaiting_internal_team' => 'Awaiting Internal Team', 'resolved' => 'Resolved', 'closed' => 'Closed', 'reopened' => 'Reopened',
+    ],
+    'ticket_statuses_closed' => ['closed'],
+    'ticket_statuses_resolved' => ['resolved', 'closed', 'rejected', 'unable_to_reproduce'],
+
+    /*
+     * Who may make a move. Letters: S staff handling the ticket (bugs.manage for bugs, tickets.update_status for support tickets),
+     * F fixer (bugs.fix), K closer (tickets.close), C the owning client (tickets.reply_own), X = only the dedicated workflow
+     * (submit a draft, the chargeable-cost approval). The client can never make a technical move (triage, confirm, in progress, fixed).
+     */
+    'bug_transitions' => [
+        'draft' => ['open' => 'X'],
+        'open' => ['triaged' => 'S', 'need_more_information' => 'S', 'unable_to_reproduce' => 'S', 'rejected' => 'S', 'closed' => 'K'],
+        'triaged' => ['confirmed' => 'S', 'need_more_information' => 'S', 'unable_to_reproduce' => 'S', 'rejected' => 'S', 'closed' => 'K'],
+        'confirmed' => ['in_progress' => 'SF', 'need_more_information' => 'S', 'rejected' => 'S', 'closed' => 'K'],
+        'in_progress' => ['fixed' => 'SF', 'confirmed' => 'S', 'need_more_information' => 'S', 'closed' => 'K'],
+        'fixed' => ['client_verification' => 'SF', 'in_progress' => 'SF', 'closed' => 'K'],
+        'client_verification' => ['closed' => 'CK', 'open' => 'C', 'in_progress' => 'S'],
+        'need_more_information' => ['open' => 'C', 'rejected' => 'S', 'closed' => 'K'],
+        'unable_to_reproduce' => ['open' => 'C', 'closed' => 'CK'],
+        'rejected' => ['open' => 'C', 'closed' => 'K'],
+        'closed' => ['open' => 'CK'],
+    ],
+    'support_transitions' => [
+        'open' => ['assigned' => 'S', 'in_progress' => 'S', 'awaiting_client_response' => 'S', 'awaiting_internal_team' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+        'assigned' => ['open' => 'S', 'in_progress' => 'S', 'awaiting_client_response' => 'S', 'awaiting_internal_team' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+        'in_progress' => ['assigned' => 'S', 'awaiting_client_response' => 'S', 'awaiting_internal_team' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+        'awaiting_client_response' => ['in_progress' => 'SC', 'awaiting_internal_team' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+        'awaiting_internal_team' => ['in_progress' => 'S', 'awaiting_client_response' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+        'resolved' => ['closed' => 'CK', 'reopened' => 'CS'],
+        'closed' => ['reopened' => 'CK'],
+        'reopened' => ['assigned' => 'S', 'in_progress' => 'S', 'awaiting_client_response' => 'S', 'awaiting_internal_team' => 'S', 'resolved' => 'S', 'closed' => 'K'],
+    ],
+    /** Moves that need a written explanation (shown to the client). */
+    'ticket_note_required' => ['rejected', 'unable_to_reproduce', 'need_more_information', 'reopened_by_client', 'open_by_client'],
+
+    // Warranty review of a bug report.
+    'bug_eligibility' => [
+        'awaiting_technical_review' => 'Awaiting technical review',
+        'submitted_for_assessment' => 'Submitted for assessment',
+        'covered' => 'Covered by the warranty',
+        'not_covered' => 'Not covered by the warranty',
+        'potentially_chargeable' => 'Potentially chargeable',
+    ],
+    /** Points a reviewer may weigh. They are CONSIDERATIONS only, never automatic exclusions: the contract decides. */
+    'bug_considerations' => [
+        'new_feature' => 'Request for a new feature', 'scope_change' => 'Change to the originally approved scope', 'client_modification' => 'Client modification of code or configuration',
+        'third_party' => 'Third-party service failure', 'hosting_domain_api' => 'Hosting, domain or external API problem', 'environment_change' => 'Unsupported software or environment change',
+    ],
+
+    'warranty_statuses' => [
+        'not_applicable' => 'Not Applicable', 'pending_confirmation' => 'Pending Confirmation', 'scheduled' => 'Scheduled',
+        'active' => 'Active', 'expired' => 'Expired', 'suspended' => 'Suspended',
+    ],
+    'warranty_start_bases' => ['final_delivery' => 'Final delivery', 'client_acceptance' => 'Client acceptance', 'contract_date' => 'Manually confirmed contractual start date'],
+
+
     // ---- Phase 3: deliverables, versions, revisions ------------------------------------------------------------------------
 
     'deliverable_categories' => [

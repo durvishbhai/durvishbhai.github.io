@@ -20,6 +20,8 @@ final class CrmReference
         'deliverable' => ['DLV', 4],
         'revision' => ['REV', 5],
         'change' => ['CHG', 5],
+        'bug' => ['BUG', 5],
+        'ticket' => ['TKT', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string

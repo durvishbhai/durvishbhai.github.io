@@ -25,5 +25,7 @@ return [
         'upload_user' => [40, 3600],
         'download_user' => [200, 3600],
         'revision_user' => [20, 3600],
+        'ticket_create_user' => [20, 3600],
+        'ticket_message_user' => [60, 3600],
     ],
 ];
