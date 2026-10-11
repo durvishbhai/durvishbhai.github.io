@@ -43,7 +43,7 @@ final class RevisionController extends Controller
             'mine' => $staff && $request->string('mine') === '1',
             'open' => $request->string('open') === '1',
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = RevisionQuery::paginate($uid, $f, $page, self::PER_PAGE);
 
         return $this->page($staff ? 'pages/revisions' : 'pages/client-revisions', [

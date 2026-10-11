@@ -39,7 +39,7 @@ final class DeliverableController extends Controller
             return Response::redirect('/my/deliverables');
         }
         $f = $this->filters($request);
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = DeliverableQuery::paginate($uid, $f, $page, self::PER_PAGE);
 
         return $this->page('pages/deliverables', [
@@ -63,7 +63,7 @@ final class DeliverableController extends Controller
         $staff = in_array($level, ['all', 'assigned'], true);
         $f = $this->filters($request);
         $f['project'] = $project['public_id'];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = DeliverableQuery::paginate($uid, $f, $page, self::PER_PAGE);
         $canUpload = $staff && ProjectPolicy::canStaff($uid, $project, 'deliverables.upload') && $project['archived_at'] === null && $project['status'] !== 'cancelled';
         $data = [

@@ -16,7 +16,7 @@ final class NotificationController extends Controller
     {
         $uid = $this->actorId();
         $unread = $request->string('unread') === '1';
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = Notifier::paginate($uid, $unread, $page, 25);
 
         return $this->page('pages/notifications', ['title' => 'Notifications', 'rows' => $res['rows'], 'total' => $res['total'], 'page' => $page, 'perPage' => 25, 'unread' => $unread, 'qs' => $unread ? ['unread' => '1'] : []]);

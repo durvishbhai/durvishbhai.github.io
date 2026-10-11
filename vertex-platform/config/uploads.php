@@ -17,7 +17,11 @@ use Vertex\Core\Env;
  */
 $mb = static fn (string $key, int $default): int => max(1, (int) Env::get($key, $default)) * 1024 * 1024;
 
+$root = trim((string) Env::get('UPLOAD_STORAGE_PATH', ''));
+
 return [
+    // Absolute directory for private uploads. Default: <app root>/storage/uploads. Must be outside the web root and writable by PHP.
+    'root' => $root !== '' ? rtrim($root, '/') : VERTEX_ROOT . '/storage/uploads',
     'max_bytes' => [
         'deliverable' => $mb('UPLOAD_MAX_MB', 50),
         'revision' => $mb('UPLOAD_REVISION_MAX_MB', 10),

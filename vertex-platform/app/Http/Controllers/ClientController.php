@@ -45,7 +45,7 @@ final class ClientController extends Controller
             'status' => in_array($request->string('status'), ['active', 'inactive'], true) ? $request->string('status') : '',
             'archived' => Gate::can('clients.view_all', $uid) && $request->string('archived') === '1',
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = ClientService::paginate($uid, $f, $page, self::PER_PAGE);
         $qs = $f;
         $qs['archived'] = $f['archived'] ? '1' : '';

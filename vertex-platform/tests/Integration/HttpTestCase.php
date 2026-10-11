@@ -34,6 +34,7 @@ abstract class HttpTestCase extends DatabaseTestCase
             'REGISTRATION_ENABLED' => 'true',
             'MAIL_DRIVER' => 'log',
             'LOGIN_MAX_ATTEMPTS' => '5',
+            'UPLOAD_STORAGE_PATH' => (string) getenv('UPLOAD_STORAGE_PATH'),
         ] + static::extraEnv();
         self::$proc = proc_open(
             [PHP_BINARY, '-S', "127.0.0.1:{$port}", '-t', VERTEX_ROOT . '/public', VERTEX_ROOT . '/bin/dev-router.php'],

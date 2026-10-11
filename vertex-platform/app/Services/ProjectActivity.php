@@ -41,7 +41,7 @@ final class ProjectActivity
     {
         $where = 'a.project_id = ?' . ($clientView ? " AND a.visibility = 'client'" : '');
         $total = (int) Database::one("SELECT COUNT(*) AS c FROM project_activity a WHERE {$where}", [$projectId])['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT a.id, a.event_type, a.subject_type, a.subject_id, a.summary, a.details_json, a.visibility, a.created_at,
                     a.actor_id, u.name AS actor_name

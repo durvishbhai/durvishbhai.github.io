@@ -449,7 +449,7 @@ final class EnquiryService
     public static function timeline(int $enquiryId, int $page = 1, int $perPage = 40): array
     {
         $total = (int) Database::one('SELECT COUNT(*) AS c FROM enquiry_activity WHERE enquiry_id = ?', [$enquiryId])['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT a.id, a.type, a.summary, a.body, a.details_json, a.created_at, a.actor_id, u.name AS actor_name
                FROM enquiry_activity a LEFT JOIN users u ON u.id = a.actor_id WHERE a.enquiry_id = ? ORDER BY a.id DESC LIMIT {$perPage} OFFSET {$offset}",

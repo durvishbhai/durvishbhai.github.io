@@ -73,7 +73,7 @@ final class RevisionQuery
         }
         $cond = implode(' AND ', $w);
         $total = (int) Database::one('SELECT COUNT(*) AS c ' . self::BASE . " WHERE {$cond}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(self::COLS . ' ' . self::BASE . " WHERE {$cond} ORDER BY (r.status IN ('resolved','rejected','cancelled')), r.updated_at DESC, r.id DESC LIMIT {$perPage} OFFSET {$offset}", $params);
 
         return ['rows' => self::shape($userId, $rows), 'total' => $total];

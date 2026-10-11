@@ -64,7 +64,7 @@ abstract class DatabaseTestCase extends TestCase
         foreach (['stored_files', 'attachments'] as $t) { // remove files written by earlier tests
             foreach ($pdo->query("SELECT stored_path FROM {$t}")->fetchAll(\PDO::FETCH_COLUMN) as $rel) {
                 if (preg_match('#^\d{4}/\d{2}/[a-f0-9]{40}$#', (string) $rel)) {
-                    @unlink(VERTEX_ROOT . '/storage/uploads/' . $rel);
+                    @unlink(\Vertex\Services\FileStore::root() . '/' . $rel);
                 }
             }
         }

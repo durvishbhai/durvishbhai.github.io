@@ -58,7 +58,7 @@ final class EnquiryQuery
         $w = implode(' AND ', $where);
         $from = 'FROM enquiries e JOIN crm_stages s ON s.id = e.stage_id LEFT JOIN users o ON o.id = e.owner_id';
         $total = (int) Database::one("SELECT COUNT(*) AS c {$from} WHERE {$w}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT e.public_id, e.reference, e.contact_name, e.company_name, e.email, e.service, e.source, e.priority, e.next_followup_date, e.created_at, e.duplicate_status,
                     e.converted_project_id, e.archived_at, s.name AS stage_name, s.code AS stage_code, s.kind AS stage_kind, o.name AS owner_name

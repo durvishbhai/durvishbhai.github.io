@@ -304,7 +304,7 @@ final class WarrantyService
         $sub = "SELECT p.id, p.public_id, p.code, p.title, p.service_category, c.contact_name, c.company_name, w.duration_months, w.start_basis, w.start_date, w.end_date, w.quotation_ref, {$status} AS wstatus {$base}";
         $outer = 'SELECT * FROM (' . $sub . ') x' . ($having === [] ? '' : ' WHERE ' . str_replace('w.end_date', 'x.end_date', implode(' AND ', $having)));
         $total = (int) Database::one("SELECT COUNT(*) AS c FROM ({$outer}) y", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all($outer . " ORDER BY FIELD(wstatus,'active','scheduled','pending_confirmation','suspended','expired','not_applicable'), end_date, id LIMIT {$perPage} OFFSET {$offset}", $params);
 
         return ['rows' => $rows, 'total' => $total];

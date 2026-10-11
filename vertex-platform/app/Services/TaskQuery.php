@@ -26,7 +26,7 @@ final class TaskQuery
             return ['rows' => [], 'total' => 0];
         }
         $total = (int) Database::one('SELECT COUNT(*) AS c ' . self::FROM . " WHERE {$where}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             self::columns() . ' ' . self::FROM . " WHERE {$where} ORDER BY (t.due_date IS NULL), t.due_date, FIELD(t.priority,'urgent','high','normal','low'), t.id LIMIT {$perPage} OFFSET {$offset}",
             $params,

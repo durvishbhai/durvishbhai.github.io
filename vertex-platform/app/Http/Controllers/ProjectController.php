@@ -43,7 +43,7 @@ final class ProjectController extends Controller
             'service' => $this->in($request->string('service'), array_keys((array) Config::get('workflow.services'))),
             'archived' => Gate::can('projects.view_all', $uid) && $request->string('archived') === '1',
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = ProjectPolicy::visibleTo($uid, $f, $page, self::PER_PAGE);
         $qs = $f;
         $qs['archived'] = $f['archived'] ? '1' : '';
@@ -170,7 +170,7 @@ final class ProjectController extends Controller
     {
         $uid = $this->actorId();
         $project = $request->attributes['project'];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = ProjectActivity::timeline((int) $project['id'], ProjectPolicy::level($uid, $project) === 'own', $page, 30);
 
         return $this->page('pages/project-timeline', ['title' => 'Timeline · ' . $project['title'], 'project' => $project, 'items' => $res['rows'], 'total' => $res['total'], 'page' => $page, 'tab' => 'timeline']);

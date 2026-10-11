@@ -276,7 +276,7 @@ final class ClientService
         $where[] = !empty($f['archived']) && Gate::can('clients.view_all', $userId) ? "c.status = 'archived'" : "(c.archived_at IS NULL AND c.status <> 'archived')";
         $w = implode(' AND ', $where);
         $total = (int) Database::one("SELECT COUNT(*) AS n FROM clients c WHERE {$w}", $params)['n'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT c.public_id, c.client_type, c.contact_name, c.company_name, c.email, c.phone, c.status, c.user_id, c.created_at, c.merged_into_client_id
                FROM clients c WHERE {$w} ORDER BY c.contact_name, c.id LIMIT {$perPage} OFFSET {$offset}",

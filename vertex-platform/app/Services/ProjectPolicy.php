@@ -184,7 +184,7 @@ final class ProjectPolicy
         $w = implode(' AND ', $where);
         $base = "FROM projects p JOIN clients c ON c.id = p.client_id WHERE {$w}";
         $total = (int) Database::one("SELECT COUNT(*) AS c {$base}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT p.id, p.public_id, p.code, p.title, p.status, p.priority, p.service_category, p.start_date, p.target_date, p.created_at, p.archived_at,
                     c.public_id AS client_public_id, c.company_name, c.contact_name AS client_name,

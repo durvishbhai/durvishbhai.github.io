@@ -68,11 +68,11 @@ final class AttachmentService
         }
 
         $rel = gmdate('Y/m') . '/' . bin2hex(random_bytes(20));
-        $dir = VERTEX_ROOT . '/storage/uploads/' . dirname($rel);
+        $dir = FileStore::root() . '/' . dirname($rel);
         if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
             throw new \RuntimeException('Upload directory is not writable.');
         }
-        $dest = VERTEX_ROOT . '/storage/uploads/' . $rel;
+        $dest = FileStore::root() . '/' . $rel;
         $moved = $requireHttpUpload ? move_uploaded_file($tmp, $dest) : copy($tmp, $dest);
         if (!$moved) {
             throw new \RuntimeException('Could not store the uploaded file.');
@@ -121,7 +121,7 @@ final class AttachmentService
     /** Absolute path of the stored file (never exposed to clients). @param array<string,mixed> $att */
     public static function path(array $att): string
     {
-        $p = VERTEX_ROOT . '/storage/uploads/' . $att['stored_path'];
+        $p = FileStore::root() . '/' . $att['stored_path'];
         if (!preg_match('#^\d{4}/\d{2}/[a-f0-9]{40}$#', (string) $att['stored_path']) || !is_file($p)) {
             throw new HttpException(404);
         }
@@ -135,7 +135,7 @@ final class AttachmentService
             Database::run('UPDATE attachments SET deleted_at = UTC_TIMESTAMP() WHERE id = ? AND deleted_at IS NULL', [$att['id']]);
             Audit::record('attachment.deleted', (string) $att['parent_type'], (int) $att['parent_id'], [], [], ['attachment_id' => (int) $att['id']], $actorId);
         });
-        @unlink(VERTEX_ROOT . '/storage/uploads/' . $att['stored_path']);
+        @unlink(FileStore::root() . '/' . $att['stored_path']);
     }
 
     public static function safeName(string $name): string

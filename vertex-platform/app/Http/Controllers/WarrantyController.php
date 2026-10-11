@@ -28,7 +28,7 @@ final class WarrantyController extends Controller
         if ($f['status'] !== '' && !array_key_exists($f['status'], (array) Config::get('workflow.warranty_statuses'))) {
             $f['status'] = '';
         }
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = WarrantyService::report($uid, $f, $page, self::PER_PAGE);
 
         return $this->page('pages/warranties', [

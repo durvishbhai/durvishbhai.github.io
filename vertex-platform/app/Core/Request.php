@@ -61,6 +61,14 @@ final class Request
     }
 
     /** @return array<string,mixed> */
+    /** The requested page number: a positive integer, bounded so a crafted value can never overflow the SQL offset. */
+    public function page(string $key = 'page'): int
+    {
+        $v = $this->string($key, '1');
+
+        return ctype_digit($v) && strlen($v) <= 6 ? max(1, (int) $v) : 1;
+    }
+
     public function all(): array
     {
         return $this->query + $this->body;

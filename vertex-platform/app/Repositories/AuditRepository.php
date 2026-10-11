@@ -40,7 +40,7 @@ final class AuditRepository
         }
         $w = implode(' AND ', $where);
         $total = (int) Database::one("SELECT COUNT(*) AS c FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id WHERE {$w}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT a.id, a.created_at, a.action, a.entity_type, a.entity_id, a.before_json, a.after_json, a.meta_json, a.ip, a.request_id,
                     a.actor_id, u.name AS actor_name, u.email AS actor_email

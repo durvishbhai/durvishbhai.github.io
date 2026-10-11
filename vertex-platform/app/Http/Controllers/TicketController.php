@@ -36,7 +36,7 @@ final class TicketController extends Controller
         $uid = $this->actorId();
         $staff = TicketQuery::staffView($uid);
         $f = $this->filters($request, $staff);
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = TicketQuery::paginate($uid, $f, $page, self::PER_PAGE);
 
         return $this->page($staff ? 'pages/tickets' : 'pages/client-tickets', [

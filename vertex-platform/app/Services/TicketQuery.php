@@ -41,7 +41,7 @@ final class TicketQuery
         $staff = self::staffView($userId);
         [$where, $params] = self::where($userId, $scope, $f, $staff);
         $total = (int) Database::one('SELECT COUNT(*) AS c ' . self::BASE . " WHERE {$where}", $params['count'])['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             self::COLS . ' ' . self::BASE . " WHERE {$where} ORDER BY (t.status IN " . self::RESOLVED . '), t.escalated_at IS NULL, ' . ($staff ? "FIELD(COALESCE(t.severity, 'normal'), 'critical','high','normal','low')," : '') . " t.updated_at DESC, t.id DESC LIMIT {$perPage} OFFSET {$offset}",
             $params['rows'],

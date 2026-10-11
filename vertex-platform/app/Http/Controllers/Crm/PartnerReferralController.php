@@ -25,7 +25,7 @@ final class PartnerReferralController extends Controller
     /** @param array<string,string> $params */
     public function index(Request $request, array $params = []): Response
     {
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = EnquiryQuery::paginate($this->actorId(), ['q' => mb_substr($request->string('q'), 0, 100)], $page, self::PER_PAGE);
 
         return $this->page('partner/index', ['title' => 'My referrals', 'rows' => $res['rows'], 'total' => $res['total'], 'page' => $page, 'perPage' => self::PER_PAGE, 'filters' => ['q' => $request->string('q')]]);

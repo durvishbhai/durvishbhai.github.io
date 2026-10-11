@@ -27,7 +27,7 @@ final class AuditController extends Controller
             'from_date' => $this->date($request->string('from')),
             'to_date' => $this->date($request->string('to')),
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $result = $repo->search([
             'q' => $filters['q'], 'action' => $filters['action'], 'entity' => $filters['entity'],
             'from' => $this->utcBoundary($filters['from_date'], 0),

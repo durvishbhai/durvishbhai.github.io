@@ -94,7 +94,7 @@ final class Notifier
     {
         $w = 'user_id = ?' . ($unreadOnly ? ' AND read_at IS NULL' : '');
         $total = (int) Database::one("SELECT COUNT(*) AS c FROM notifications WHERE {$w}", [$userId])['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all("SELECT id, event_type, title, body, link, created_at, read_at FROM notifications WHERE {$w} ORDER BY id DESC LIMIT {$perPage} OFFSET {$offset}", [$userId]);
 
         return ['rows' => $rows, 'total' => $total];

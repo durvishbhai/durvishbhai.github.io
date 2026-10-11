@@ -34,7 +34,7 @@ final class CrmHttpTest extends HttpTestCase
         $this->partner = $this->makeUser('p1@x.test', ['referral_partner']);
         $this->partner2 = $this->makeUser('p2@x.test', ['referral_partner']);
         $this->client = $this->makeUser('cl@x.test', ['client']);
-        foreach (glob(VERTEX_ROOT . '/storage/uploads/*/*/*') ?: [] as $stale) {
+        foreach (glob(\Vertex\Services\FileStore::root() . '/*/*/*') ?: [] as $stale) {
             @unlink($stale);
         }
         $this->mine = $this->enq('Alpha Lead', 'alpha@lead.test', '+91 91000 00001', 'Alpha Works');
@@ -335,8 +335,8 @@ final class CrmHttpTest extends HttpTestCase
         $this->assertSame('image/png', $att['mime']);
         $this->assertDoesNotMatchRegularExpression('/[\/"<>]/', $att['original_name'], 'file name is sanitised');
         $this->assertMatchesRegularExpression('#^\d{4}/\d{2}/[a-f0-9]{40}$#', $att['stored_path'], 'random storage name, no user input');
-        $this->assertFileExists(VERTEX_ROOT . '/storage/uploads/' . $att['stored_path']);
-        $this->assertStringStartsNotWith(VERTEX_ROOT . '/public', VERTEX_ROOT . '/storage/uploads/' . $att['stored_path'], 'stored outside the web root');
+        $this->assertFileExists(\Vertex\Services\FileStore::root() . '/' . $att['stored_path']);
+        $this->assertStringStartsNotWith(VERTEX_ROOT . '/public', \Vertex\Services\FileStore::root() . '/' . $att['stored_path'], 'stored outside the web root');
 
         $page = $m->get($u)['body'];
         $this->assertStringContainsString('/attachments/' . $att['public_id'], $page);
@@ -392,7 +392,7 @@ final class CrmHttpTest extends HttpTestCase
             @unlink($f);
         }
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM attachments')['c'], 'nothing dangerous was stored');
-        $this->assertSame([], glob(VERTEX_ROOT . '/storage/uploads/*/*/*') ?: [], 'no stray files on disk');
+        $this->assertSame([], glob(\Vertex\Services\FileStore::root() . '/*/*/*') ?: [], 'no stray files on disk');
         $this->assertStringContainsString('not allowed', $m->get('/crm/enquiries/' . $this->mine['public_id'])['body'] . 'not allowed', 'sanity');
     }
 

@@ -32,7 +32,7 @@ final class TaskController extends Controller
     {
         $uid = $this->actorId();
         $f = $this->filters($request);
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = TaskQuery::paginate($uid, $f, $page, self::PER_PAGE);
 
         return $this->page('pages/tasks', [
@@ -77,7 +77,7 @@ final class TaskController extends Controller
         }
         $f = $this->filters($request);
         $f['project'] = $project['public_id'];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = TaskQuery::paginate($uid, $f, $page, self::PER_PAGE);
         $open = $project['archived_at'] === null && !in_array($project['status'], ['cancelled', 'completed'], true);
         $canAssign = Gate::can('tasks.assign', $uid);

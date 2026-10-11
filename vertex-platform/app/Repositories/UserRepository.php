@@ -136,7 +136,7 @@ final class UserRepository
         $w = implode(' AND ', $where);
 
         $total = (int) Database::one("SELECT COUNT(*) AS c FROM users u WHERE {$w}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             "SELECT u.id, u.public_id, u.name, u.email, u.status, u.email_verified_at, u.last_login_at,
                     (SELECT GROUP_CONCAT(r.name ORDER BY r.level DESC SEPARATOR ', ') FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id) AS role_names,

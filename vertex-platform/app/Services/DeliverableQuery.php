@@ -38,7 +38,7 @@ final class DeliverableQuery
         $w[] = !empty($f['archived']) ? 'd.archived_at IS NOT NULL' : 'd.archived_at IS NULL';
         $cond = implode(' AND ', $w);
         $total = (int) Database::one('SELECT COUNT(*) AS c ' . self::FROM . " WHERE {$cond}", $params)['c'];
-        $offset = max(0, ($page - 1) * $perPage);
+        $offset = (int) min(max(0, ($page - 1) * $perPage), 2_000_000_000);
         $rows = Database::all(
             'SELECT d.id, d.public_id, d.code, d.title, d.category, d.status, d.first_published_at, d.archived_at, d.created_at, d.updated_at, d.published_version_id,
                     p.public_id AS project_public_id, p.code AS project_code, p.title AS project_title,

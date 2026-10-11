@@ -133,7 +133,7 @@ final class FileStore
 
     public static function root(): string
     {
-        return VERTEX_ROOT . '/storage/uploads';
+        return (string) Config::get('uploads.root', VERTEX_ROOT . '/storage/uploads');
     }
 
     /** The limit that really applies: the application limit capped by PHP's own upload limits. */

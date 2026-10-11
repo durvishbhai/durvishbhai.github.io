@@ -31,7 +31,7 @@ final class UserController extends Controller
             'role' => preg_match('/^[a-z_]{2,40}$/', $request->string('role')) ? $request->string('role') : '',
             'status' => in_array($request->string('status'), ['pending', 'active', 'deactivated', 'archived'], true) ? $request->string('status') : '',
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $result = (new UserRepository())->paginate($filters, $page, self::PER_PAGE);
         $actorLevel = Gate::level($this->actorId());
 

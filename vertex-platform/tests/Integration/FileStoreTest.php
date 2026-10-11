@@ -63,7 +63,7 @@ final class FileStoreTest extends DatabaseTestCase
             $this->assertMatchesRegularExpression('#^\d{4}/\d{2}/[a-f0-9]{40}$#', $m['stored_path'], 'random server-side name');
             $path = $this->stored($m);
             $this->assertFileExists($path);
-            $this->assertStringStartsWith(realpath(VERTEX_ROOT . '/storage/uploads'), realpath($path));
+            $this->assertStringStartsWith(realpath(\Vertex\Services\FileStore::root() . ''), realpath($path));
             $this->assertStringNotContainsString('/public/', $path, 'never under the web root');
             $this->assertSame('0640', substr(sprintf('%o', fileperms($path)), -4));
             $this->assertSame('not_scanned', $m['scan_status'], 'no scanner: never claimed clean');

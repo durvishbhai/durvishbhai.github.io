@@ -42,7 +42,7 @@ final class EnquiryController extends Controller
             'followup' => in_array($request->string('followup'), ['due', 'overdue'], true) ? $request->string('followup') : '',
             'archived' => Gate::can('enquiries.view_all', $uid) && $request->string('archived') === '1',
         ];
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $res = EnquiryQuery::paginate($uid, $f, $page, self::PER_PAGE);
         $qs = $f;
         $qs['archived'] = $f['archived'] ? '1' : '';
@@ -82,7 +82,7 @@ final class EnquiryController extends Controller
         if (!in_array(EnquiryPolicy::level($uid, $enq), ['all', 'assigned'], true)) {
             return Response::redirect('/partner/referrals/' . $enq['public_id']);
         }
-        $page = max(1, (int) $request->string('page', '1'));
+        $page = $request->page();
         $timeline = EnquiryService::timeline((int) $enq['id'], $page, 40);
         $dups = EnquiryService::duplicatesFor($uid, $enq);
         $canConvert = $enq['stage_kind'] === 'won' && $enq['converted_project_id'] === null && Gate::can('enquiries.convert', $uid) && Gate::can('projects.create', $uid)

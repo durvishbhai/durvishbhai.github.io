@@ -76,7 +76,7 @@ final class DeliverableHttpTest extends HttpTestCase
         $this->assertSame(['draft', null], [$v['status'], $v['published_at']]);
         $stored = Database::one('SELECT * FROM stored_files');
         $this->assertSame('mockup.png', $stored['original_name']);
-        $this->assertFileExists(VERTEX_ROOT . '/storage/uploads/' . $stored['stored_path']);
+        $this->assertFileExists(\Vertex\Services\FileStore::root() . '/' . $stored['stored_path']);
         $this->assertStringContainsString('Homepage mock-up', $dev->get('/projects/' . $this->alpha['public_id'] . '/deliverables')['body']);
         $this->assertStringNotContainsString('Homepage mock-up', $this->loggedIn('alpha@client.test')->get('/projects/' . $this->alpha['public_id'] . '/deliverables')['body'], 'the client sees nothing of a draft');
         $this->assertStringNotContainsString('Homepage mock-up', $this->loggedIn('alpha@client.test')->get('/my/deliverables')['body']);
@@ -87,7 +87,7 @@ final class DeliverableHttpTest extends HttpTestCase
         $dev = $this->loggedIn('dev@x.test');
         $path = '/projects/' . $this->alpha['public_id'] . '/deliverables';
         $form = ['title' => 'Bad upload', 'category' => 'other'];
-        $filesBefore = glob(VERTEX_ROOT . '/storage/uploads/' . gmdate('Y/m') . '/*') ?: [];
+        $filesBefore = glob(\Vertex\Services\FileStore::root() . '/' . gmdate('Y/m') . '/*') ?: [];
         $bad = [
             $this->tmp('shell.php', '<?php system($_GET["x"]);'), $this->tmp('page.html', '<script>alert(1)</script>'), $this->tmp('x.png', "MZ fake exe"),
             $this->png('logo.php.png'), $this->tmp('empty.png', ''),
@@ -106,7 +106,7 @@ final class DeliverableHttpTest extends HttpTestCase
         $this->assertStringContainsString('larger than', $dev->get($path)['body']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM deliverables')['c']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM stored_files')['c']);
-        $this->assertSame($filesBefore, glob(VERTEX_ROOT . '/storage/uploads/' . gmdate('Y/m') . '/*') ?: [], 'rejected uploads leave nothing in storage');
+        $this->assertSame($filesBefore, glob(\Vertex\Services\FileStore::root() . '/' . gmdate('Y/m') . '/*') ?: [], 'rejected uploads leave nothing in storage');
         // traversal-style names are neutralised, never used as a path
         $f = $this->png();
         $r = $this->up($dev, $path, ['title' => 'Traversal name', 'category' => 'other'], [$f['tmp_name'], '../../../public/pwn.png', 'image/png']);
