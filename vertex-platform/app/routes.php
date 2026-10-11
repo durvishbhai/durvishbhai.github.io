@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Vertex\Core\Router;
 use Vertex\Http\Controllers\AccountController;
 use Vertex\Http\Controllers\Admin\AuditController;
+use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\RoleController;
 use Vertex\Http\Controllers\Admin\UserController;
 use Vertex\Http\Controllers\Admin\CrmStageController;
@@ -23,6 +24,10 @@ use Vertex\Http\Controllers\PasswordController;
 use Vertex\Http\Controllers\PricingController;
 use Vertex\Http\Controllers\ProjectController;
 use Vertex\Http\Controllers\TaskController;
+use Vertex\Http\Controllers\NotificationController;
+use Vertex\Http\Controllers\ChangeRequestController;
+use Vertex\Http\Controllers\RevisionController;
+use Vertex\Http\Controllers\DeliverableController;
 use Vertex\Http\Controllers\TeamController;
 use Vertex\Http\Controllers\RegistrationController;
 
@@ -94,6 +99,46 @@ return static function (Router $router): void {
     $router->post('/projects/{project}/pricing/baseline', [PricingController::class, 'baseline'], ['auth', 'can:projects.record_approval', 'project']);
     $router->post('/projects/{project}/pricing/requests/{req}/decision', [PricingController::class, 'decide'], ['auth', 'can:pricing.respond_change', 'project']);
     $router->post('/projects/{project}/pricing/requests/{req}/withdraw', [PricingController::class, 'withdraw'], ['auth', 'can:pricing.request_change', 'project']);
+
+    // Deliverables, versions, QA, client approvals, revisions, change requests, notifications (Phase 3).
+    // `can:` is the first gate only; DeliverablePolicy / RevisionAccess decide per record (404) and the services re-check every permission.
+    $dv = ['auth', 'can:deliverables.view'];
+    $router->get('/deliverables', [DeliverableController::class, 'index'], $dv);
+    $router->get('/qa', [DeliverableController::class, 'qa'], ['auth', 'can:deliverables.review,deliverables.publish']);
+    $router->get('/my/deliverables', [DeliverableController::class, 'clientDashboard'], ['auth', 'can:deliverables.view,projects.view_own']);
+    $router->get('/projects/{project}/deliverables', [DeliverableController::class, 'projectIndex'], ['auth', 'can:deliverables.view', 'project']);
+    $router->post('/projects/{project}/deliverables', [DeliverableController::class, 'store'], ['auth', 'can:deliverables.upload', 'project']);
+    $router->get('/deliverables/{deliverable}', [DeliverableController::class, 'show'], $dv);
+    $router->post('/deliverables/{deliverable}', [DeliverableController::class, 'update'], ['auth', 'can:deliverables.upload']);
+    $router->post('/deliverables/{deliverable}/versions', [DeliverableController::class, 'addVersion'], ['auth', 'can:deliverables.upload']);
+    $router->get('/deliverables/{deliverable}/compare', [DeliverableController::class, 'compare'], $dv);
+    $router->get('/deliverables/{deliverable}/versions/{version}/download', [DeliverableController::class, 'download'], ['auth', 'can:deliverables.view,files.download']);
+    $router->post('/deliverables/{deliverable}/versions/{version}/submit', [DeliverableController::class, 'submit'], ['auth', 'can:deliverables.upload']);
+    $router->post('/deliverables/{deliverable}/versions/{version}/review', [DeliverableController::class, 'review'], ['auth', 'can:deliverables.review']);
+    $router->post('/deliverables/{deliverable}/versions/{version}/publish', [DeliverableController::class, 'publish'], ['auth', 'can:deliverables.publish']);
+    $router->post('/deliverables/{deliverable}/versions/{version}/withdraw', [DeliverableController::class, 'withdraw'], ['auth', 'can:deliverables.publish']);
+    $router->post('/deliverables/{deliverable}/archive', [DeliverableController::class, 'archive'], ['auth', 'can:deliverables.archive']);
+    $router->get('/deliverables/{deliverable}/respond', [DeliverableController::class, 'respondForm'], ['auth', 'can:deliverables.respond']);
+    $router->post('/deliverables/{deliverable}/respond', [DeliverableController::class, 'respond'], ['auth', 'can:deliverables.respond']);
+    $router->get('/deliverables/{deliverable}/revisions/new', [RevisionController::class, 'create'], ['auth', 'can:revisions.request']);
+    $router->post('/deliverables/{deliverable}/revisions', [RevisionController::class, 'store'], ['auth', 'can:revisions.request']);
+
+    $router->get('/revisions', [RevisionController::class, 'index'], ['auth', 'can:revisions.manage,revisions.request']);
+    $router->get('/revisions/{revision}', [RevisionController::class, 'show'], ['auth', 'can:revisions.manage,revisions.request']);
+    $router->post('/revisions/{revision}/status', [RevisionController::class, 'transition'], ['auth', 'can:revisions.manage,revisions.request']);
+    $router->post('/revisions/{revision}/classify', [RevisionController::class, 'classify'], ['auth', 'can:revisions.classify']);
+    $router->post('/revisions/{revision}/override', [RevisionController::class, 'override'], ['auth', 'can:revisions.override']);
+    $router->post('/revisions/{revision}/assign', [RevisionController::class, 'assign'], ['auth', 'can:revisions.manage']);
+    $router->post('/revisions/{revision}/notes', [RevisionController::class, 'note'], ['auth', 'can:revisions.manage']);
+    $router->post('/revisions/{revision}/response', [RevisionController::class, 'response'], ['auth', 'can:revisions.manage']);
+    $router->get('/revisions/{revision}/files/{file}', [RevisionController::class, 'file'], ['auth', 'can:revisions.manage,revisions.request']);
+    $router->get('/changes/{change}', [ChangeRequestController::class, 'show'], ['auth', 'can:revisions.manage,revisions.respond_cost']);
+    $router->post('/changes/{change}', [ChangeRequestController::class, 'update'], ['auth', 'can:revisions.classify']);
+    $router->post('/changes/{change}/send', [ChangeRequestController::class, 'send'], ['auth', 'can:revisions.classify']);
+    $router->post('/changes/{change}/withdraw', [ChangeRequestController::class, 'withdraw'], ['auth', 'can:revisions.classify']);
+    $router->post('/changes/{change}/decision', [ChangeRequestController::class, 'decide'], ['auth', 'can:revisions.respond_cost']);
+    $router->get('/notifications', [NotificationController::class, 'index'], ['auth']);
+    $router->post('/notifications/read', [NotificationController::class, 'read'], ['auth']);
 
     // Tasks, Kanban board, deadlines. Staff only (TaskPolicy keeps clients out even if a role were misconfigured).
     $router->get('/projects/{project}/tasks', [TaskController::class, 'projectTasks'], $p);
@@ -185,6 +230,9 @@ return static function (Router $router): void {
 
         $r->get('/pricing', [PricingController::class, 'rules'], ['can:pricing.view']);
         $r->post('/pricing', [PricingController::class, 'saveRule'], ['can:pricing.manage']);
+
+        $r->get('/revision-policies', [RevisionTermsController::class, 'index'], ['can:revisions.policy,revisions.classify,revisions.override']);
+        $r->post('/revision-policies', [RevisionTermsController::class, 'save'], ['can:revisions.policy']);
 
         $r->get('/audit', [AuditController::class, 'index'], ['can:audit.view']);
         $r->post('/audit/verify', [AuditController::class, 'verify'], ['can:audit.view']);

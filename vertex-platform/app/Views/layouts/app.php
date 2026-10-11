@@ -6,6 +6,8 @@ use Vertex\Services\Auth;
 $user = Auth::user();
 $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name') : (string) config('app.name');
 $path = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+$staffProjects = can('projects.view_all') || can('projects.view_assigned');
+$unread = $user !== null ? \Vertex\Services\Notifier::unreadCount((int) Auth::id()) : 0;
 $nav = [
     ['/dashboard', 'Dashboard', true],
     ['/crm', 'CRM', can('enquiries.view_all') || can('enquiries.view_assigned')],
@@ -17,10 +19,16 @@ $nav = [
     ['/tasks', 'Tasks', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
     ['/board', 'Board', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
     ['/deadlines', 'Deadlines', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
+    ['/deliverables', 'Deliverables', can('deliverables.view') && $staffProjects],
+    ['/qa', 'QA', (can('deliverables.review') || can('deliverables.publish')) && $staffProjects],
+    ['/my/deliverables', 'My deliverables', can('deliverables.view') && can('projects.view_own') && !$staffProjects],
+    ['/revisions', can('revisions.manage') && $staffProjects ? 'Revisions' : 'My revisions', (can('revisions.manage') && $staffProjects) || can('revisions.request')],
     ['/admin/pricing', 'Pricing', can('pricing.view')],
+    ['/admin/revision-policies', 'Revision policy', can('revisions.policy') || can('revisions.classify')],
     ['/admin/users', 'Users', can('users.view')],
     ['/admin/roles', 'Roles', can('roles.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
+    ['/notifications', 'Notifications' . ($unread > 0 ? ' (' . $unread . ')' : ''), true],
     ['/account', 'My account', true],
 ];
 ?><!doctype html>

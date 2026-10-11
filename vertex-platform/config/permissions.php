@@ -81,7 +81,11 @@ $p = [
         'files.manage' => 'Delete or replace files',
         'deliverables.view' => 'View deliverables',
         'deliverables.upload' => 'Upload deliverables',
-        'deliverables.publish' => 'Publish deliverables to the client',
+        'deliverables.publish' => 'Publish deliverables to the client and choose the client-facing version',
+        'deliverables.view_drafts' => 'View draft, in-review and approved-but-unpublished deliverables on accessible projects',
+        'deliverables.review' => 'Approve internally or send back deliverables in QA review',
+        'deliverables.archive' => 'Archive and restore deliverables',
+        'deliverables.respond' => 'Approve, reject or request revisions on own published deliverables (client)',
     ],
     'website' => [
         'cms.view' => 'View website content',
@@ -133,6 +137,10 @@ $p = [
         'chat.use' => 'Use project chat on accessible projects',
         'revisions.request' => 'Request a revision (client)',
         'revisions.manage' => 'Triage and resolve revisions',
+        'revisions.classify' => 'Classify revisions as included or potentially chargeable and propose extra cost',
+        'revisions.override' => 'Override a revision classification (audited)',
+        'revisions.policy' => 'Manage revision policies and terms',
+        'revisions.respond_cost' => 'Approve or decline a proposed additional cost on own project (client)',
         'bugs.report' => 'Report a bug (client)',
         'bugs.manage' => 'Triage and resolve bugs',
         'warranty.view_own' => 'View own warranty status (client)',
@@ -187,6 +195,7 @@ $sensitive = [
     'commissions.rules.manage', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
+    'revisions.override', 'revisions.policy',
 ];
 
 $all = [];
@@ -201,7 +210,7 @@ $worker = [
     'milestones.view', 'milestones.propose',
     'tasks.view', 'tasks.update_assigned', 'tasks.comment', 'tasks.log_time',
     'files.upload', 'files.download',
-    'deliverables.view', 'deliverables.upload',
+    'deliverables.view', 'deliverables.upload', 'deliverables.view_drafts',
     'payouts.request', 'payouts.view_own', 'commissions.view_own',
     'chat.use',
 ];
@@ -221,6 +230,7 @@ $roles = [
             'roles.manage_sensitive', 'settings.manage', 'backups.manage',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
+            'deliverables.respond', 'revisions.respond_cost', 'revisions.request',
         ])),
     ],
     'manager' => [
@@ -237,7 +247,8 @@ $roles = [
             'clients.view_assigned', 'clients.notes_view', 'clients.notes_add',
             'pricing.request_change',
             'files.upload', 'files.download',
-            'deliverables.view', 'deliverables.upload', 'deliverables.publish',
+            'deliverables.view', 'deliverables.upload', 'deliverables.publish', 'deliverables.view_drafts', 'deliverables.review', 'deliverables.archive',
+            'revisions.classify',
             'pricing.view', 'estimates.create', 'quotes.view', 'quotes.create',
             'payouts.request', 'payouts.view_own', 'commissions.view_own',
             'chat.use', 'revisions.manage', 'bugs.manage', 'warranty.manage',
@@ -300,7 +311,7 @@ $roles = [
         'permissions' => [
             'projects.view_own', 'projects.give_feedback', 'clients.view_own', 'pricing.respond_change',
             'milestones.view',
-            'files.download', 'files.upload', 'deliverables.view',
+            'files.download', 'files.upload', 'deliverables.view', 'deliverables.respond', 'revisions.respond_cost',
             'invoices.view_own', 'receipts.view_own', 'payments.pay', 'quotes.view',
             'chat.use', 'revisions.request', 'bugs.report', 'warranty.view_own',
             'requirements.submit', 'appointments.book',

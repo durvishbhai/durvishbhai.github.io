@@ -29,6 +29,17 @@
         }
     });
 
+    // Loading state for slow submits (uploads): form[data-busy] shows the message on its submit button and prevents a double submit.
+    document.addEventListener('submit', function (e) {
+        var f = e.target;
+        if (!f || !f.getAttribute || e.defaultPrevented) { return; }
+        var msg = f.getAttribute('data-busy');
+        if (!msg) { return; }
+        var btn = f.querySelector('button[type=submit]');
+        if (btn) { btn.setAttribute('data-label', btn.textContent); btn.textContent = msg; btn.disabled = true; }
+        f.classList.add('is-busy');
+    });
+
     // Progress bars: widths come from data-pct (inline styles are blocked by the CSP).
     document.querySelectorAll('[data-pct]').forEach(function (el) {
         el.style.width = Math.max(0, Math.min(100, parseInt(el.getAttribute('data-pct'), 10) || 0)) + '%';

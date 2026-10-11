@@ -61,8 +61,16 @@ abstract class DatabaseTestCase extends TestCase
     protected function setUp(): void
     {
         $pdo = Database::connection();
+        foreach (['stored_files', 'attachments'] as $t) { // remove files written by earlier tests
+            foreach ($pdo->query("SELECT stored_path FROM {$t}")->fetchAll(\PDO::FETCH_COLUMN) as $rel) {
+                if (preg_match('#^\d{4}/\d{2}/[a-f0-9]{40}$#', (string) $rel)) {
+                    @unlink(VERTEX_ROOT . '/storage/uploads/' . $rel);
+                }
+            }
+        }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['price_change_requests', 'price_revisions', 'task_time_entries', 'task_comments', 'task_dependencies', 'tasks', 'milestones', 'project_notes', 'project_activity', 'enquiry_followups', 'enquiry_activity', 'attachments', 'enquiries', 'client_notes', 'project_assignments', 'projects', 'referrals', 'clients', 'reference_sequences', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
+        foreach (['notifications', 'client_approvals', 'revision_status_history', 'revision_notes', 'revision_files', 'change_requests', 'revision_requests', 'revision_policies',
+            'deliverable_reviews', 'deliverable_versions', 'deliverables', 'stored_files', 'price_change_requests', 'price_revisions', 'task_time_entries', 'task_comments', 'task_dependencies', 'tasks', 'milestones', 'project_notes', 'project_activity', 'enquiry_followups', 'enquiry_activity', 'attachments', 'enquiries', 'client_notes', 'project_assignments', 'projects', 'referrals', 'clients', 'reference_sequences', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
             $pdo->exec("TRUNCATE TABLE {$t}");
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');

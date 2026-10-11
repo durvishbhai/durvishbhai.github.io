@@ -56,7 +56,7 @@ final class MigrationUpgradeTest extends DatabaseTestCase
         // ---- upgrade (all migrations) ----
         $full = new Migrator(VERTEX_ROOT . '/database/migrations');
         $applied = $full->migrate();
-        $this->assertSame(['0002_accounts_security.sql', '0003_roles_hierarchy.sql', '0004_project_access.sql', '0005_crm_clients.sql', '0006_projects_tasks.sql', '0007_priority_pricing.sql'], $applied);
+        $this->assertSame(['0002_accounts_security.sql', '0003_roles_hierarchy.sql', '0004_project_access.sql', '0005_crm_clients.sql', '0006_projects_tasks.sql', '0007_priority_pricing.sql', '0008_deliverables_revisions.sql'], $applied);
         PermissionSync::run();
 
         // ---- nothing lost, privileges preserved ----

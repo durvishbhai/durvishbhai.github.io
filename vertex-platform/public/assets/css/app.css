@@ -301,3 +301,24 @@ textarea:focus { border-color: var(--blue); outline: none; box-shadow: 0 0 0 3px
 .portal-main, .container-wide { min-width: 0; }
 .board { max-width: 100%; position: relative; } /* position: contains the .sr-only labels so they cannot widen the page */
 .toolbar .field .check { flex-direction: row; align-items: center; min-height: 44px; }
+
+/* ---- Deliverables, revisions, notifications ---- */
+.badge-dstatus-published, .badge-vstatus-published { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-dstatus-approved_internal, .badge-vstatus-approved_internal { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.5); }
+.badge-dstatus-pending_review, .badge-vstatus-pending_review, .badge-vstatus-changes_requested { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-dstatus-archived, .badge-vstatus-withdrawn, .badge-vstatus-superseded { color: var(--text-dim); }
+.badge-rstatus-resolved, .badge-rstatus-approved_for_work, .badge-rstatus-included_revision { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-rstatus-potentially_chargeable, .badge-rstatus-awaiting_cost_approval, .badge-rstatus-ready_for_client_review { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-rstatus-rejected, .badge-rstatus-cancelled { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.badge-cstate-approved { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-cstate-awaiting, .badge-cstate-revision_requested { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-cstate-rejected { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.milestone.is-current { border-color: rgba(60, 200, 120, 0.55); }
+tr.diff th, tr.diff td { background: rgba(201, 162, 75, 0.1); }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line-strong); display: grid; gap: 12px; }
+.timeline li { position: relative; }
+.note.is-unread { border-left-color: var(--blue); }
+.hint { color: var(--text-dim); font-size: 0.85rem; margin: 4px 0 0; }
+fieldset.field { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+fieldset.field label { display: block; margin-top: 8px; }
+form.is-busy { opacity: 0.7; pointer-events: none; }

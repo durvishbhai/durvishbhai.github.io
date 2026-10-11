@@ -8,7 +8,7 @@ use Vertex\Core\Database;
 
 /**
  * Human-readable, unique, race-free reference numbers per scope and calendar year:
- *   enquiry -> ENQ-2026-000123      project -> VIS-2026-0042
+ *   enquiry -> ENQ-2026-000123      project -> VIS-2026-0042   deliverable -> DLV-2026-0007   revision -> REV-2026-00012   change request -> CHG-2026-00003
  * Uses a single atomic upsert (LAST_INSERT_ID trick), so concurrent requests never get the same number. Call inside the
  * transaction that creates the record so a rollback does not leave a visible gap in practice.
  */
@@ -17,6 +17,9 @@ final class CrmReference
     private const FORMAT = [
         'enquiry' => ['ENQ', 6],
         'project' => ['VIS', 4],
+        'deliverable' => ['DLV', 4],
+        'revision' => ['REV', 5],
+        'change' => ['CHG', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string

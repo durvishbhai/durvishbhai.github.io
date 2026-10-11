@@ -22,5 +22,8 @@ return [
         'token_ip' => [30, 3600],
         'public_form_ip' => [5, 3600],
         'attachment_user' => [30, 3600],
+        'upload_user' => [40, 3600],
+        'download_user' => [200, 3600],
+        'revision_user' => [20, 3600],
     ],
 ];

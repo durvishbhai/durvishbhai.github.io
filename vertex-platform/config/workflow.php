@@ -118,4 +118,75 @@ return [
     ],
 
     'due_soon_days' => 7,
+
+    // ---- Phase 3: deliverables, versions, revisions ------------------------------------------------------------------------
+
+    'deliverable_categories' => [
+        'video' => 'Video', 'thumbnail' => 'Thumbnail', 'graphic_design' => 'Graphic Design', 'website_files' => 'Website Files',
+        'document' => 'Document', 'source_files' => 'Source Files', 'other' => 'Other',
+    ],
+
+    // Lifecycle/visibility of the deliverable as a whole. Only `published` (and `archived` after having been published) reaches clients.
+    'deliverable_statuses' => [
+        'draft' => 'Draft', 'pending_review' => 'Pending Review', 'approved_internal' => 'Approved Internally',
+        'published' => 'Published to Client', 'archived' => 'Archived',
+    ],
+
+    // Each VERSION has its own status; approval/publication never carries over from one version to another.
+    'version_statuses' => [
+        'draft' => 'Draft', 'pending_review' => 'Pending Review', 'changes_requested' => 'Changes Requested (internal)',
+        'approved_internal' => 'Approved Internally', 'published' => 'Published (current)', 'superseded' => 'Superseded', 'withdrawn' => 'Withdrawn',
+    ],
+
+    'revision_statuses' => [
+        'submitted' => 'Submitted',
+        'under_review' => 'Under Review',
+        'included_revision' => 'Included Revision',
+        'potentially_chargeable' => 'Potentially Chargeable Change',
+        'awaiting_cost_approval' => 'Awaiting Client Approval of Additional Cost',
+        'approved_for_work' => 'Approved for Work',
+        'in_progress' => 'In Progress',
+        'ready_for_client_review' => 'Ready for Client Review',
+        'resolved' => 'Resolved',
+        'rejected' => 'Rejected with Explanation',
+        'cancelled' => 'Cancelled',
+    ],
+
+    // What the CLIENT is shown. "Potentially chargeable" is an internal assessment: until a proposal is sent the client just sees "Under review".
+    'revision_client_labels' => [
+        'submitted' => 'Received',
+        'under_review' => 'Under review',
+        'included_revision' => 'Accepted: included in your project',
+        'potentially_chargeable' => 'Under review',
+        'awaiting_cost_approval' => 'Additional cost awaiting your approval',
+        'approved_for_work' => 'Approved for work',
+        'in_progress' => 'In progress',
+        'ready_for_client_review' => 'Ready for your review',
+        'resolved' => 'Resolved',
+        'rejected' => 'Not accepted',
+        'cancelled' => 'Cancelled',
+    ],
+
+    /*
+     * Revision status machine: from => [to => who]. Letters:
+     *   S staff reviewer (revisions.manage + staff access to the project)   K classifier (revisions.classify)
+     *   O override (revisions.override: administrators)                     C the owning client (revisions.request)
+     *   X not a direct move: only the dedicated workflow (send proposal / client cost decision) may perform it.
+     */
+    'revision_transitions' => [
+        'submitted' => ['under_review' => 'S', 'rejected' => 'S', 'cancelled' => 'SC'],
+        'under_review' => ['included_revision' => 'K', 'potentially_chargeable' => 'K', 'rejected' => 'S', 'cancelled' => 'SC'],
+        'included_revision' => ['in_progress' => 'S', 'under_review' => 'K', 'rejected' => 'S', 'cancelled' => 'SC'],
+        'potentially_chargeable' => ['awaiting_cost_approval' => 'X', 'under_review' => 'K', 'included_revision' => 'O', 'rejected' => 'S', 'cancelled' => 'SC'],
+        'awaiting_cost_approval' => ['approved_for_work' => 'X', 'potentially_chargeable' => 'X', 'cancelled' => 'SC'],
+        'approved_for_work' => ['in_progress' => 'S', 'cancelled' => 'SC'],
+        'in_progress' => ['ready_for_client_review' => 'S', 'cancelled' => 'S'],
+        'ready_for_client_review' => ['resolved' => 'SC', 'in_progress' => 'SC'],
+        'resolved' => [],
+        'rejected' => [],
+        'cancelled' => [],
+    ],
+    /** Moves that need a written explanation that the client can read. */
+    'revision_transition_requires_note' => ['rejected', 'in_progress_from_review'],
+
 ];

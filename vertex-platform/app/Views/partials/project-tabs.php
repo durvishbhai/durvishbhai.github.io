@@ -12,6 +12,9 @@ $tabs = ['overview' => [$base, 'Overview'], 'milestones' => [$base . '/milestone
 if ($staff && Gate::can('tasks.view', $uid)) {
     $tabs['tasks'] = [$base . '/tasks', 'Tasks'];
 }
+if (\Vertex\Services\Gate::can('deliverables.view', $uid) && ($staff || $level === 'own')) {
+    $tabs['deliverables'] = [$base . '/deliverables', 'Deliverables'];
+}
 $tabs['timeline'] = [$base . '/timeline', 'Timeline'];
 if (\Vertex\Services\PriceChangeService::canView($uid, $project)) {
     $tabs['pricing'] = [$base . '/pricing', 'Pricing'];
