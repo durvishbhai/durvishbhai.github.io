@@ -250,3 +250,20 @@ erDiagram
 ```
 
 Integrity rules in the schema: `UNIQUE partner_applications.active_key` (one open application per email), `UNIQUE (partner_id, submit_token)` on referrals and payouts (double submit), `UNIQUE partner_referrals.credit_project_id` (one credited referral per project), `UNIQUE client_payments.external_key` (a transaction reference is recorded once), `UNIQUE commission_entries (referral_id, milestone, seq)`, `UNIQUE payout_requests.payment_reference`, `UNIQUE referral_email_log.sent_key` (set only on a successful send), `UNIQUE commission_rules.current_flag` (one current version). Money is `BIGINT` paise. Foreign keys are `RESTRICT` (or `SET NULL` for optional user/CRM links); history tables are append-only by convention and by the absence of any update/delete code path.
+
+## Phase 7: domain / hosting / SSL renewals and the scheduler (migration 0011)
+
+```mermaid
+erDiagram
+    clients ||--o{ renewal_services : owns
+    projects |o--o{ renewal_services : "optional"
+    renewal_services ||--o{ renewal_cycles : "one per renewal attempt"
+    renewal_cycles ||--o{ renewal_payments : "money received (unique transaction)"
+    renewal_services ||--o{ renewal_history : "append-only"
+    renewal_services ||--o{ renewal_reminders : "UNIQUE per reminder slot"
+    renewal_prices }o..o{ renewal_cycles : "snapshotted at approval"
+    users |o--o{ renewal_cycles : "approver / invoice / provider confirmation"
+```
+
+`renewal_services` UNIQUE (client_id, service_type, identifier); `renewal_cycles` UNIQUE (service_id, cycle_no) and holds the approved price snapshot, the quotation/invoice references, `paid_minor`, and the provider confirmation (`provider_confirmation_ref`, `provider_confirmed_by/at`, `new_expiry`); `renewal_payments.payment_key` is UNIQUE (SHA-256 of method and reference) so a transaction cannot be counted twice; `renewal_reminders` UNIQUE (service_id, expires_on, kind, offset_days, audience, channel) is the claim that makes reminders idempotent; `renewal_prices` is append-only with UNIQUE (service_type, period_months, effective_from); `scheduler_runs` records every run of `schedule:run`. There is **no column for a provider password or credential** and a test asserts it. Foreign keys are `RESTRICT` (or `SET NULL` for optional user/project links). Money is `BIGINT` paise.
+

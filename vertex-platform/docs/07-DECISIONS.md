@@ -100,6 +100,19 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-67 | Approving a partner application never activates an account: new applicants get a pending account + invitation; signed-in applicants get the role on their own account; never linked by email match. | Secure activation, no account takeover via a guessed email. |
 | D-68 | **Finance Staff holds `payouts.record`** (records the manual transfer) but not `payouts.approve`, `payments.reconcile` or any commission approval. Earlier phases had reserved `payouts.record` for Administrator/Owner; `PermissionMatrixTest` was updated deliberately. | The Phase 6 brief: Admin/Finance approve and pay; separation of duties comes from two different permissions. |
 
+## Decisions taken in Phase 7 (please confirm or change)
+
+| # | Decision | Why |
+|---|---|---|
+| D-69 | A service becomes **Renewed only through the provider confirmation** (reference + date + the provider's new expiry), by `renewals.confirm_provider` with the password. Payment, approval and invoicing never renew anything. | The brief: payment must never imply provider renewal. |
+| D-70 | Renewal payments live in their own table (`renewal_payments`), **not** in `client_payments`: they are not project payments and must never trigger referral commission. | Keeps the commission engine's input pure. |
+| D-71 | Quotation/invoice numbers on a renewal are **references** typed by staff; the amount must equal the approved price; to change a price an approver voids the invoice and the renewal returns to Admin review. | There is no quotation/invoice module; an invoice must never silently differ from what was approved. |
+| D-72 | Lead times: Renewal Approaching at 30 days, Admin review due at 10 days (`RENEWAL_APPROACH_DAYS`, `RENEWAL_REVIEW_DAYS`). Reminders at 30/10/3/1/0 days, only the smallest unsent offset fires. Clients are reminded in the portal; client **email is opt-in** (`RENEWAL_CLIENT_EMAIL`). | Predictable, no bursts after a missed cron day, no email to clients without a conscious switch. |
+| D-73 | Paid or in-progress services past their expiry are flagged **overdue**, not marked Expired. | They are mid-workflow; Expired would be misleading and would stop the workflow. |
+| D-74 | Backups are a pure-PHP zip (no mysqldump/tar), exclude `.env`, are verified at creation, and restore **only into an empty database**. Encryption and off-site copy are the operator's job. | Works on shared hosting; a restore can never overwrite live data by accident; secrets are kept apart from the data. |
+| D-75 | `backups.manage` is reserved: there is **no web UI or download for backups**. | A downloadable full-database file in the web app would be the highest-value attack target. |
+| D-76 | Not built and stated as such on the System status page: quotations, invoices (GST-compliant numbering needs your legal details), online payment gateway and webhooks, WhatsApp, a CMS, chat, calendar-slot appointment booking, worker/freelancer payouts, financial reports, two-factor authentication. | Each needs business input, credentials or a legal decision. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |
