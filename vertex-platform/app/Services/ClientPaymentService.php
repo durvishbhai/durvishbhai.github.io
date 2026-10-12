@@ -214,12 +214,12 @@ final class ClientPaymentService
             if ($inv === null || !in_array($inv['status'], ['issued', 'partially_paid'], true)) {
                 throw new ValidationException(['This invoice cannot take a payment (it is paid, void or not issued).']);
             }
+            if (Database::one('SELECT 1 AS x FROM client_payments WHERE external_key = ? FOR UPDATE', [$key]) !== null) {
+                throw new ValidationException(['That transaction number has already been submitted. If you think this is a mistake, contact us.']);
+            }
             $room = (int) $inv['total_minor'] - InvoiceService::paidMinor((int) $inv['id']) - InvoiceService::pendingMinor((int) $inv['id']);
             if ($amount > $room) {
                 throw new ValidationException(['That is more than the ₹' . FieldRules::formatMinor(max(0, $room)) . ' still due (payments already submitted and waiting for confirmation are counted).']);
-            }
-            if (Database::one('SELECT 1 AS x FROM client_payments WHERE external_key = ? FOR UPDATE', [$key]) !== null) {
-                throw new ValidationException(['That transaction number has already been submitted. If you think this is a mistake, contact us.']);
             }
             $pub = uuid_hex();
             $reference = CrmReference::next('client_payment');

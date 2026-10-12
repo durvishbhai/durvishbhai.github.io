@@ -1,0 +1,5 @@
+<?php /** @var list<array<string,mixed>> $items */ /** @var int $subtotal */ /** @var int $discount */ /** @var int $total */ ?>
+<div class="table-wrap"><table class="table"><thead><tr><th>Description</th><th class="num">Quantity</th><th class="num">Price each</th><th class="num">Amount</th></tr></thead><tbody>
+    <?php foreach ($items as $it) : ?><tr><td><?= e($it['description']) ?></td><td class="num"><?= e(\Vertex\Services\BillingItems::qty((int) $it['quantity_x100'])) ?></td><td class="num"><?= e(money($it['unit_minor'])) ?></td><td class="num"><?= e(money($it['total_minor'])) ?></td></tr><?php endforeach; ?>
+    <?php if ($discount > 0) : ?><tr><td colspan="3" class="num">Subtotal</td><td class="num"><?= e(money($subtotal)) ?></td></tr><tr><td colspan="3" class="num">Discount</td><td class="num">− <?= e(money($discount)) ?></td></tr><?php endif; ?>
+    <tr><td colspan="3" class="num"><strong>Total</strong></td><td class="num"><strong><?= e(money($total)) ?></strong></td></tr></tbody></table></div>

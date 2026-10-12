@@ -78,6 +78,23 @@ if (!function_exists('old')) {
     }
 }
 
+if (!function_exists('old_items')) {
+    /** The line items the user typed before a validation error, or null. @return list<array<string,string>>|null */
+    function old_items(): ?array
+    {
+        $old = Session::get('_old', []);
+        if (!is_array($old) || !isset($old['items']) || !is_array($old['items'])) {
+            return null;
+        }
+        $out = [];
+        foreach ($old['items'] as $row) {
+            $out[] = ['description' => is_array($row) ? (string) ($row['description'] ?? '') : '', 'quantity' => is_array($row) ? (string) ($row['quantity'] ?? '') : '', 'unit' => is_array($row) ? (string) ($row['unit'] ?? '') : ''];
+        }
+
+        return $out;
+    }
+}
+
 if (!function_exists('uuid_hex')) {
     function uuid_hex(): string
     {

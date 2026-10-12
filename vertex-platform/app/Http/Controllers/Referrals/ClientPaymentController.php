@@ -78,10 +78,10 @@ final class ClientPaymentController extends Controller
 
         return $this->guarded(function () use ($request, $uid, $p, $to): Response {
             $this->requireStepUp($request);
-            ClientPaymentService::verify($uid, $p);
+            ClientPaymentService::verify($uid, $p, ['received' => $request->string('received'), 'role' => $request->string('role')]);
 
-            return $this->ok($to, 'The payment is verified. Commission milestones were re-evaluated.');
-        }, $to);
+            return $this->ok($to, 'The payment is verified. The invoice status and any commission milestones were re-evaluated.');
+        }, $to, ['received' => $request->string('received')]);
     }
 
     /** @param array<string,string> $params */
@@ -98,6 +98,20 @@ final class ClientPaymentController extends Controller
             ClientPaymentService::refund($uid, $p, $amount, $request->string('reason'), $type);
 
             return $this->ok($to, 'Recorded. Any commission built on this payment was re-evaluated and adjusted.');
+        }, $to, ['reason' => $request->string('reason')]);
+    }
+
+    /** @param array<string,string> $params */
+    public function reject(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $p = ClientPaymentService::requireView($uid, $params['pay'] ?? '');
+        $to = '/client-payments/' . $p['public_id'];
+
+        return $this->guarded(function () use ($request, $uid, $p, $to): Response {
+            ClientPaymentService::reject($uid, $p, $request->string('reason'));
+
+            return $this->ok($to, 'The payment was rejected and the reason recorded. The client was told if they submitted it.');
         }, $to, ['reason' => $request->string('reason')]);
     }
 }

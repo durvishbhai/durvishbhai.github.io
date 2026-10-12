@@ -189,14 +189,11 @@ final class QuotationService
             throw new ValidationException(['Choose accept or decline.']);
         }
         $note = (string) FieldRules::line($note, 'Note', 2, 500, false);
+        self::expireOne($q); // outside the transaction: the expiry must persist even though the decision is refused
         Database::transaction(function () use ($actorId, $q, $decision, $note, $channel): void {
             $cur = Database::one('SELECT * FROM quotations WHERE id = ? FOR UPDATE', [$q['id']]);
             if ($cur === null || $cur['status'] !== 'sent') {
                 throw new ValidationException(['This quotation can no longer be accepted or declined' . ($cur !== null && $cur['status'] === 'expired' ? ' (it has expired)' : '') . '.']);
-            }
-            if ($cur['valid_until'] !== null && $cur['valid_until'] < AppTime::today()) {
-                Database::run("UPDATE quotations SET status = 'expired', updated_at = UTC_TIMESTAMP() WHERE id = ?", [$q['id']]);
-                throw new ValidationException(['This quotation has expired. Please ask us for a new one.']);
             }
             $to = $decision === 'accept' ? 'accepted' : 'rejected';
             Database::run('UPDATE quotations SET status = ?, decided_at = UTC_TIMESTAMP(), decided_by = ?, decision_channel = ?, decision_note = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$to, $actorId, $channel, $note === '' ? null : $note, $q['id']]);

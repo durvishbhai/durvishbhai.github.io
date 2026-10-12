@@ -29,6 +29,12 @@
         }
     });
 
+    // Print button on invoices and quotations (inline handlers are blocked by the CSP).
+    document.addEventListener('click', function (e) {
+        var t = e.target && e.target.closest ? e.target.closest('[data-print]') : null;
+        if (t) { e.preventDefault(); window.print(); }
+    });
+
     // Loading state for slow submits (uploads): form[data-busy] shows the message on its submit button and prevents a double submit.
     document.addEventListener('submit', function (e) {
         var f = e.target;

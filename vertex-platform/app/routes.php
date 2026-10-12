@@ -39,7 +39,11 @@ use Vertex\Http\Controllers\Referrals\ReferralAdminController;
 use Vertex\Http\Controllers\TicketController;
 use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
+use Vertex\Http\Controllers\Admin\BillingSettingsController;
 use Vertex\Http\Controllers\Admin\SystemController;
+use Vertex\Http\Controllers\Billing\InvoiceController;
+use Vertex\Http\Controllers\Billing\MyBillingController;
+use Vertex\Http\Controllers\Billing\QuotationController;
 use Vertex\Http\Controllers\Renewals\ClientServiceController;
 use Vertex\Http\Controllers\Renewals\RenewalController;
 use Vertex\Http\Controllers\Renewals\RenewalPriceController;
@@ -189,6 +193,7 @@ return static function (Router $router): void {
     $router->get('/client-payments/new', [ClientPaymentController::class, 'create'], ['auth', 'can:payments.record']);
     $router->post('/client-payments', [ClientPaymentController::class, 'store'], ['auth', 'can:payments.record']);
     $router->get('/client-payments/{pay}', [ClientPaymentController::class, 'show'], $cp);
+    $router->post('/client-payments/{pay}/reject', [ClientPaymentController::class, 'reject'], $cp);
     $router->post('/client-payments/{pay}/verify', [ClientPaymentController::class, 'verify'], ['auth', 'can:payments.reconcile']);
     $router->post('/client-payments/{pay}/refund', [ClientPaymentController::class, 'refund'], ['auth', 'can:payments.reconcile']);
     $po = ['auth', 'can:payouts.view_all,payouts.approve,payouts.record'];
@@ -206,6 +211,27 @@ return static function (Router $router): void {
     $router->post('/renewals/prices', [RenewalPriceController::class, 'store'], ['auth', 'can:renewals.prices']);
     $router->get('/renewals/{service}', [RenewalController::class, 'show'], $rn);
     $router->post('/renewals/{service}', [RenewalController::class, 'action'], $rn);
+    // Quotations, invoices (no tax) and the client's own billing pages (Phase 8). Static paths before `{id}` routes.
+    $qs = ['auth', 'can:quotes.create,quotes.send,quotes.record_decision'];
+    $router->get('/quotations', [QuotationController::class, 'index'], $qs);
+    $router->get('/quotations/new', [QuotationController::class, 'create'], ['auth', 'can:quotes.create']);
+    $router->post('/quotations', [QuotationController::class, 'store'], ['auth', 'can:quotes.create']);
+    $router->get('/quotations/{quote}', [QuotationController::class, 'show'], $qs);
+    $router->post('/quotations/{quote}', [QuotationController::class, 'action'], $qs);
+    $iv = ['auth', 'can:invoices.view_all'];
+    $router->get('/invoices', [InvoiceController::class, 'index'], $iv);
+    $router->get('/invoices/new', [InvoiceController::class, 'create'], ['auth', 'can:invoices.create']);
+    $router->post('/invoices', [InvoiceController::class, 'store'], ['auth', 'can:invoices.create']);
+    $router->get('/invoices/{invoice}', [InvoiceController::class, 'show'], $iv);
+    $router->get('/invoices/{invoice}/print', [InvoiceController::class, 'print'], $iv);
+    $router->post('/invoices/{invoice}', [InvoiceController::class, 'action'], $iv);
+    $router->get('/my/invoices', [MyBillingController::class, 'invoices'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
+    $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
+    $router->get('/my/quotes', [MyBillingController::class, 'quotes'], ['auth', 'can:quotes.view']);
+    $router->get('/my/quotes/{quote}', [MyBillingController::class, 'quote'], ['auth', 'can:quotes.view']);
+    $router->post('/my/quotes/{quote}', [MyBillingController::class, 'quoteDecision'], ['auth', 'can:quotes.respond']);
     $router->get('/my/services', [ClientServiceController::class, 'index'], ['auth', 'can:renewals.view_own']);
     $router->get('/my/services/{service}', [ClientServiceController::class, 'show'], ['auth', 'can:renewals.view_own']);
 
@@ -315,6 +341,10 @@ return static function (Router $router): void {
     // Administration
     $router->group('/admin', ['auth'], static function (Router $r): void {
         $r->get('/system', [SystemController::class, 'index'], ['can:settings.view']);
+        $r->get('/payments', [BillingSettingsController::class, 'payments'], ['can:billing.configure']);
+        $r->post('/payments', [BillingSettingsController::class, 'savePayments'], ['can:billing.configure']);
+        $r->get('/business', [BillingSettingsController::class, 'business'], ['can:billing.configure']);
+        $r->post('/business', [BillingSettingsController::class, 'saveBusiness'], ['can:billing.configure']);
         $r->get('/users', [UserController::class, 'index'], ['can:users.view']);
         $r->get('/users/create', [UserController::class, 'create'], ['can:users.create']);
         $r->post('/users', [UserController::class, 'store'], ['can:users.create']);
