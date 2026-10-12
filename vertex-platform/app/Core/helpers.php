@@ -123,6 +123,19 @@ if (!function_exists('local_date')) {
     }
 }
 
+if (!function_exists('money')) {
+    /** Integer paise for display: "₹12,500.50" (negative amounts keep their sign). */
+    function money(int|string|null $minor): string
+    {
+        if ($minor === null || $minor === '') {
+            return '—';
+        }
+        $m = (int) $minor;
+
+        return ($m < 0 ? '-' : '') . '₹' . \Vertex\Services\FieldRules::formatMinor(abs($m));
+    }
+}
+
 if (!function_exists('status_label')) {
     function status_label(string $status): string
     {
