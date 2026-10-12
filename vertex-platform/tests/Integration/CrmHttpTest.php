@@ -295,16 +295,15 @@ final class CrmHttpTest extends HttpTestCase
         $this->assertStringContainsString('/partner/referrals/', (string) $p->get('/crm/enquiries/' . $this->viaPartner['public_id'])['location'], 'the staff URL redirects partners to their restricted page');
     }
 
-    public function testPartnerSubmissionIsBoundToThePartnerAndIgnoresStaffFields(): void
+    public function testLegacyPartnerSubmissionFormIsRetiredAndCreatesNothing(): void
     {
         $p = $this->loggedIn('p1@x.test');
-        $r = $p->post('/partner/referrals', $this->form(['contact_name' => 'New Referral', 'email' => 'nr@lead.test', 'phone' => '+91 96000 00006', 'company_name' => 'NR Co', 'priority' => 'urgent', 'owner_id' => (string) $this->manager, 'referral_partner_id' => (string) $this->partner2, 'stage' => 'won']), '/partner/referrals/create');
+        $before = (int) Database::one('SELECT COUNT(*) AS c FROM enquiries')['c'];
+        $r = $p->post('/partner/referrals', $this->form(['contact_name' => 'New Referral', 'email' => 'nr@lead.test', 'phone' => '+91 96000 00006', 'company_name' => 'NR Co']), '/partner/referrals');
         $this->assertSame(303, $r['status']);
-        $e = Database::one("SELECT * FROM enquiries WHERE email = 'nr@lead.test'");
-        $this->assertSame($this->partner, (int) $e['referral_partner_id']);
-        $this->assertSame('normal', $e['priority']);
-        $this->assertNull($e['owner_id']);
-        $this->assertSame('referral_partner', $e['source']);
+        $this->assertStringContainsString('/partner/submit', (string) $r['location']);
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) AS c FROM enquiries')['c'], 'the retired form must not create a CRM enquiry that bypasses duplicate detection and attribution');
+        $this->assertStringContainsString('/partner/submit', (string) $p->get('/partner/referrals/create')['location']);
         $this->assertSame(403, $this->loggedIn('mgr@x.test')->get('/partner/referrals/create')['status']);
     }
 

@@ -344,3 +344,13 @@ form.is-busy { opacity: 0.7; pointer-events: none; }
 .field .check input { width: auto; flex: none; }
 fieldset.field { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
 fieldset.field legend { color: var(--text-dim); font-size: 0.85rem; padding: 0 6px; }
+/* Phase 6: referral partners, commissions, payouts */
+.badge-ps-received, .badge-ps-requested, .badge-ps-pending_eligibility, .badge-ps-pending_verification, .badge-ps-under_review, .badge-ps-eligible_for_review, .badge-ps-on_hold, .badge-ps-suspended { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-ps-approved, .badge-ps-contacted, .badge-ps-qualified, .badge-ps-quote_sent, .badge-ps-processing, .badge-ps-payable, .badge-ps-payout_requested, .badge-ps-adjusted { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.5); }
+.badge-ps-converted, .badge-ps-paid, .badge-ps-verified, .badge-ps-active { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-ps-rejected, .badge-ps-not_converted, .badge-ps-cancelled, .badge-ps-reversed { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.table .num, .table th.num { text-align: right; white-space: nowrap; }
+.page-head .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+ol.timeline > li { position: relative; }
+ol.timeline > li::before { content: ""; position: absolute; left: -25px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px var(--bg-card); }
+.note { border-left: 3px solid var(--gold); padding: 4px 12px; margin: 8px 0; }

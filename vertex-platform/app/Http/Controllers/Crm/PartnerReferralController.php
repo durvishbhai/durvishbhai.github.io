@@ -31,28 +31,21 @@ final class PartnerReferralController extends Controller
         return $this->page('partner/index', ['title' => 'My referrals', 'rows' => $res['rows'], 'total' => $res['total'], 'page' => $page, 'perPage' => self::PER_PAGE, 'filters' => ['q' => $request->string('q')]]);
     }
 
-    /** @param array<string,string> $params */
+    /**
+     * Retired in Phase 6: new referrals go through the referral service (duplicate detection, attribution, partner-scoped history). The old form
+     * created a CRM enquiry directly and so bypassed all of that. Existing enquiries stay readable below; nothing is created here any more.
+     *
+     * @param array<string,string> $params
+     */
     public function create(Request $request, array $params = []): Response
     {
-        $r = $this->page('partner/create', ['title' => 'Submit a referral']);
-        Session::forget('_old');
-
-        return $r;
+        return Response::redirect('/partner/submit');
     }
 
     /** @param array<string,string> $params */
     public function store(Request $request, array $params = []): Response
     {
-        $in = [];
-        foreach (['contact_name', 'email', 'phone', 'company_name', 'service', 'description', 'budget_range', 'expected_deadline'] as $f) {
-            $in[$f] = $request->string($f);
-        }
-
-        return $this->guarded(function () use ($in): Response {
-            $r = EnquiryService::create($this->actorId(), 'referral_partner', $in);
-
-            return $this->ok('/partner/referrals/' . $r['public_id'], "Referral {$r['reference']} submitted.");
-        }, '/partner/referrals/create', $in);
+        return Response::redirect('/partner/submit');
     }
 
     /** @param array<string,string> $params */

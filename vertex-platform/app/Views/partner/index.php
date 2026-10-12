@@ -1,5 +1,5 @@
 <?php /** @var list<array<string,mixed>> $rows */ /** @var int $total */ /** @var int $page */ /** @var int $perPage */ /** @var array<string,string> $filters */ ?>
-<div class="page-head"><div><p class="eyebrow">Referral partner</p><h1>My referrals</h1></div><a class="btn btn-primary" href="/partner/referrals/create">Submit a referral</a></div>
+<div class="page-head"><div><p class="eyebrow">Referral partner</p><h1>Earlier referrals</h1></div><a class="btn btn-primary" href="/partner/submit">Submit a referral</a></div>
 <p class="muted">You can see only the referrals you submitted.</p>
 <form method="get" action="/partner/referrals" class="toolbar" role="search"><div class="field"><label for="q">Search</label><input id="q" name="q" type="search" maxlength="100" value="<?= e($filters['q']) ?>"></div><div class="field"><button class="btn btn-ghost" type="submit">Search</button></div></form>
 <div class="table-wrap"><table class="table">
