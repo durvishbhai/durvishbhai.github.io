@@ -30,5 +30,6 @@ return [
         'partner_details_user' => [10, 3600],
         'partner_referral_user' => [30, 3600],
         'payout_request_user' => [10, 3600],
+        'payment_claim_user' => [10, 3600],
     ],
 ];

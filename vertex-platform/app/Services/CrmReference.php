@@ -29,6 +29,8 @@ final class CrmReference
         'payout' => ['PYO', 5],
         'client_payment' => ['RCP', 5],
         'renewal' => ['RNW', 5],
+        'quotation' => ['QUO', 5],
+        'invoice' => ['INV', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string
