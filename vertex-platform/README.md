@@ -1,6 +1,6 @@
 # Vertex Integrated Solutions — platform
 
-Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phase 6 (referral partner portal, commissions, payouts) built — see `docs/14-PHASE6-REFERRAL-COMMISSIONS.md`. Still NOT built: quotations, invoices, a payment gateway/webhooks and domain/hosting renewals (`docs/13-FINAL-AUDIT.md`). Phase 5 — bug reports, website warranty tracking and support tickets (on top of Phase 3 — deliverables with versions, secure private file storage, internal QA, client approvals, revision requests with an included-vs-chargeable policy foundation and in-app notifications; Phase 2: CRM, projects, tasks/Kanban, pricing foundation; Phase 1: accounts, RBAC, audit).** Quotations, invoices, payments, payouts, commissions, chat and the CMS are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
+Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phases 0–7 built (referral partners and commissions: `docs/14`; domain/hosting renewals, scheduler, backups: `docs/15`). NOT production-ready: quotations, invoices, a payment gateway/webhooks and several integrations are not built and the platform has never run on the real host. Read `docs/16-GO-LIVE-AND-HANDOVER.md` first. Phase 5 — bug reports, website warranty tracking and support tickets (on top of Phase 3 — deliverables with versions, secure private file storage, internal QA, client approvals, revision requests with an included-vs-chargeable policy foundation and in-app notifications; Phase 2: CRM, projects, tasks/Kanban, pricing foundation; Phase 1: accounts, RBAC, audit).** Quotations, invoices, payments, payouts, commissions, chat and the CMS are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
 
 > This folder lives inside a GitHub Pages repository only so the existing site (`../index.html`, `../CNAME`) stays untouched. Read `docs/01-INSPECTION.md` (exposure risk) before deploying; a private repository is recommended.
 
@@ -51,6 +51,8 @@ Integration tests drop every table in the configured test database and refuse an
 | `docs/08-DEPLOYMENT.md` | Hostinger/cPanel deployment |
 | `docs/09-PHASE1-ACCOUNTS-RBAC.md` | Phase 1: migrations, env vars, first Super Admin, rollback, test results, gaps |
 | `docs/11-PHASE3-DELIVERABLES-REVISIONS.md` | Phase 3: file storage and configuration, security controls, workflows, manual test checklist, limitations |
+| `docs/16-GO-LIVE-AND-HANDOVER.md` | Is it production-ready? (no), completion matrix, go-live gates and checklist, handover package, operations runbook |
+| `docs/15-PHASE7-RENEWALS-OPERATIONS.md` | Phase 7: renewals workflow, reminders, scheduler/cron, backup and restore, system status, security and performance review, smoke test |
 | `docs/14-PHASE6-REFERRAL-COMMISSIONS.md` | Phase 6: referral partner applications, referrals and attribution, commission formula and eligibility rules, payouts, permissions, manual test script, limitations |
 | `docs/13-FINAL-AUDIT.md` | Final audit: what exists and what does not, test results, defects fixed, security review, completion matrix, prioritized issues, manual test script |
 | `docs/12-PHASE5-SUPPORT-WARRANTY.md` | Phase 5: bug reports, warranty dates and eligibility rules, support tickets, permission controls, dependencies, manual test checklist |

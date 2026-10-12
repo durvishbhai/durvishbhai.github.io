@@ -82,7 +82,7 @@ final class Phase2UpgradeTest extends DatabaseTestCase
 
         // ---- upgrade to Phase 2 using the real migrations directory ----
         $ran = (new Migrator(VERTEX_ROOT . '/database/migrations'))->migrate();
-        $this->assertSame(['0005_crm_clients.sql', '0006_projects_tasks.sql', '0007_priority_pricing.sql', '0008_deliverables_revisions.sql', '0009_support_warranty.sql', '0010_referral_partners.sql'], $ran);
+        $this->assertSame(['0005_crm_clients.sql', '0006_projects_tasks.sql', '0007_priority_pricing.sql', '0008_deliverables_revisions.sql', '0009_support_warranty.sql', '0010_referral_partners.sql', '0011_renewals.sql'], $ran);
         PermissionSync::run();
 
         // identities, hashes and links untouched

@@ -30,6 +30,7 @@ final class FullPlatformJourneyTest extends DatabaseTestCase
 
     private string $uploads;
     private string $dir;
+    private string $origUploads;
 
     protected function setUp(): void
     {
@@ -39,12 +40,14 @@ final class FullPlatformJourneyTest extends DatabaseTestCase
         $this->uploads = sys_get_temp_dir() . '/vis-jr-up-' . bin2hex(random_bytes(4));
         $this->dir = sys_get_temp_dir() . '/vis-jr-bk-' . bin2hex(random_bytes(4));
         mkdir($this->uploads, 0750, true);
+        $this->origUploads = (string) Config::get('uploads.root');
         Config::set('uploads.root', $this->uploads);
         Config::set('mail.driver', 'none');
     }
 
     protected function tearDown(): void
     {
+        Config::set('uploads.root', $this->origUploads);
         foreach ([$this->uploads, $this->uploads . '-restored', $this->dir] as $d) {
             if (is_dir($d)) {
                 $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($d, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);

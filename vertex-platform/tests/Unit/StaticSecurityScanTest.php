@@ -103,6 +103,9 @@ final class StaticSecurityScanTest extends TestCase
             if (!preg_match('/\.(php|md|json|js|css|sql|example|txt|yml|yaml|htaccess|html)$|^\.[a-z]+$/', $f) && !str_ends_with($f, '.example')) {
                 continue;
             }
+            if ($f === 'tests/Unit/StaticSecurityScanTest.php') {
+                continue; // this file contains the patterns it searches for
+            }
             $path = VERTEX_ROOT . '/' . $f;
             if (!is_file($path) || filesize($path) > 2_000_000 || str_contains($f, 'vendor/') || str_contains($f, 'composer.lock')) {
                 continue;

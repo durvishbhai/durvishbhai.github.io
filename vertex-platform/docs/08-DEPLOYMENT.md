@@ -19,7 +19,7 @@ Upload the whole project and set the domain's document root to `<project>/public
 
 ## Steps
 
-1. cPanel → **Select PHP Version**: PHP 8.2 or newer; enable `pdo_mysql`, `mbstring`, `openssl`, `json`, `ctype`, `fileinfo` (later phases: `gd`, `intl`, `zip`, `curl`).
+1. cPanel → **Select PHP Version**: PHP 8.2 or newer; enable `pdo_mysql`, `mbstring`, `openssl`, `json`, `ctype`, `fileinfo` (`zip` is required for backups; later phases may use `gd`, `intl`, `curl`).
 2. cPanel → **MySQL Databases**: create a database and user, grant all privileges.
 3. Copy `.env.example` to `.env`; set `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL`, DB credentials; generate the key with `php bin/console.php key:generate` (or run it locally and paste the value). `chmod 600 .env`.
 4. Make `storage/*` writable by PHP (755/775 depending on the host's user model); never expose `storage/`.
@@ -37,28 +37,22 @@ Upload changed files, run `php bin/console.php migrate` then `permissions:sync`.
 
 Private uploads are stored in `storage/uploads/YYYY/MM/<random>` by default. Set `UPLOAD_STORAGE_PATH` (absolute path) to keep them elsewhere, outside the web root. **The automated tests never touch this directory** (they use a temporary one); earlier versions of the test suite deleted files in `storage/uploads`, so do not run a pre-audit copy of the tests on a machine that holds real uploads.
 
-## Backup and restore (manual procedure; tested once in a development container)
+## Backup and restore
 
-There is **no backup module and no scheduler** in this release (`backups.manage` is only a permission key). Nothing in this document means backups are running: you must configure and test them. A backup is **two things**: the database and the uploads directory, taken together.
-
-```bash
-# 1. Database (consistent snapshot, no table locks for InnoDB). Credentials come from ~/.my.cnf or prompts; never put the password on the command line.
-mysqldump --single-transaction --default-character-set=utf8mb4 DBNAME | gzip > vis-db-$(date +%F).sql.gz
-# 2. Uploads (same moment as the dump) and the env file (stored separately and encrypted: it holds the APP_KEY and DB password)
-tar -czf vis-uploads-$(date +%F).tgz -C /path/to/storage uploads
-```
-
-Restore into an EMPTY database (never over production while testing):
+Since Phase 7 the application can create, verify and restore its own backups from the console (details, limits and the tested results in `15-PHASE7-RENEWALS-OPERATIONS.md` §4). **Nothing runs by itself**: a backup exists only after `backup:create` has been run (by hand or by cron), and backups are trustworthy only after a restore drill.
 
 ```bash
-mysql -e "CREATE DATABASE vis_restore CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-gunzip -c vis-db-YYYY-MM-DD.sql.gz | mysql vis_restore
-DB_DATABASE=vis_restore php bin/console.php migrate:status     # every migration "applied"
-DB_DATABASE=vis_restore php bin/console.php audit:verify        # "Audit chain intact (N rows verified)"
-tar -xzf vis-uploads-YYYY-MM-DD.tgz -C /path/to/restored/storage
+php bin/console.php backup:create --keep=14          # database + uploads -> one verified zip in BACKUP_DIR (default storage/backups)
+php bin/console.php backup:verify --file=PATH.zip     # re-check every checksum
+php bin/console.php backup:status                     # when was the newest one made? says so plainly if there is none
+# restore ONLY into an empty database (it refuses anything else):
+php bin/console.php backup:restore --file=PATH.zip --database=NEW_EMPTY_DB --uploads-dir=/path/to/new/uploads
+php bin/console.php migrate:status && php bin/console.php audit:verify    # with DB_DATABASE pointing at the restored database
 ```
 
-Verified here: a dump of the development database restored into a new database with identical row counts for users, clients, projects, tickets, audit log, stored files and migrations; `audit:verify` passed on the restored copy and reported `AUDIT CHAIN BROKEN at row 5` after a single row was edited. **Not verified:** off-site storage, encryption, scheduled runs, restore time on production-sized data. Keep the `APP_KEY` with the backup set; losing it does not corrupt data but invalidates sessions and tokens.
+The zip contains the database snapshot, the uploads store and a checksum manifest. It does **not** contain `.env`: keep `APP_KEY` with the backup set (a password manager), otherwise encrypted payout details cannot be read after a restore. The backup is not encrypted: encrypt it (for example `gpg -c`) and copy it **off the server**. The manual `mysqldump` + `tar` procedure from earlier phases still works and is a valid second method. Requires the PHP `zip` extension.
+
+Verified: a backup/restore round trip on the development database and in automated tests (identical row counts, uploads and audit chain). **Not verified:** a restore on the real host, off-site storage, encryption, scheduled runs, restore time at production size.
 
 ## Rollback
 
@@ -66,4 +60,12 @@ Migrations are forward-only. Roll back a bad release by restoring the pre-releas
 
 ## Cron / scheduled tasks
 
-None are required by the current code, and none exist. Do not tell clients that reminders, expiry notices or automatic backups run: they do not.
+Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
+
+```
+15 2 * * *  /usr/bin/php /home/USER/vertex/bin/console.php schedule:run >> /home/USER/vertex/storage/logs/cron.log 2>&1
+40 2 * * *  /usr/bin/php /home/USER/vertex/bin/console.php backup:create --keep=14 >> /home/USER/vertex/storage/logs/cron.log 2>&1
+```
+
+`schedule:run` moves renewals along the calendar, sends reminders and releases commission hold periods; it is idempotent. **Do not tell staff or clients that reminders or backups run until you have seen both jobs run** (`schedule:status`, `backup:status`, *Admin → System status*). Until then the dashboards show a warning. Run `php bin/console.php doctor` before launch: it lists every production warning (HTTP instead of HTTPS, debug on, SMTP not configured, no scanner, seed users, never-run cron, no backup).
+
