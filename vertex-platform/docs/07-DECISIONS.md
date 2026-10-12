@@ -86,6 +86,20 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-58 | Nothing closes automatically: replies and uploads never change a status except returning "Need more information"/"Awaiting client response" to the team. | The brief. |
 | D-59 | Assignment is allowed to anyone who can work tickets (`tickets.reply/note/bugs.fix/update_status`) and either can already open the ticket or holds `tickets.view_assigned` (the assignment grants access). Clients, partners and workers on other projects cannot be assigned. | `TicketAccess::canBeAssigned`. |
 
+## Decisions taken in Phase 6 (please confirm or change)
+
+| # | Decision | Why |
+|---|---|---|
+| D-60 | **Commission formula mode defaults to `cumulative`** (milestone 1 = 10% of eligible money at the advance; milestone 2 = 15% of all eligible money minus milestone 1, so the total is 15%). `per_milestone` (10% of advance-stage payments + 5% of later payments) is one setting away. **Needs your confirmation of which one the partner agreement means.** | "10% + 5%" is ambiguous; both are implemented, versioned and tested. |
+| D-61 | Commission base = verified payments, net of refunds, excluding tax; contract value includes approved change requests; full payment tolerance 0; cancelled project: milestone 1 stays, milestone 2 never. All configurable and versioned. | Conservative defaults; nothing is ever paid on unpaid or refunded money. |
+| D-62 | `client_payments` is the single source of verified payments (recorded by one person, verified by another). It is the integration point for the future invoice/payment module and gateway. | No payment module exists; a commission must never rest on an unverified claim. |
+| D-63 | Attribution is a separate, reasoned decision by `referrals.decide`; one credited referral per contact/project; locked once any commission entry is eligible; no UI override. | Prevents commission disputes being rewritten after money moved. |
+| D-64 | Separation of duties is ON by default: the verifier/recorder of a payment cannot approve the commission; the approver of a payout cannot record its payment. Switch with the rules screen or `COMMISSION_SEPARATION_OF_DUTIES`. | Fraud control with two or more people; a one-person business can turn it off and the audit log still records everything. |
+| D-65 | Payout details are stored AES-256-GCM encrypted with a key derived from `APP_KEY`; masked hint only; reveal is limited to the payer and audited. Losing/changing `APP_KEY` loses them. | No plaintext bank details in the database, backups or logs. |
+| D-66 | The old Phase 2 form that let a partner create a CRM enquiry directly (`/partner/referrals/create`) is retired (redirects to `/partner/submit`); old enquiries stay readable. | It bypassed duplicate detection and attribution. |
+| D-67 | Approving a partner application never activates an account: new applicants get a pending account + invitation; signed-in applicants get the role on their own account; never linked by email match. | Secure activation, no account takeover via a guessed email. |
+| D-68 | **Finance Staff holds `payouts.record`** (records the manual transfer) but not `payouts.approve`, `payments.reconcile` or any commission approval. Earlier phases had reserved `payouts.record` for Administrator/Owner; `PermissionMatrixTest` was updated deliberately. | The Phase 6 brief: Admin/Finance approve and pay; separation of duties comes from two different permissions. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

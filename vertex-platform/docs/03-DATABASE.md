@@ -222,3 +222,31 @@ erDiagram
 ```
 
 Rules: every foreign key is `RESTRICT` (or `SET NULL` for optional user links; `ticket_reads.user_id` cascades with the user); `UNIQUE (requester_id, submit_token)` and `UNIQUE (author_id, submit_token)` make retried form posts idempotent; one warranty row per project (`UNIQUE project_id`); one current terms version (`current_flag`); warranty status is not stored, it is derived from the recorded dates and today's date; `ticket_notes` and `ticket_messages` are different tables so no conversation query can return an internal note.
+
+## Phase 6: referral partners, commissions, payouts (migration 0010)
+
+```mermaid
+erDiagram
+    users ||--o| referral_partners : "is a partner"
+    partner_terms ||--o{ partner_applications : "agreed version"
+    partner_applications |o--o| referral_partners : "approved into"
+    referral_partners ||--o{ partner_referrals : submits
+    partner_referrals ||--o{ referral_history : "history"
+    partner_referrals ||--o{ referral_email_log : "previewed emails"
+    partner_referrals |o--o| enquiries : "linked CRM enquiry"
+    partner_referrals |o--o| projects : "converted / credited project"
+    projects ||--o{ client_payments : "verified payments"
+    client_payments ||--o{ client_payment_events : "append-only"
+    partner_referrals ||--o{ commission_entries : earns
+    commission_entries ||--o{ commission_entry_payments : "payments counted"
+    client_payments ||--o{ commission_entry_payments : "counted in"
+    commission_entries |o--o{ commission_entries : "adjustment lines (parent)"
+    commission_entries ||--o{ commission_history : "append-only"
+    referral_partners ||--o{ payout_requests : requests
+    payout_requests ||--o{ payout_allocations : reserves
+    commission_entries ||--o{ payout_allocations : "reserved by"
+    payout_requests ||--o{ payout_history : "append-only"
+    commission_rules ||--o{ commission_entries : "version used"
+```
+
+Integrity rules in the schema: `UNIQUE partner_applications.active_key` (one open application per email), `UNIQUE (partner_id, submit_token)` on referrals and payouts (double submit), `UNIQUE partner_referrals.credit_project_id` (one credited referral per project), `UNIQUE client_payments.external_key` (a transaction reference is recorded once), `UNIQUE commission_entries (referral_id, milestone, seq)`, `UNIQUE payout_requests.payment_reference`, `UNIQUE referral_email_log.sent_key` (set only on a successful send), `UNIQUE commission_rules.current_flag` (one current version). Money is `BIGINT` paise. Foreign keys are `RESTRICT` (or `SET NULL` for optional user/CRM links); history tables are append-only by convention and by the absence of any update/delete code path.

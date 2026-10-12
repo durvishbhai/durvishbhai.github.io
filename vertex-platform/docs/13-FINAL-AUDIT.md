@@ -1,5 +1,7 @@
 # 13 · Final project audit
 
+> **Update after Phase 6:** referral partner applications, referrals, attribution, the 10% + 5% commission ledger, payout requests/approval/manual payment recording and a minimal `client_payments` verification table were built afterwards and are documented in `14-PHASE6-REFERRAL-COMMISSIONS.md`. Quotations, invoices, a payment gateway, webhooks and domain/hosting renewals are **still not built**. Everything below describes the state at the time of the audit.
+
 Scope: the code and schema that exist in this repository on branch `ccr-13b48464-fpb2gp`, inspected and exercised in a development container (PHP 8.3.6, MariaDB 10.11, throwaway databases, Chromium). Nothing was deployed, no live payment was enabled, and no existing record was deleted or replaced.
 
 ## 0. The most important finding

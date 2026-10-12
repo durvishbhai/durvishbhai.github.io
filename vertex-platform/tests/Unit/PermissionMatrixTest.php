@@ -113,7 +113,8 @@ final class PermissionMatrixTest extends TestCase
             'only owner makes backups' => ['backups.manage', ['super_admin']],
             'approving transactions' => ['transactions.approve', ['administrator', 'super_admin']],
             'approving payouts' => ['payouts.approve', ['administrator', 'super_admin']],
-            'recording payouts' => ['payouts.record', ['administrator', 'super_admin']],
+            // Phase 6: Finance Staff pays approved payouts (the Phase 6 brief: Admin/Finance approve and pay); approving stays Administrator/Owner, so approval and payment are separate duties
+            'recording payouts' => ['payouts.record', ['administrator', 'finance_staff', 'super_admin']],
             'deciding referrals' => ['referrals.decide', ['administrator', 'super_admin']],
             'approving renewals' => ['renewals.approve', ['administrator', 'super_admin']],
             'provider confirmation' => ['renewals.confirm_provider', ['administrator', 'super_admin']],
@@ -159,8 +160,11 @@ final class PermissionMatrixTest extends TestCase
         $f = Config::get('permissions.roles.finance_staff.permissions');
         $this->assertEqualsCanonicalizing([
             'finance.view', 'invoices.view_all', 'invoices.create', 'invoices.edit',
-            'payments.view_all', 'payments.record', 'payouts.view_all', 'commissions.view_all',
+            'payments.view_all', 'payments.record', 'payouts.view_all', 'payouts.record', 'commissions.view_all',
         ], $f);
+        foreach (['payouts.approve', 'commissions.approve', 'commissions.adjust', 'commissions.rules.manage', 'payments.reconcile', 'referrals.decide'] as $never) {
+            $this->assertNotContains($never, $f, "finance must not hold {$never}");
+        }
     }
 
     public function testSupportStaffHasNoFinanceOrUserAdmin(): void

@@ -25,6 +25,8 @@ Generated from `config/permissions.php` with `php bin/console.php permissions:ma
 
 15. **Phase 5 additions.** Tickets and bug reports: `TicketAccess` (client: own client record only, drafts only for their author; staff: `tickets.view_all`, or `tickets.view_assigned` for tickets assigned to them and tickets on projects they are assigned to; workers: `tickets.view_technical`, technical categories on assigned projects only, never billing, payment or account-access tickets, never reply to clients). The client moves a ticket only to confirm a fix, reopen it or close their own resolved ticket; triage, confirm, in-progress and fixed are staff or assigned-developer moves (`bugs.manage`, `bugs.fix`). **`warranty.manage` (contractual warranty settings) and `warranty.override` (override a recorded eligibility decision) are Administrator-only and sensitive**; the earlier default grant of `warranty.manage` to Manager and Support was removed by migration 0009. Managers and Support can *view* warranty terms and dates (`warranty.view`) and decide per-issue eligibility (`bugs.review_eligibility`, Manager only); changing an earlier decision, or covering an issue the warranty did not cover when it was reported, needs `warranty.override`. Proposing a chargeable change is `tickets.propose_change` (Manager and Administrator); only the client approves it (`revisions.respond_cost`). Administrators hold none of the client-only ticket permissions.
 
+16. **Phase 6 additions (referral partners, commissions, payouts).** A partner needs the permission **and** an active `referral_partners` record: every query is scoped by that record in SQL (another partner's referral, commission or payout is a 404; a worker or staff member who merely holds a partner key but has no partner record gets 404 too). Partners never see invoices, payments, project prices, internal notes, other partners or the reason a commission is held. **Only `referrals.decide`** (Administrator/Owner) approves or rejects applications and decides attribution; **`payments.reconcile`** (Administrator/Owner) verifies payments; **`commissions.approve/adjust/rules.manage`** and **`payouts.approve`** are Administrator/Owner only; Finance Staff may view ledgers, **record** payments and **record manual payouts** (`payouts.record`) but cannot approve or verify anything. With separation of duties on, the person who recorded/verified a payment cannot approve the commission built on it, and the person who approved a payout cannot record its payment. Financial decisions also need the actor's password (step-up). Clients and workers hold none of these keys. Existing databases: run `permissions:sync` (adds keys) and, to apply the new default grants to existing roles, `permissions:sync --reset-roles` or edit the role in the UI.
+
 Users can hold several roles; permissions are the union.
 
 ## Default matrix
@@ -123,14 +125,18 @@ Users can hold several roles; permissions are the union.
 | `payouts.view_own` — View own payout requests | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ | ✔ |  |
 | `payouts.view_all` — View all payout requests | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `payouts.approve` — Approve or reject payout requests | ✔ | ✔ |  |  |  |  |  |  |  |  |
-| `payouts.record` — Record a manual payout as paid | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `payouts.record` — Record a manual payout as paid | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `commissions.view_own` — View own commission ledger | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ | ✔ |  |
 | `commissions.view_all` — View all commission ledgers | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `commissions.rules.manage` — Edit commission rules | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `commissions.approve` — Approve, hold or release commission entries | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `commissions.adjust` — Adjust or reverse commission entries | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Referrals** | | | | | | | | | | |
-| `referrals.view_own` — View own referral records | ✔ | ✔ |  |  |  |  |  |  | ✔ |  |
+| `referrals.view_own` — View own referral records | ✔ |  |  |  |  |  |  |  | ✔ |  |
 | `referrals.review` — View referral applications | ✔ | ✔ |  |  |  |  |  |  |  |  |
-| `referrals.decide` — Approve or reject referral applications | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `referrals.decide` — Approve or reject partner applications; decide referral attribution; record partner terms | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `referrals.manage` — View all referrals; update referral status, notes and CRM links; send previewed status emails | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `referrals.submit` — Submit referrals (approved referral partner) | ✔ |  |  |  |  |  |  |  | ✔ |  |
 | **Support** | | | | | | | | | | |
 | `chat.use` — Use project chat on accessible projects | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  | ✔ |
 | `revisions.request` — Request a revision (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |

@@ -80,6 +80,21 @@ final class CommissionEngineTest extends DatabaseTestCase
         $this->assertTrue(Audit::verify()['ok']);
     }
 
+    public function testAnUnverifiedPaymentBesideAVerifiedOneNeverCountsTowardTheBase(): void
+    {
+        $ref = $this->creditedReferral();
+        // an unpaid / unverified INR 30,000 payment exists on the project while another payment is verified: the evaluation runs and must ignore it
+        ClientPaymentService::record($this->finance, ['project' => $this->alpha['public_id'], 'role' => 'advance', 'gross' => '30000', 'tax' => '0', 'method' => 'upi', 'external_ref' => 'UPI-PENDING', 'received_on' => \Vertex\Services\AppTime::today()]);
+        $this->pay('advance', '20000');
+        $e = $this->entry($ref, 'advance');
+        $this->assertSame(2000000, (int) $e['base_minor'], 'only the verified INR 20,000 counts');
+        $this->assertSame(200000, (int) $e['amount_minor']);
+        $this->assertCount(1, Database::all('SELECT 1 FROM commission_entry_payments WHERE entry_id = ?', [$e['id']]));
+        $f = json_decode($e['formula_json'], true);
+        $this->assertSame(2000000, $f['inputs']['advance_eligible_minor']);
+        $this->assertSame(2000000, $f['inputs']['received_net_of_refunds_minor']);
+    }
+
     public function testTheBaseExcludesTaxAndOnlyCountsWhatWasReceived(): void
     {
         $ref = $this->creditedReferral();
