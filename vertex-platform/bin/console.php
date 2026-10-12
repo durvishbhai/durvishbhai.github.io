@@ -17,6 +17,10 @@ declare(strict_types=1);
  *   audit:verify              Verify the audit-log hash chain
  *   schedule:run              The scheduled task for cron: renewal stages and reminders, commission hold periods (safe to run repeatedly)
  *   schedule:status           When the scheduled task last ran
+ *   backup:create             Write a verified backup zip (database + uploads) to the backup directory (--dir=, --keep=N)
+ *   backup:verify             Check a backup file's integrity (--file=)
+ *   backup:restore            Restore a backup into an EMPTY database (--file=, --database=, optional --uploads-dir=)
+ *   backup:status             When the newest backup was made
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -96,6 +100,36 @@ switch ($command) {
         } catch (Throwable $e) {
             $check('database connection', false, $e->getMessage());
         }
+        $isProd = Config::get('app.env') === 'production';
+        $warn = static function (string $label, bool $ok, string $hint = '') use (&$warnings): void {
+            out(sprintf('  [%s] %s%s', $ok ? ' ok ' : 'warn', $label, $ok || $hint === '' ? '' : " — {$hint}"));
+            $warnings += $ok ? 0 : 1;
+        };
+        $warnings = 0;
+        out('Production readiness (warnings do not fail the command but must be reviewed before launch):');
+        $url = (string) Config::get('app.url', '');
+        $warn('APP_ENV is production', $isProd, 'this is a ' . (string) Config::get('app.env') . ' environment');
+        $warn('APP_URL uses https://', str_starts_with($url, 'https://'), 'cookies and links must be HTTPS in production');
+        $warn('APP_DEBUG is off', Config::get('app.debug') !== true);
+        $warn('Mail driver is smtp (log/none cannot send real email)', \Vertex\Services\Mailer::driver() === 'smtp', 'invitations, resets and reminder emails will not be delivered');
+        $warn('Uploads are scanned (UPLOAD_SCANNER is not none)', (string) Config::get('uploads.scanner.driver', 'none') !== 'none', 'uploads are stored without a malware scan');
+        $docroot = realpath(VERTEX_ROOT . '/public') ?: '';
+        $warn('storage/ is outside the public folder', $docroot !== '' && !str_starts_with((string) realpath(VERTEX_ROOT . '/storage'), $docroot));
+        $envPerm = is_file(VERTEX_ROOT . '/.env') ? (fileperms(VERTEX_ROOT . '/.env') & 0007) : 0;
+        $warn('.env is not world-readable', $envPerm === 0, 'chmod 600 .env');
+        try {
+            $sch = \Vertex\Services\RenewalScheduler::lastRun();
+            $warn('Scheduled task has run in the last 36 hours', \Vertex\Services\RenewalScheduler::healthy(), $sch['at'] === null ? 'it has never run: add the cron job' : 'last run ' . $sch['hours'] . ' hours ago');
+            $demo = (int) Database::one("SELECT COUNT(*) AS c FROM users WHERE email LIKE '%@example.test'")['c'];
+            $warn('No development seed accounts (@example.test) exist', $demo === 0, "{$demo} seeded account(s): remove them before launch");
+            $owners = (int) Database::one("SELECT COUNT(*) AS c FROM users u JOIN user_roles ur ON ur.user_id = u.id JOIN roles r ON r.id = ur.role_id WHERE r.slug = 'super_admin' AND u.status = 'active'")['c'];
+            $warn('At least one active Super Admin exists', $owners >= 1, 'php bin/console.php user:create-super-admin');
+        } catch (Throwable) {
+            $warn('Database checks', false, 'migrate first');
+        }
+        $bk = \Vertex\Services\BackupService::latest();
+        $warn('A backup exists and is recent', $bk['path'] !== null && $bk['hours'] <= (int) Config::get('backup.stale_hours', 36), $bk['path'] === null ? 'no backup has ever been made: backups are NOT operational' : 'newest backup is ' . $bk['hours'] . ' hours old');
+        out($warnings === 0 ? 'No production warnings.' : "{$warnings} production warning(s).");
         out($problems === 0 ? 'All required checks passed.' : "{$problems} required check(s) failed.");
         exit($problems === 0 ? 0 : 1);
 
@@ -111,6 +145,50 @@ switch ($command) {
     case 'schedule:status':
         $r = \Vertex\Services\RenewalScheduler::lastRun();
         out($r['at'] === null ? 'The scheduled task has NEVER run. Renewal stages and reminders are NOT active until cron runs it.' : sprintf('Last run %s UTC (%d hour(s) ago), %s. %s', $r['at'], $r['hours'], $r['ok'] ? 'ok' : 'with errors', \Vertex\Services\RenewalScheduler::healthy() ? '' : 'It is overdue: check the cron job.'));
+        break;
+
+    case 'backup:create':
+        try {
+            $keep = isset($options['keep']) ? (int) $options['keep'] : (int) Config::get('backup.keep', 0);
+            $b = \Vertex\Services\BackupService::create($options['dir'] ?? null, $keep > 0 ? $keep : null);
+            $v = \Vertex\Services\BackupService::verify($b['path']);
+        } catch (Throwable $e) {
+            fail('Backup FAILED: ' . $e->getMessage());
+        }
+        out(sprintf('Backup written: %s (%d bytes, %d tables, %d rows, %d upload files).', $b['path'], $b['bytes'], $b['tables'], $b['rows'], $b['uploads']));
+        out('SHA-256: ' . $b['sha256']);
+        if (!$v['ok']) {
+            fail('Verification FAILED: ' . implode(' ', $v['problems']));
+        }
+        out('Verification passed. Copy this file off the server; a backup that exists only on this server is not a backup. Keep APP_KEY with it (it is NOT inside the file).');
+        break;
+
+    case 'backup:verify':
+        $f = $options['file'] ?? fail('Usage: backup:verify --file=PATH');
+        $v = \Vertex\Services\BackupService::verify($f);
+        if (!$v['ok']) {
+            fail('INVALID: ' . implode(' ', $v['problems']));
+        }
+        out(sprintf('Backup is intact: %s, %d tables, %d upload files, created %s.', basename($f), count((array) $v['manifest']['tables']), count((array) $v['manifest']['uploads']), $v['manifest']['created_at']));
+        break;
+
+    case 'backup:restore':
+        $f = $options['file'] ?? fail('Usage: backup:restore --file=PATH --database=EMPTY_DB_NAME [--uploads-dir=PATH]');
+        $db = $options['database'] ?? fail('Usage: backup:restore --file=PATH --database=EMPTY_DB_NAME [--uploads-dir=PATH]');
+        try {
+            $r = \Vertex\Services\BackupService::restore($f, $db, $options['uploads-dir'] ?? null);
+        } catch (Throwable $e) {
+            fail('Restore FAILED: ' . $e->getMessage());
+        }
+        out(sprintf('Restored into %s: %d tables, %d rows, %d upload files. Row counts %s the backup. Audit chain %s.', $db, $r['tables'], $r['rows'], $r['uploads'], $r['row_counts_match'] ? 'MATCH' : 'DO NOT MATCH', $r['audit_chain']));
+        foreach ($r['problems'] as $p) {
+            out('  PROBLEM: ' . $p);
+        }
+        exit($r['problems'] === [] ? 0 : 1);
+
+    case 'backup:status':
+        $l = \Vertex\Services\BackupService::latest();
+        out($l['path'] === null ? 'There is NO backup in ' . \Vertex\Services\BackupService::dir() . '. Backups are not operational.' : sprintf('Newest backup: %s (%d hour(s) ago); %d file(s) kept. %s', basename($l['path']), $l['hours'], $l['count'], $l['hours'] > (int) Config::get('backup.stale_hours', 36) ? 'It is STALE: check the cron job.' : ''));
         break;
 
     case 'key:generate':
