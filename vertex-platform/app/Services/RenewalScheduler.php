@@ -32,7 +32,12 @@ final class RenewalScheduler
             Database::run('INSERT INTO scheduler_runs (job, started_at, ok) VALUES (?, UTC_TIMESTAMP(), 0)', [self::JOB]);
             $runId = Database::insertId();
             $summary['ran'] = true;
-            foreach (Database::all("SELECT id FROM renewal_services WHERE status <> 'cancelled' ORDER BY id") as $row) {
+            // Only services whose date or stage can have changed are loaded: a large table of far-off renewals costs one indexed query, not one lock per row.
+            $lead = (array) Config::get('renewals.lead');
+            $expirable = "'" . implode("','", array_map('strval', (array) Config::get('renewals.expirable'))) . "'";
+            $toAdvance = Database::all("SELECT id FROM renewal_services WHERE (status IN ('active','renewed') AND expires_on <= ?) OR (status = 'renewal_approaching' AND expires_on <= ?) OR (status IN ({$expirable}) AND expires_on < ?) ORDER BY id",
+                [gmdate('Y-m-d', strtotime($today . ' +' . (int) $lead['approach_days'] . ' day')), gmdate('Y-m-d', strtotime($today . ' +' . (int) $lead['review_days'] . ' day')), $today]);
+            foreach ($toAdvance as $row) {
                 try {
                     $summary['advanced'] += count(RenewalService::advance((int) $row['id'], $today, null));
                 } catch (\Throwable $e) {
@@ -40,7 +45,8 @@ final class RenewalScheduler
                     Logger::error('Renewal advance failed', ['service_id' => (int) $row['id'], 'error' => $e->getMessage()]);
                 }
             }
-            foreach (Database::all("SELECT s.*, c.user_id AS client_user_id FROM renewal_services s JOIN clients c ON c.id = s.client_id WHERE s.status NOT IN ('cancelled','on_hold') ORDER BY s.id") as $s) {
+            $horizonDate = gmdate('Y-m-d', strtotime($today . ' +' . max([(int) $lead['approach_days'], ...array_map('intval', (array) Config::get('renewals.reminder_days'))]) . ' day'));
+            foreach (Database::all("SELECT s.*, c.user_id AS client_user_id FROM renewal_services s JOIN clients c ON c.id = s.client_id WHERE s.status NOT IN ('cancelled','on_hold') AND s.expires_on <= ? ORDER BY s.id", [$horizonDate]) as $s) {
                 try {
                     $summary['reminders'] += self::remind($s, $today);
                 } catch (\Throwable $e) {

@@ -10,3 +10,5 @@
 !/storage/*/.gitkeep
 .phpunit.cache/
 .phpunit.result.cache
+/storage/backups/*
+!/storage/backups/.gitkeep

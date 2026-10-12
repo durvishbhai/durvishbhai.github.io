@@ -40,6 +40,7 @@ $nav = [
     ['/admin/users', 'Users', can('users.view')],
     ['/admin/roles', 'Roles', can('roles.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
+    ['/admin/system', 'System status', can('settings.view')],
     ['/notifications', 'Notifications' . ($unread > 0 ? ' (' . $unread . ')' : ''), true],
     ['/account', 'My account', true],
 ];

@@ -364,3 +364,6 @@ ol.timeline > li::before { content: ""; position: absolute; left: -25px; top: 6p
 .step { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-dim); }
 .step-done { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
 .step-current { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.6); font-weight: 600; }
+.badge-sys-ok { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-sys-warn { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-sys-info { color: var(--text-dim); }

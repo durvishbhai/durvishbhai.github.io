@@ -39,6 +39,7 @@ use Vertex\Http\Controllers\Referrals\ReferralAdminController;
 use Vertex\Http\Controllers\TicketController;
 use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
+use Vertex\Http\Controllers\Admin\SystemController;
 use Vertex\Http\Controllers\Renewals\ClientServiceController;
 use Vertex\Http\Controllers\Renewals\RenewalController;
 use Vertex\Http\Controllers\Renewals\RenewalPriceController;
@@ -313,6 +314,7 @@ return static function (Router $router): void {
 
     // Administration
     $router->group('/admin', ['auth'], static function (Router $r): void {
+        $r->get('/system', [SystemController::class, 'index'], ['can:settings.view']);
         $r->get('/users', [UserController::class, 'index'], ['can:users.view']);
         $r->get('/users/create', [UserController::class, 'create'], ['can:users.create']);
         $r->post('/users', [UserController::class, 'store'], ['can:users.create']);
