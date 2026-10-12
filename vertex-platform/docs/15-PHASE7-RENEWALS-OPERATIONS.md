@@ -78,3 +78,6 @@ Measured on the development container (MariaDB 10.11) with 20,000 synthetic rene
 6. As the client: *Domains & hosting* shows only your own services; another client's URL is 404.
 7. `backup:create`, `backup:verify`, create an empty database, `backup:restore --database=… --uploads-dir=…`: row counts MATCH and the audit chain is intact.
 8. `doctor` lists the production warnings you still have to clear.
+
+## 10. Test results (actual)
+Full suite after Phase 7: **665 tests, 19,317 assertions, all passing**. Phase 7 adds `RenewalServiceTest` (24), `RenewalHttpTest` (7), `BackupServiceTest` (6), `SystemStatusHttpTest` (2), `FullPlatformJourneyTest` (1, referral → commission → payout → renewal → backup → restore), `StaticSecurityScanTest` (5); `RouteSweepTest` covers every new route. An earlier run found 5 failures caused by my own changes (two migration-list expectations, a test file matching its own secret pattern, and a test that leaked a temporary uploads path into later tests); all were fixed and the suite re-run clean.
