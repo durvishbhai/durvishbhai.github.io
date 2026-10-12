@@ -22,6 +22,12 @@ final class CrmReference
         'change' => ['CHG', 5],
         'bug' => ['BUG', 5],
         'ticket' => ['TKT', 5],
+        'partner' => ['PRT', 4],
+        'partner_app' => ['PAP', 5],
+        'partner_ref' => ['REF', 5],
+        'commission' => ['COM', 5],
+        'payout' => ['PYO', 5],
+        'client_payment' => ['RCP', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string

@@ -83,7 +83,7 @@ final class EnquiryService
      * Creates an enquiry. $actorId is null for public form submissions.
      *
      * @param array<string,mixed> $in
-     * @param array{consent?:bool,ip?:string,referral_partner_id?:int} $meta
+     * @param array{consent?:bool,ip?:string,referral_partner_user_id?:int} $meta
      * @return array{id:int,public_id:string,reference:string,duplicate_of:?int}
      */
     public static function create(?int $actorId, string $source, array $in, array $meta = []): array
@@ -92,6 +92,9 @@ final class EnquiryService
             throw new \InvalidArgumentException("Unknown enquiry source '{$source}'.");
         }
         if ($source === 'manual') {
+            Gate::authorize('enquiries.create', (int) $actorId);
+        } elseif ($source === 'referral_partner' && isset($meta['referral_partner_user_id'])) {
+            // staff creating the CRM enquiry for a partner's approved referral (ReferralService::createEnquiry); the partner is the credited submitter
             Gate::authorize('enquiries.create', (int) $actorId);
         } elseif ($source === 'referral_partner') {
             Gate::authorize('enquiries.submit_referral', (int) $actorId);
@@ -123,7 +126,7 @@ final class EnquiryService
                 [
                     $pub, $ref, $source, $d['contact_name'], $d['email'], $d['phone'], $d['phone_digits'], $d['company_name'], $d['company_norm'], $d['service'], $d['description'],
                     $d['budget_range'], $d['expected_deadline'], $d['preferred_slot'], $d['priority'], $stage['id'],
-                    $source === 'referral_partner' ? $actorId : null,
+                    $source === 'referral_partner' ? ($meta['referral_partner_user_id'] ?? $actorId) : null,
                     $dupOf, $dupOf !== null ? 'suspected' : 'none',
                     !empty($meta['consent']) ? gmdate('Y-m-d H:i:s') : null, $ipHash, $source === 'manual' ? $actorId : null,
                 ],
@@ -520,6 +523,7 @@ final class EnquiryService
             Database::run('UPDATE enquiries SET client_id = ?, converted_project_id = ?, converted_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP() WHERE id = ?', [$clientId, $project['id'], $enq['id']]);
             self::activity((int) $enq['id'], $actorId, 'converted', "Converted to project {$project['code']}" . ($choice === '' || $choice === 'new' ? ' with a new client record' : ' linked to an existing client'));
             Audit::record('enquiry.converted', 'enquiry', (int) $enq['id'], [], [], ['client_id' => $clientId, 'project_id' => $project['id'], 'linked_existing_client' => !($choice === '' || $choice === 'new')], $actorId);
+            ReferralService::onEnquiryConverted((int) $enq['id'], (int) $clientId, (int) $project['id'], $actorId);
 
             return ['client_id' => $clientId, 'client_public_id' => $clientPublic, 'project_id' => $project['id'], 'project_public_id' => $project['public_id'], 'project_code' => $project['code']];
         });

@@ -181,7 +181,7 @@ final class EndToEndWorkflowTest extends DatabaseTestCase
         // ---- modules that are NOT built leave no trace and nothing pretends to be money
         $tables = array_column(Database::all('SHOW TABLES'), array_key_first(Database::one('SHOW TABLES')));
         foreach ($tables as $t) {
-            $this->assertDoesNotMatchRegularExpression('/invoice|payment|commission|payout|renewal|webhook|quotation/', (string) $t, "table {$t} suggests an unbuilt module exists");
+            $this->assertDoesNotMatchRegularExpression('/invoice|renewal|webhook|quotation/', (string) $t, "table {$t} suggests an unbuilt module exists");
         }
     }
 

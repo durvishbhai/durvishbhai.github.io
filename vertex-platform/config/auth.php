@@ -27,5 +27,8 @@ return [
         'revision_user' => [20, 3600],
         'ticket_create_user' => [20, 3600],
         'ticket_message_user' => [60, 3600],
+        'partner_details_user' => [10, 3600],
+        'partner_referral_user' => [30, 3600],
+        'payout_request_user' => [10, 3600],
     ],
 ];

@@ -127,11 +127,15 @@ $p = [
         'commissions.view_own' => 'View own commission ledger',
         'commissions.view_all' => 'View all commission ledgers',
         'commissions.rules.manage' => 'Edit commission rules',
+        'commissions.approve' => 'Approve, hold or release commission entries',
+        'commissions.adjust' => 'Adjust or reverse commission entries',
     ],
     'referrals' => [
         'referrals.view_own' => 'View own referral records',
         'referrals.review' => 'View referral applications',
-        'referrals.decide' => 'Approve or reject referral applications',
+        'referrals.decide' => 'Approve or reject partner applications; decide referral attribution; record partner terms',
+        'referrals.manage' => 'View all referrals; update referral status, notes and CRM links; send previewed status emails',
+        'referrals.submit' => 'Submit referrals (approved referral partner)',
     ],
     'support' => [
         'chat.use' => 'Use project chat on accessible projects',
@@ -210,7 +214,7 @@ $sensitive = [
     'settings.manage', 'backups.manage', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
-    'commissions.rules.manage', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider',
+    'commissions.rules.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
     'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',
@@ -249,6 +253,7 @@ $roles = [
             'roles.manage_sensitive', 'settings.manage', 'backups.manage',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
+            'referrals.submit', 'referrals.view_own',
             'deliverables.respond', 'revisions.respond_cost', 'revisions.request',
             'bugs.report', 'tickets.create', 'tickets.view_own', 'tickets.reply_own', 'warranty.view_own',
         ])),
@@ -287,7 +292,7 @@ $roles = [
             'finance.view',
             'invoices.view_all', 'invoices.create', 'invoices.edit',
             'payments.view_all', 'payments.record',
-            'payouts.view_all', 'commissions.view_all',
+            'payouts.view_all', 'payouts.record', 'commissions.view_all',
         ],
     ],
     'support_staff' => [
@@ -325,7 +330,7 @@ $roles = [
         'name' => 'Referral Partner',
         'description' => 'Sees only own referral records and commissions. No project access.',
         'level' => 20, 'locked' => false, 'assignable_in_ui' => true, 'phone_required' => true,
-        'permissions' => ['referrals.view_own', 'enquiries.submit_referral', 'enquiries.view_own', 'commissions.view_own', 'payouts.request', 'payouts.view_own'],
+        'permissions' => ['referrals.view_own', 'referrals.submit', 'enquiries.submit_referral', 'enquiries.view_own', 'commissions.view_own', 'payouts.request', 'payouts.view_own'],
     ],
     'client' => [
         'name' => 'Client',
