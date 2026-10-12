@@ -397,6 +397,9 @@ final class CommissionService
         $partnerNote = (string) FieldRules::line($partnerNote, 'Note for the partner', 5, 255, false);
         Database::transaction(function () use ($actorId, $e, $reason, $partnerNote): void {
             $row = Database::one('SELECT * FROM commission_entries WHERE id = ? FOR UPDATE', [$e['id']]);
+            if ($row !== null && $row['status'] === 'payout_requested') {
+                throw new ValidationException(['This entry is reserved by a payout request. Resolve the payout first.']);
+            }
             if ($row === null || !in_array($row['status'], ['eligible_for_review', 'approved', 'payable'], true) || $row['milestone'] === 'adjustment' && (int) $row['amount_minor'] < 0) {
                 throw new ValidationException(['This entry cannot be put on hold in its current state.']);
             }
