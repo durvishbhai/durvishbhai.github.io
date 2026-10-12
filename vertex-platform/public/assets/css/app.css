@@ -354,3 +354,4 @@ fieldset.field legend { color: var(--text-dim); font-size: 0.85rem; padding: 0 6
 ol.timeline > li { position: relative; }
 ol.timeline > li::before { content: ""; position: absolute; left: -25px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px var(--bg-card); }
 .note { border-left: 3px solid var(--gold); padding: 4px 12px; margin: 8px 0; }
+.detail-list dd, .timeline p { overflow-wrap: anywhere; }
