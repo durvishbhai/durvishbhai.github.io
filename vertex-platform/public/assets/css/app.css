@@ -355,3 +355,12 @@ ol.timeline > li { position: relative; }
 ol.timeline > li::before { content: ""; position: absolute; left: -25px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 3px var(--bg-card); }
 .note { border-left: 3px solid var(--gold); padding: 4px 12px; margin: 8px 0; }
 .detail-list dd, .timeline p { overflow-wrap: anywhere; }
+/* Phase 7: renewals */
+.badge-rn-active, .badge-rn-renewed { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.badge-rn-renewal_approaching, .badge-rn-awaiting_admin_review, .badge-rn-awaiting_payment, .badge-rn-on_hold { color: #ffd98a; border-color: rgba(201, 162, 75, 0.6); }
+.badge-rn-approved_for_renewal, .badge-rn-invoice_issued, .badge-rn-payment_received, .badge-rn-renewal_in_progress { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.5); }
+.badge-rn-expired, .badge-rn-cancelled { color: #ffadad; border-color: rgba(255, 107, 107, 0.5); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.step { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-dim); }
+.step-done { color: #8ff0b8; border-color: rgba(60, 200, 120, 0.5); }
+.step-current { color: #9ec3ff; border-color: rgba(47, 123, 255, 0.6); font-weight: 600; }

@@ -20,6 +20,8 @@ $nav = [
     ['/commissions', 'Commissions', can('commissions.view_all')],
     ['/payouts', 'Payouts', can('payouts.view_all') || can('payouts.approve') || can('payouts.record')],
     ['/client-payments', 'Client payments', can('payments.view_all') || can('payments.record') || can('payments.reconcile')],
+    ['/renewals', 'Domains & hosting', can('renewals.view') || can('renewals.manage') || can('renewals.approve') || can('renewals.confirm_provider')],
+    ['/my/services', 'Domains & hosting', can('renewals.view_own')],
     ['/projects', 'Projects', can('projects.view_all') || can('projects.view_assigned') || can('projects.view_own')],
     ['/team', 'Team', can('projects.view_all')],
     ['/tasks', 'Tasks', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],

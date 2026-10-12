@@ -39,6 +39,9 @@ use Vertex\Http\Controllers\Referrals\ReferralAdminController;
 use Vertex\Http\Controllers\TicketController;
 use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
+use Vertex\Http\Controllers\Renewals\ClientServiceController;
+use Vertex\Http\Controllers\Renewals\RenewalController;
+use Vertex\Http\Controllers\Renewals\RenewalPriceController;
 
 /*
  * Route table. Every route is backed by working code. Middleware aliases:
@@ -191,6 +194,19 @@ return static function (Router $router): void {
     $router->get('/payouts', [PayoutController::class, 'index'], $po);
     $router->get('/payouts/{payout}', [PayoutController::class, 'show'], $po);
     $router->post('/payouts/{payout}', [PayoutController::class, 'action'], $po);
+
+    // Domain / hosting / SSL renewals (Phase 7). Static paths first so `/renewals/new` is never read as an id.
+    $rn = ['auth', 'can:renewals.view,renewals.manage,renewals.approve,renewals.confirm_provider'];
+    $router->get('/renewals', [RenewalController::class, 'index'], $rn);
+    $router->get('/renewals/new', [RenewalController::class, 'create'], ['auth', 'can:renewals.manage']);
+    $router->post('/renewals', [RenewalController::class, 'store'], ['auth', 'can:renewals.manage']);
+    $router->get('/renewals/export', [RenewalController::class, 'export'], ['auth', 'can:renewals.manage']);
+    $router->get('/renewals/prices', [RenewalPriceController::class, 'index'], $rn);
+    $router->post('/renewals/prices', [RenewalPriceController::class, 'store'], ['auth', 'can:renewals.prices']);
+    $router->get('/renewals/{service}', [RenewalController::class, 'show'], $rn);
+    $router->post('/renewals/{service}', [RenewalController::class, 'action'], $rn);
+    $router->get('/my/services', [ClientServiceController::class, 'index'], ['auth', 'can:renewals.view_own']);
+    $router->get('/my/services/{service}', [ClientServiceController::class, 'show'], ['auth', 'can:renewals.view_own']);
 
     // Support Centre: bug reports, support tickets, warranty (Phase 5). `can:` is the first gate only; TicketAccess decides per ticket (404).
     $tk = ['auth', 'can:tickets.view_own,tickets.view_all,tickets.view_assigned,tickets.view_technical'];

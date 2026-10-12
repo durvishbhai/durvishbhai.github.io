@@ -28,6 +28,7 @@ final class CrmReference
         'commission' => ['COM', 5],
         'payout' => ['PYO', 5],
         'client_payment' => ['RCP', 5],
+        'renewal' => ['RNW', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string

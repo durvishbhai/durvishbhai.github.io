@@ -1,0 +1,18 @@
+<?php /** @var list<array<string,mixed>> $prices */ /** @var bool $canEdit */ $v = static fn (string $k, string $d = ''): string => old($k, $d); ?>
+<div class="page-head"><div><p class="eyebrow">Services</p><h1>Renewal price list</h1></div><a class="btn btn-ghost" href="/renewals">&larr; Services</a></div>
+<div class="panel"><p class="muted">Price = base + markup − discount, plus tax. A price applies from its effective date. Rows are never edited: add a new row with a later date. A renewal that was already approved keeps the price it was approved at.</p>
+    <div class="table-wrap"><table class="table"><thead><tr><th>Type</th><th>Period</th><th class="num">Base</th><th class="num">Markup</th><th class="num">Discount</th><th class="num">Tax</th><th>From</th><th>Note</th></tr></thead><tbody>
+        <?php foreach ($prices as $p) : ?><tr><td><?= e(config("renewals.types.{$p['service_type']}", $p['service_type'])) ?></td><td><?= (int) $p['period_months'] ?> mo</td><td class="num"><?= e(money($p['base_minor'])) ?></td><td class="num"><?= e(money($p['markup_minor'])) ?></td><td class="num"><?= e(money($p['discount_minor'])) ?></td>
+            <td class="num"><?= e(rtrim(rtrim(number_format((int) $p['tax_bps'] / 100, 2), '0'), '.')) ?>%</td><td><?= e(local_date($p['effective_from'])) ?></td><td><?= e($p['note'] ?? '') ?><br><span class="muted"><?= e($p['author'] ?? '') ?></span></td></tr><?php endforeach; ?>
+        <?php if ($prices === []) : ?><tr><td colspan="8" class="muted">No prices yet. Until a price exists, an approver must enter an approved price (with a reason) for each renewal.</td></tr><?php endif; ?></tbody></table></div></div>
+<?php if ($canEdit) : ?><div class="panel"><h2>Add a price</h2><form method="post" action="/renewals/prices" class="form-grid" data-confirm="Add this price?"><?= csrf_field() ?>
+    <div class="field"><label for="t">Type</label><select id="t" name="service_type"><?php foreach (config('renewals.types') as $c => $l) : ?><option value="<?= e($c) ?>"<?= $v('service_type') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="m">Period</label><select id="m" name="period_months"><?php foreach (config('renewals.periods') as $m) : ?><option value="<?= (int) $m ?>"<?= $v('period_months', '12') === (string) $m ? ' selected' : '' ?>><?= (int) $m ?> months</option><?php endforeach; ?></select></div>
+    <div class="field"><label for="b">Base price (₹)</label><input id="b" name="base" required inputmode="decimal" value="<?= e($v('base')) ?>"></div>
+    <div class="field"><label for="mk">Markup or fee (₹)</label><input id="mk" name="markup" inputmode="decimal" value="<?= e($v('markup', '0')) ?>"></div>
+    <div class="field"><label for="d">Discount (₹)</label><input id="d" name="discount" inputmode="decimal" value="<?= e($v('discount', '0')) ?>"></div>
+    <div class="field"><label for="tx">Tax (%)</label><input id="tx" name="tax_percent" inputmode="decimal" value="<?= e($v('tax_percent', '0')) ?>"></div>
+    <div class="field"><label for="ef">Effective from</label><input id="ef" name="effective_from" type="date" required value="<?= e($v('effective_from')) ?>"></div>
+    <div class="field"><label for="nt">Note (required)</label><input id="nt" name="note" required maxlength="255" value="<?= e($v('note')) ?>"></div>
+    <div class="field"><label for="pw">Your password</label><input id="pw" name="confirm_password" type="password" required autocomplete="current-password"></div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Add price</button></div></form></div><?php endif; ?>

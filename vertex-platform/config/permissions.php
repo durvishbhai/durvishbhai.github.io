@@ -205,6 +205,8 @@ $p = [
         'renewals.manage' => 'Create and edit renewal records',
         'renewals.approve' => 'Record Admin approval for a renewal',
         'renewals.confirm_provider' => 'Record provider confirmation and mark Renewed',
+        'renewals.prices' => 'Edit the renewal price list',
+        'renewals.view_own' => 'View own domain/hosting services (client)',
     ],
 ];
 
@@ -214,7 +216,7 @@ $sensitive = [
     'settings.manage', 'backups.manage', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
-    'commissions.rules.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider',
+    'commissions.rules.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
     'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',
@@ -253,7 +255,7 @@ $roles = [
             'roles.manage_sensitive', 'settings.manage', 'backups.manage',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
-            'referrals.submit', 'referrals.view_own',
+            'referrals.submit', 'referrals.view_own', 'renewals.view_own',
             'deliverables.respond', 'revisions.respond_cost', 'revisions.request',
             'bugs.report', 'tickets.create', 'tickets.view_own', 'tickets.reply_own', 'warranty.view_own',
         ])),
@@ -342,7 +344,7 @@ $roles = [
             'files.download', 'files.upload', 'deliverables.view', 'deliverables.respond', 'revisions.respond_cost',
             'invoices.view_own', 'receipts.view_own', 'payments.pay', 'quotes.view',
             'chat.use', 'revisions.request', 'bugs.report', 'warranty.view_own', 'tickets.create', 'tickets.view_own', 'tickets.reply_own',
-            'requirements.submit', 'appointments.book',
+            'requirements.submit', 'appointments.book', 'renewals.view_own',
         ],
     ],
 ];

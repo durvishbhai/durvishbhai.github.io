@@ -15,6 +15,8 @@ declare(strict_types=1);
  *   user:set-password         Set a user's password and activate a pending account (--email=; prompted)
  *   db:seed-dev               Insert FICTIONAL development data (APP_ENV=local only; prints a generated password once)
  *   audit:verify              Verify the audit-log hash chain
+ *   schedule:run              The scheduled task for cron: renewal stages and reminders, commission hold periods (safe to run repeatedly)
+ *   schedule:status           When the scheduled task last ran
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -96,6 +98,20 @@ switch ($command) {
         }
         out($problems === 0 ? 'All required checks passed.' : "{$problems} required check(s) failed.");
         exit($problems === 0 ? 0 : 1);
+
+    case 'schedule:run':
+        $r = \Vertex\Services\RenewalScheduler::run();
+        if (!$r['ran']) {
+            out('Another run is in progress; nothing done.');
+            break;
+        }
+        out(sprintf('Scheduler: %d status move(s), %d reminder(s), %d commission release(s), %d error(s).', $r['advanced'], $r['reminders'], $r['commission_releases'], $r['errors']));
+        exit($r['errors'] === 0 ? 0 : 1);
+
+    case 'schedule:status':
+        $r = \Vertex\Services\RenewalScheduler::lastRun();
+        out($r['at'] === null ? 'The scheduled task has NEVER run. Renewal stages and reminders are NOT active until cron runs it.' : sprintf('Last run %s UTC (%d hour(s) ago), %s. %s', $r['at'], $r['hours'], $r['ok'] ? 'ok' : 'with errors', \Vertex\Services\RenewalScheduler::healthy() ? '' : 'It is overdue: check the cron job.'));
+        break;
 
     case 'key:generate':
         out('APP_KEY=base64:' . base64_encode(random_bytes(32)));
