@@ -29,6 +29,8 @@ Generated from `config/permissions.php` with `php bin/console.php permissions:ma
 
 17. **Phase 7 additions (domain/hosting renewals, system status, backups).** Staff see renewals with `renewals.view` (Manager and above); `renewals.manage` creates and edits records, records invoices (as references), payments and the start of provider work, puts services on hold and exports CSV; **`renewals.approve`** (Administrator/Owner, sensitive) approves a renewal and its price, rejects, voids an invoice to revise the price and cancels; **`renewals.confirm_provider`** (Administrator/Owner, sensitive) is the only permission that can mark a service Renewed, by recording the provider's confirmation and new expiry; **`renewals.prices`** (Administrator/Owner, sensitive) edits the append-only price list. Approval, cancellation, price changes and confirmation also need the actor's password. **`renewals.view_own`** lets a client see only services of their own client record (read-only: no price, status, invoice or confirmation can be changed by a client, and internal notes, hold reasons and the provider confirmation reference are never shown). Workers, Support and Referral Partners hold none. `settings.view` opens the read-only *System status* page (Administrator/Owner). `backups.manage` is reserved: backups are created only from the server console (`backup:create`), there is no web download of a backup. New permission keys are granted to roles by `permissions:sync`; a changed default for an *existing* key (for example Finance `payouts.record`) needs `--reset-roles` or a role edit.
 
+18. **Phase 8 additions (billing).** `billing.configure` (Administrator/Owner, sensitive) edits the business details and the Google Pay settings and always needs the password; stored secrets are never displayed. `invoices.issue` and `invoices.void` stay Administrator/Owner (password); Finance Staff drafts and edits invoices and records payments (`payments.record`) but cannot issue, void, verify (`payments.reconcile`) or reject. `quotes.respond` is held by the Client role only (no staff role, including Administrator, can accept on a client's behalf; `quotes.record_decision`, Administrator/Owner, records a decision the client gave outside the portal, with a note). Clients see only their own issued invoices and sent quotations (404 otherwise) and may submit payment details (`payments.pay`), which count for nothing until staff verify them. New keys are granted by `permissions:sync`.
+
 Users can hold several roles; permissions are the union.
 
 ## Default matrix
@@ -106,6 +108,8 @@ Users can hold several roles; permissions are the union.
 | `quotes.view` — View quotations | ✔ | ✔ | ✔ |  |  |  |  |  |  | ✔ |
 | `quotes.create` — Draft quotations | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `quotes.send` — Send quotations to clients | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `quotes.respond` — Accept or decline own quotations (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `quotes.record_decision` — Record a quotation decision received outside the portal | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `pricing.request_change` — Propose a price change (e.g. from a priority change) for client approval | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `pricing.respond_change` — Approve or reject a proposed price change on own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
 | **Finance** | | | | | | | | | | |
@@ -121,6 +125,7 @@ Users can hold several roles; permissions are the union.
 | `payments.pay` — Pay own invoices (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `payments.record` — Record payments | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `payments.reconcile` — Reconcile payments with the gateway | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `billing.configure` — Edit business details and the Google Pay settings | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `transactions.approve` — Approve financial transactions | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Payouts** | | | | | | | | | | |
 | `payouts.request` — Submit a payout request | ✔ | ✔ | ✔ |  |  | ✔ | ✔ | ✔ | ✔ |  |

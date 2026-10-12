@@ -113,6 +113,18 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-75 | `backups.manage` is reserved: there is **no web UI or download for backups**. | A downloadable full-database file in the web app would be the highest-value attack target. |
 | D-76 | Not built and stated as such on the System status page: quotations, invoices (GST-compliant numbering needs your legal details), online payment gateway and webhooks, WhatsApp, a CMS, chat, calendar-slot appointment booking, worker/freelancer payouts, financial reports, two-factor authentication. | Each needs business input, credentials or a legal decision. |
 
+## Decisions taken in Phase 8 (please confirm or change)
+
+| # | Decision | Why |
+|---|---|---|
+| D-77 | **No tax anywhere**: no tax column in quotations/invoices; every document prints the business's tax statement ("Tax is not applicable."), frozen into the invoice at issue. | You stated GST is not applicable. |
+| D-78 | **Google Pay by UPI is the working payment path; Google Pay API (cards) stores its fields but is inactive** until a processor integration exists. The admin screen, System status and docs state this. | Google Pay is not a stand-alone gateway; a processor must charge the card, and I will not guess which one. |
+| D-79 | UPI payments are **confirmed by staff against the bank statement**; a client's "I have paid" is only a claim that counts for nothing until verified, and the verifier enters the amount that really arrived. | UPI gives a plain UPI ID no callback; a client's word must never mark an invoice paid. |
+| D-80 | Invoice payments are rows of the existing `client_payments` (no second table); the commission engine is unchanged. | "Do not duplicate financial records"; one source of verified payments. |
+| D-81 | Invoice numbers are assigned at issue, sequential, never reused; an issued invoice is never edited (void and reissue). | Audit and accounting integrity. |
+| D-82 | Gateway secrets are sealed with `SecretBox` (key derived from `APP_KEY`), written once, never shown again, never audited in clear; edits need `billing.configure` and the password. | Secrets must not live in the page, the log or the config text. |
+| D-83 | Finance Staff may draft invoices and record payments but not issue, void, verify or reject; Administrator/Owner issue and verify; the verifier of a payment is never its recorder. | Separation of duties. |
+
 ## External integrations and credentials
 
 | Integration | Needed from you | Phase |

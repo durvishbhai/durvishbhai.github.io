@@ -6,8 +6,8 @@ Date of assessment: 2026-10-12 · Branch `ccr-13b48464-fpb2gp` · Environment te
 
 **No — not as a complete system, and not yet as a pilot.** What exists is solid and heavily tested; what stands between it and production is a short list of *unbuilt features*, *missing credentials/business decisions*, and *things that have never been run on the real host*. None of the blockers is a known security flaw.
 
-* **Ready in code (tested):** accounts and roles, audit chain, CRM, clients, projects, tasks, deliverables and client approval, revisions and chargeable-work consent, bug reports, warranty, support tickets, referral partners with 10% + 5% commissions and payouts, domain/hosting renewals with a scheduler, portable backup and restore, system status page. **Full automated suite: 665 tests, 19,317 assertions, all passing (final run, 2026-10-12).**
-* **Not built (so the platform cannot yet run the whole business):** quotations, invoices and receipts; an online payment gateway and its webhooks (so "duplicate webhook handling" does not exist to be tested); WhatsApp and general email notifications; a CMS and public website inside the platform (the existing `crazybooks.me` GitHub Pages site is separate); chat; calendar-slot appointment booking; payouts for freelancers/workers; financial reports; two-factor authentication.
+* **Ready in code (tested):** accounts and roles, audit chain, CRM, quotations, invoices (no tax) with Google Pay by UPI and staff-verified payments, clients, projects, tasks, deliverables and client approval, revisions and chargeable-work consent, bug reports, warranty, support tickets, referral partners with 10% + 5% commissions and payouts, domain/hosting renewals with a scheduler, portable backup and restore, system status page. **Full automated suite: 665 tests, 19,317 assertions, all passing (final run, 2026-10-12).**
+* **Not built (so the platform cannot yet run the whole business):** card payments through Google Pay and any processor, and automatic payment confirmation (webhooks), so "duplicate webhook handling" does not exist to be tested (UPI payments are confirmed by staff against the bank); WhatsApp and general email notifications; a CMS and public website inside the platform (the existing `crazybooks.me` GitHub Pages site is separate); chat; calendar-slot appointment booking; payouts for freelancers/workers; financial reports; two-factor authentication.
 * **Never exercised on the real host:** Hostinger/cPanel deployment, cron, SMTP delivery, HTTPS cookie behaviour behind the real proxy, a restore on the real server.
 
 ### Gate A — internal pilot (staff only, billing stays outside the system)
@@ -22,7 +22,7 @@ Can be reached with **no new development**, in roughly this order:
 8. Business decisions in §5 (at least D-60).
 
 ### Gate B — public launch with customers paying through the platform
-Needs **new work and inputs that only you can provide**: a payment gateway account and a choice of provider (sandbox first, then live; webhook secret; signature verification and idempotency to be built and audited); quotations and GST-compliant invoices (GSTIN, HSN/SAC, numbering rules, credit notes: needs your accountant); legal text (Terms, Privacy Policy, Referral Partner Terms: placeholders today); two-factor authentication for Owner/Administrator; a malware scanner; a third-party penetration test; a provider/registrar workflow decision for renewals; accountant sign-off on TDS/GST for commission payouts.
+Needs **new work and inputs that only you can provide**: **only if you want card payments**: a payment processor account and your choice of provider (sandbox first, then live; its webhook built, signature-verified, idempotent and audited; the Google Pay merchant approval for PRODUCTION); not needed for UPI payments, which work today with manual verification; legal text (Terms, Privacy Policy, Referral Partner Terms: placeholders today); two-factor authentication for Owner/Administrator; a malware scanner; a third-party penetration test; a provider/registrar workflow decision for renewals; accountant sign-off on TDS/GST for commission payouts.
 
 ## 2. Completion matrix (exactly one label per feature)
 
@@ -45,9 +45,12 @@ Labels: **IT** Implemented and tested · **INT** Implemented but not fully teste
 | | Revisions, cost proposals, client consent | IT | |
 | | Bug reports, warranty, support tickets | IT | |
 | | Chat | DEF | Permission key only |
-| Money | Quotations | DEF | Not built |
-| | Invoices, receipts, GST numbering | DEF | Not built; needs your legal details |
-| | Online payments, gateway, webhooks, duplicate-webhook handling | BLK | Not built; needs a provider account and keys |
+| Money | Quotations (send, client accept/decline, expiry) | IT | `17-BILLING-AND-GOOGLE-PAY.md` |
+| | Invoices (no tax), numbering at issue, void, print view | IT | GST is not supported by design |
+| | Google Pay by UPI link + client "I have paid" + staff verification | IT | Confirmation is manual by design; the UPI ID itself must be proven with a real ₹1 payment |
+| | Google Pay API settings in the admin panel (encrypted secrets) | PI | Fields are stored; the integration is NOT active |
+| | Card payments through Google Pay / a processor, webhooks, duplicate-webhook handling | BLK | Needs your processor choice, credentials and Google's PRODUCTION approval; not built |
+| | Receipts | PI | The invoice page lists verified payments; no separate receipt document |
 | | Manual client payment recording + two-person verification | IT | `client_payments`, unique reference |
 | | Financial reports | DEF | |
 | Referral partners | Application, approval (no auto-activation), terms | IT | |
@@ -82,7 +85,7 @@ Labels: **IT** Implemented and tested · **INT** Implemented but not fully teste
 - [ ] No claim to clients that online payment, automatic invoices or WhatsApp exist.
 
 ## 4. Handover package (what to give the operator; contains no secrets)
-1. **Source and layout** — repository `durvishbhai.github.io`, folder `vertex-platform/` (README.md, composer.json). 2. **Architecture** — `docs/02-ARCHITECTURE.md`. 3. **Module inventory and status** — §2 above and `docs/05-MODULES-AND-PLAN.md`. 4. **Database** — `docs/03-DATABASE.md`, `database/migrations/0001…0011` (forward-only). 5. **Roles and permissions** — `docs/04-PERMISSIONS.md` (generated matrix). 6. **Configuration reference** — `.env.example` (names and meanings only). 7. **Deployment guide** — `docs/08-DEPLOYMENT.md`. 8. **Scheduled tasks** — `docs/15-PHASE7-RENEWALS-OPERATIONS.md` §3. 9. **Backup and restore runbook** — same document §4. 10. **Security review and residual risks** — `docs/13-FINAL-AUDIT.md` and `15` §7. 11. **Tests** — `tests/` (`composer test`; needs a throwaway database named `*_phpunit`; see README). 12. **Manual smoke tests** — `docs/09…15` checklists and §6 below. 13. **Operations runbook** — §6. 14. **Decisions and open questions** — `docs/07-DECISIONS.md` (D-01 … D-76) and §5.
+1. **Source and layout** — repository `durvishbhai.github.io`, folder `vertex-platform/` (README.md, composer.json). 2. **Architecture** — `docs/02-ARCHITECTURE.md`. 3. **Module inventory and status** — §2 above and `docs/05-MODULES-AND-PLAN.md`. 4. **Database** — `docs/03-DATABASE.md`, `database/migrations/0001…0011` (forward-only). 5. **Roles and permissions** — `docs/04-PERMISSIONS.md` (generated matrix). 6. **Configuration reference** — `.env.example` (names and meanings only). 7. **Deployment guide** — `docs/08-DEPLOYMENT.md`. 8. **Scheduled tasks** — `docs/15-PHASE7-RENEWALS-OPERATIONS.md` §3. 9. **Backup and restore runbook** — same document §4. 10. **Security review and residual risks** — `docs/13-FINAL-AUDIT.md` and `15` §7. 11. **Tests** — `tests/` (`composer test`; needs a throwaway database named `*_phpunit`; see README). 12. **Manual smoke tests** — `docs/09…15` checklists and §6 below. 13. **Operations runbook** — §6. 14. **Decisions and open questions** — `docs/07-DECISIONS.md` (D-01 … D-83), `docs/17-BILLING-AND-GOOGLE-PAY.md` and §5.
 Credentials, API keys, the `.env` file, `APP_KEY`, SMTP and gateway secrets are **never** part of the handover repository; hand them over through a password manager.
 
 ## 5. Open business decisions

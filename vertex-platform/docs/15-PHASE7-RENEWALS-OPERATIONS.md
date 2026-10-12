@@ -3,6 +3,7 @@
 Migration `0011_renewals.sql`. Code: `app/Services/{RenewalService,RenewalPricing,RenewalScheduler,BackupService,SystemStatus}.php`, controllers `Renewals/{RenewalController,RenewalPriceController,ClientServiceController}`, `Admin/SystemController`, views `renewals/*`, `admin/system.php`, config `config/renewals.php`, `config/backup.php`, console commands `schedule:run`, `schedule:status`, `backup:*`, and the production checks added to `doctor`.
 
 ## 0. What this phase does NOT do (read first)
+> Update: quotations and invoices (without tax) were added afterwards in Phase 8 (`17-BILLING-AND-GOOGLE-PAY.md`). Renewal invoice numbers are still typed references; they are not linked to the new invoice module.
 * **There is no quotation or invoice module and no payment gateway.** A renewal's quotation and invoice are **references** that staff type in after issuing the document elsewhere; the system checks only that the invoice amount equals the approved price. Payments are recorded by staff (with a unique transaction reference); nothing is charged online. A client sees "Online payment is not available yet" on an awaiting-payment renewal.
 * **There is no registrar or hosting-provider integration.** "Renewed" means a person recorded the provider's confirmation. Nothing is renewed with a provider by this system.
 * **Nothing runs by itself until cron is configured** (see §3). The admin screens say so until the scheduled task has actually run.

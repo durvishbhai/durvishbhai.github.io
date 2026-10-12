@@ -53,7 +53,9 @@ final class SystemStatusHttpTest extends HttpTestCase
         $this->assertSame(200, $a['status']);
         $this->assertStringContainsString('NEVER RUN', $a['body'], 'no scheduler run yet: the page must say so');
         $this->assertStringContainsString('NO BACKUP EXISTS', $a['body'], 'no backup yet: the page must say so');
-        $this->assertStringContainsString('Not built', $a['body'], 'unbuilt payment features are stated, not hidden');
+        $this->assertStringContainsString('Not built. Payments are confirmed by staff', $a['body'], 'unbuilt payment features are stated, not hidden');
+        $this->assertStringContainsString('NOT SET', $a['body'], 'invoices cannot be issued until the business details are set');
+        $this->assertStringContainsString('Not configured. Not available', $a['body'], 'Google Pay API is not offered as working');
         $this->assertStringNotContainsString((string) Config::get('database.password'), $a['body']);
         $this->assertStringNotContainsString((string) Config::get('app.key'), $a['body']);
         RenewalScheduler::run();

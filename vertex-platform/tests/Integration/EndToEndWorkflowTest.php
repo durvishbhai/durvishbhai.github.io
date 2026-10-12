@@ -34,7 +34,7 @@ use Vertex\Services\WarrantyService;
  * One customer journey through every module that exists in this repository, and a second client who must never see any of it:
  * CRM enquiry -> won -> converted to a project -> assignments -> approved baseline -> tasks -> deliverable -> client approval ->
  * revision -> chargeable proposal -> bug report -> warranty -> support ticket. Ends with the audit chain and a scan proving the
- * unbuilt modules (invoices, quotations, a payment gateway and its webhooks) leave no trace.
+ * unbuilt modules (a payment gateway processor and its webhooks) leave no trace.
  */
 final class EndToEndWorkflowTest extends DatabaseTestCase
 {
@@ -181,7 +181,7 @@ final class EndToEndWorkflowTest extends DatabaseTestCase
         // ---- modules that are NOT built leave no trace and nothing pretends to be money
         $tables = array_column(Database::all('SHOW TABLES'), array_key_first(Database::one('SHOW TABLES')));
         foreach ($tables as $t) {
-            $this->assertDoesNotMatchRegularExpression('/invoice|webhook|quotation/', (string) $t, "table {$t} suggests an unbuilt module exists");
+            $this->assertDoesNotMatchRegularExpression('/webhook|gateway_event/', (string) $t, "table {$t} suggests an unbuilt module exists");
         }
     }
 

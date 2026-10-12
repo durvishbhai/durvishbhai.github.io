@@ -46,8 +46,12 @@ final class SystemStatus
         $add('Files', 'Malware scanning', $scan !== 'none' ? 'ok' : 'warn', $scan !== 'none' ? "scanner driver '{$scan}'" : 'none: uploads are stored as "not scanned"');
         $root = FileStore::root();
         $add('Files', 'Upload folder', is_dir($root) && is_writable($root) ? 'ok' : 'warn', is_dir($root) && is_writable($root) ? 'writable' : 'missing or not writable');
-        $add('Payments', 'Online payment gateway', 'info', 'Not built. Payments are recorded by staff; nothing is charged or confirmed automatically.');
-        $add('Payments', 'Quotations and invoices', 'info', 'Not built. Numbers are recorded as references to documents issued elsewhere.');
+        $add('Billing', 'Business details on invoices', BusinessProfile::isComplete() ? 'ok' : 'warn', BusinessProfile::isComplete() ? 'set' : 'NOT SET: invoices cannot be issued (Administration → Business details)');
+        $upi = GatewayConfig::status(GatewayConfig::UPI);
+        $add('Billing', 'Google Pay by UPI', $upi['state'] === 'ready' ? 'ok' : 'warn', $upi['label'] . ($upi['state'] === 'ready' ? '. Each payment is verified by staff against the bank; nothing is confirmed automatically.' : ''));
+        $api = GatewayConfig::status(GatewayConfig::API);
+        $add('Billing', 'Google Pay API (cards through a processor)', 'warn', $api['state'] === 'not_configured' ? 'Not configured. Not available: it needs a payment processor integration that is not installed.' : 'Fields saved but NOT ACTIVE: no processor integration is installed, so no card payment is taken or confirmed.');
+        $add('Billing', 'Automatic payment confirmation (webhooks)', 'info', 'Not built. Payments are confirmed by staff.');
 
         return $rows;
     }
