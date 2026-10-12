@@ -19,7 +19,7 @@ final class RouteSweepTest extends HttpTestCase
     /** Routes that are intentionally reachable without signing in. Anything else without `auth` or `can:` fails the test. */
     private const PUBLIC = [
         '/', '/health', '/login', '/register', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
-        '/request-quote', '/contact', '/book-appointment', '/enquiry/received',
+        '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received',
     ];
 
     /** @var list<array<string,mixed>> */
