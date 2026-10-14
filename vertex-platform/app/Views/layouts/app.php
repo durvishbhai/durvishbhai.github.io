@@ -43,6 +43,8 @@ $nav = [
     ['/admin/revision-policies', 'Revision policy', can('revisions.policy') || can('revisions.classify')],
     ['/admin/users', 'Users', can('users.view')],
     ['/admin/roles', 'Roles', can('roles.view')],
+    ['/admin/data', 'Import & export', can('data.export') || can('data.import')],
+    ['/admin/recycle-bin', 'Recycle bin', can('recycle.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
     ['/admin/payments', 'Payments (Google Pay)', can('billing.configure')],
     ['/admin/business', 'Business details', can('billing.configure')],
@@ -76,6 +78,7 @@ $nav = [
             <?php endif; ?>
         <?php endforeach; ?>
     </nav>
+    <form class="portal-search" method="get" action="/search" role="search"><label class="sr-only" for="gs">Search</label><input id="gs" name="q" type="search" placeholder="Search" maxlength="100" autocomplete="off"></form>
     <div class="portal-user">
         <span class="portal-name"><?= e($user['name'] ?? '') ?></span>
         <form method="post" action="/logout">

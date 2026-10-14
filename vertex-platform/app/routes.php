@@ -6,7 +6,10 @@ use Vertex\Core\Router;
 use Vertex\Http\Controllers\AccountController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
+use Vertex\Http\Controllers\Admin\DataController;
+use Vertex\Http\Controllers\Admin\RecycleBinController;
 use Vertex\Http\Controllers\Admin\RoleController;
+use Vertex\Http\Controllers\SearchController;
 use Vertex\Http\Controllers\Admin\UserController;
 use Vertex\Http\Controllers\Admin\CrmStageController;
 use Vertex\Http\Controllers\AttachmentController;
@@ -65,6 +68,8 @@ return static function (Router $router): void {
     // Authentication
     $router->get('/login', [AuthController::class, 'showLogin'], ['guest']);
     $router->post('/login', [AuthController::class, 'login'], ['guest']);
+    $router->get('/login/two-factor', [AuthController::class, 'showTwoFactor'], ['guest']);
+    $router->post('/login/two-factor', [AuthController::class, 'twoFactor'], ['guest']);
     $router->post('/logout', [AuthController::class, 'logout'], ['auth']);
 
     // Registration & email verification (404 unless enabled and email configured)
@@ -85,9 +90,15 @@ return static function (Router $router): void {
 
     // Signed-in self-service
     $router->get('/dashboard', [DashboardController::class, 'index'], ['auth']);
+    $router->get('/search', [SearchController::class, 'index'], ['auth']);
     $router->get('/account', [AccountController::class, 'show'], ['auth']);
     $router->post('/account', [AccountController::class, 'update'], ['auth']);
     $router->post('/account/password', [AccountController::class, 'password'], ['auth']);
+    $router->get('/account/two-factor', [AccountController::class, 'twoFactor'], ['auth']);
+    $router->post('/account/two-factor/start', [AccountController::class, 'twoFactorStart'], ['auth']);
+    $router->post('/account/two-factor/enable', [AccountController::class, 'twoFactorEnable'], ['auth']);
+    $router->post('/account/two-factor/disable', [AccountController::class, 'twoFactorDisable'], ['auth']);
+    $router->post('/account/two-factor/recovery', [AccountController::class, 'twoFactorRecovery'], ['auth']);
 
     // Projects. `project` middleware: {project} must be visible to the user (404 otherwise). `can:` is the first gate only;
     // services re-check permission + staff-level access on every mutation.
@@ -355,10 +366,21 @@ return static function (Router $router): void {
         $r->post('/users/{user}/reactivate', [UserController::class, 'reactivate'], ['can:users.deactivate']);
         $r->post('/users/{user}/archive', [UserController::class, 'archive'], ['can:users.archive']);
         $r->post('/users/{user}/send-reset', [UserController::class, 'sendReset'], ['can:users.reset_password']);
+        $r->post('/users/{user}/reset-2fa', [UserController::class, 'reset2fa'], ['can:users.reset_2fa']);
         $r->post('/users/{user}/resend-invite', [UserController::class, 'resendInvite'], ['can:users.create']);
 
+        $r->get('/recycle-bin', [RecycleBinController::class, 'index'], ['can:recycle.view']);
+        $r->post('/recycle-bin/restore', [RecycleBinController::class, 'restore'], ['can:recycle.restore']);
+        $r->get('/data', [DataController::class, 'index'], ['can:data.export,data.import']);
+        $r->get('/data/export/{type}', [DataController::class, 'export'], ['can:data.export']);
+        $r->get('/data/template/{type}', [DataController::class, 'template'], ['can:data.import']);
+        $r->post('/data/import/{type}', [DataController::class, 'import'], ['can:data.import']);
+
         $r->get('/roles', [RoleController::class, 'index'], ['can:roles.view']);
+        $r->get('/roles/new', [RoleController::class, 'create'], ['can:roles.create']);
+        $r->post('/roles', [RoleController::class, 'store'], ['can:roles.create']);
         $r->get('/roles/{role}', [RoleController::class, 'show'], ['can:roles.view']);
+        $r->post('/roles/{role}/delete', [RoleController::class, 'destroy'], ['can:roles.create']);
         $r->post('/roles/{role}', [RoleController::class, 'update'], ['can:roles.manage']);
 
         $r->get('/crm-stages', [CrmStageController::class, 'index'], ['can:crm.configure']);

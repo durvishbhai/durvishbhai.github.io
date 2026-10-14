@@ -335,7 +335,7 @@ final class ClientService
      * @param array<string,mixed> $in
      * @return array<string,mixed>
      */
-    private static function validate(array $in): array
+    public static function validate(array $in): array
     {
         $type = FieldRules::choice($in['client_type'] ?? 'individual', ['individual' => 'Individual', 'business' => 'Business'], 'client type');
         $company = FieldRules::line($in['company_name'] ?? '', 'Company name', 2, 160, $type === 'business');

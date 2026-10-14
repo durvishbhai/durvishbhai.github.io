@@ -26,6 +26,8 @@ final class Auth
     public const LOCKED = 'locked';
     public const INACTIVE = 'inactive';
     public const PENDING = 'pending';
+    public const TWO_FACTOR = 'two_factor';
+    public const EXPIRED = 'expired';
 
     /** @var array<string,mixed>|null|false false = not resolved yet */
     private static array|null|false $user = false;
@@ -97,9 +99,53 @@ final class Auth
         }
 
         $throttle->record($email, $ip, true);
+        if (TwoFactorService::isEnabled($user)) {
+            // Password is right, but the person is NOT signed in until the second factor is checked.
+            Session::regenerate();
+            Session::put('twofa_pending', ['uid' => (int) $user['id'], 'exp' => time() + 300]);
+            Audit::record('auth.login.password_ok_2fa_pending', 'user', (int) $user['id'], [], [], [], (int) $user['id'], $ip, $request->userAgent());
+
+            return self::TWO_FACTOR;
+        }
         self::login($user);
         $repo->touchLogin((int) $user['id'], $ip);
         Audit::record('auth.login.success', 'user', (int) $user['id'], [], [], [], (int) $user['id'], $ip, $request->userAgent());
+
+        return self::OK;
+    }
+
+    /** The user whose password was accepted and who still owes the second factor, or null (none, or the 5 minutes ran out). */
+    public static function pendingTwoFactorUser(): ?array
+    {
+        $p = Session::get('twofa_pending');
+        if (!is_array($p) || (int) ($p['exp'] ?? 0) < time()) {
+            Session::forget('twofa_pending');
+
+            return null;
+        }
+        $user = (new UserRepository())->findById((int) $p['uid']);
+
+        return $user !== null && $user['status'] === 'active' && TwoFactorService::isEnabled($user) ? $user : null;
+    }
+
+    /** @return self::OK|self::INVALID|self::LOCKED|self::EXPIRED */
+    public static function completeTwoFactor(string $code, Request $request): string
+    {
+        $user = self::pendingTwoFactorUser();
+        if ($user === null) {
+            return self::EXPIRED;
+        }
+        $result = TwoFactorService::verifyLogin((int) $user['id'], $code);
+        if ($result === 'locked') {
+            return self::LOCKED;
+        }
+        if ($result !== 'ok') {
+            return self::INVALID;
+        }
+        Session::forget('twofa_pending');
+        self::login($user);
+        (new UserRepository())->touchLogin((int) $user['id'], $request->ip());
+        Audit::record('auth.login.success', 'user', (int) $user['id'], [], [], ['two_factor' => true], (int) $user['id'], $request->ip(), $request->userAgent());
 
         return self::OK;
     }

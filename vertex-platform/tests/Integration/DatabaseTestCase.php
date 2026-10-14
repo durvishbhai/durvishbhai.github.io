@@ -69,10 +69,14 @@ abstract class DatabaseTestCase extends TestCase
             }
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-        foreach (['invoice_items', 'invoices', 'quotation_items', 'quotations', 'payment_gateway_config', 'business_profile', 'renewal_history', 'renewal_reminders', 'renewal_payments', 'renewal_cycles', 'renewal_services', 'renewal_prices', 'scheduler_runs', 'payout_history', 'payout_allocations', 'payout_requests', 'commission_history', 'commission_entry_payments', 'commission_entries', 'commission_rules', 'client_payment_events', 'client_payments', 'referral_email_log', 'partner_notes', 'referral_history', 'partner_referrals', 'partner_applications', 'referral_partners', 'partner_terms', 'ticket_reads', 'ticket_activity', 'ticket_files', 'ticket_notes', 'ticket_messages', 'bug_reports', 'tickets', 'warranty_history', 'project_warranties', 'warranty_terms', 'notifications', 'client_approvals', 'revision_status_history', 'revision_notes', 'revision_files', 'change_requests', 'revision_requests', 'revision_policies',
-            'deliverable_reviews', 'deliverable_versions', 'deliverables', 'stored_files', 'price_change_requests', 'price_revisions', 'task_time_entries', 'task_comments', 'task_dependencies', 'tasks', 'milestones', 'project_notes', 'project_activity', 'enquiry_followups', 'enquiry_activity', 'attachments', 'enquiries', 'client_notes', 'project_assignments', 'projects', 'referrals', 'clients', 'reference_sequences', 'auth_tokens', 'rate_limits', 'user_roles', 'users', 'login_attempts', 'audit_logs'] as $t) {
-            $pdo->exec("TRUNCATE TABLE {$t}");
+        // Every table is emptied except the catalogue that permissions:sync owns and the migration ledger, so new modules never need to be listed here.
+        $keep = ['schema_migrations', 'permissions', 'roles', 'role_permissions', 'crm_stages', 'priority_pricing_rules'];
+        foreach ($pdo->query('SHOW TABLES')->fetchAll(\PDO::FETCH_COLUMN) as $t) {
+            if (!in_array($t, $keep, true)) {
+                $pdo->exec('TRUNCATE TABLE `' . $t . '`');
+            }
         }
+        $pdo->exec('DELETE FROM roles WHERE is_system = 0'); // custom roles created by a test
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         $pdo->exec('INSERT INTO business_profile (id, updated_at) VALUES (1, UTC_TIMESTAMP())');
         $_SESSION = [];

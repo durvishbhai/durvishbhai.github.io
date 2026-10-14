@@ -54,4 +54,44 @@ final class RoleController extends Controller
             return $this->ok($to, 'Permissions saved.');
         }, $to);
     }
+
+    /** @param array<string,string> $params */
+    public function create(Request $request, array $params = []): Response
+    {
+        $actor = $this->actorId();
+        $r = $this->page('admin/roles/new', [
+            'title' => 'New role',
+            'maxLevel' => RoleService::maxCustomLevel($actor),
+            'copyable' => array_filter(RoleService::all(), static fn (array $x): bool => (int) $x['level'] < Gate::level($actor)),
+        ]);
+        Session::forget('_old');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function store(Request $request, array $params = []): Response
+    {
+        $old = ['name' => $request->string('name'), 'description' => $request->string('description'), 'level' => $request->string('level'), 'copy_from' => $request->string('copy_from')];
+
+        return $this->guarded(function () use ($request): Response {
+            $this->requireStepUp($request);
+            $slug = RoleService::create($this->actorId(), $request->string('name'), $request->string('description'), (int) $request->string('level'), $request->string('copy_from') ?: null, []);
+
+            return $this->ok('/admin/roles/' . $slug, 'Role created. Choose its permissions below.');
+        }, '/admin/roles/new', $old);
+    }
+
+    /** @param array<string,string> $params */
+    public function destroy(Request $request, array $params = []): Response
+    {
+        $slug = (string) ($params['role'] ?? '');
+
+        return $this->guarded(function () use ($request, $slug): Response {
+            $this->requireStepUp($request);
+            RoleService::delete($this->actorId(), $slug);
+
+            return $this->ok('/admin/roles', 'Role deleted.');
+        }, '/admin/roles/' . $slug);
+    }
 }

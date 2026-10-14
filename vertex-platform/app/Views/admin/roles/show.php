@@ -10,6 +10,12 @@
     <a class="btn btn-ghost" href="/admin/roles">&larr; All roles</a>
 </div>
 <p class="muted"><?= e($role['description']) ?></p>
+<?php if ((int) $role['is_system'] === 0 && can('roles.create')) : ?>
+    <form method="post" action="/admin/roles/<?= e($role['slug']) ?>/delete" class="inline-form" data-confirm="Delete this custom role? This only works when nobody holds it.">
+        <?= csrf_field() ?><input name="confirm_password" type="password" placeholder="Your password" required autocomplete="current-password" aria-label="Your password">
+        <button class="btn btn-danger btn-sm" type="submit">Delete custom role</button>
+    </form>
+<?php endif; ?>
 <?php if ($role['is_locked']) : ?>
     <div class="alert alert-info"><p>This role is locked: it always holds every permission and cannot be edited.</p></div>
 <?php elseif (!$canEdit) : ?>

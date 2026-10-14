@@ -42,7 +42,7 @@ final class UserController extends Controller
             'page' => $page,
             'perPage' => self::PER_PAGE,
             'filters' => $filters,
-            'roles' => Config::get('permissions.roles'),
+            'roles' => \Vertex\Services\RoleService::definitions(),
             'actorLevel' => $actorLevel,
             'notice' => Session::pullFlash('notice'),
         ]);
@@ -178,6 +178,19 @@ final class UserController extends Controller
     }
 
     /** @param array<string,string> $params */
+    public function reset2fa(Request $request, array $params = []): Response
+    {
+        $target = $this->target($params);
+
+        return $this->guarded(function () use ($request, $target): Response {
+            $this->requireStepUp($request);
+            \Vertex\Services\TwoFactorService::adminReset($this->actorId(), (int) $target['id']);
+
+            return $this->ok($this->url($target), 'Two-factor login was reset. The user can sign in with the password and set it up again.');
+        }, $this->url($target));
+    }
+
+    /** @param array<string,string> $params */
     public function sendReset(Request $request, array $params = []): Response
     {
         $target = $this->target($params);
@@ -218,7 +231,7 @@ final class UserController extends Controller
     {
         $out = [];
         foreach (UserService::assignableRoleSlugs($this->actorId()) as $slug) {
-            $out[$slug] = (string) Config::get("permissions.roles.{$slug}.name");
+            $out[$slug] = \Vertex\Services\RoleService::definitions()[$slug]['name'];
         }
 
         return $out;

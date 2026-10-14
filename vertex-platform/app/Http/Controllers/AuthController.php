@@ -39,11 +39,36 @@ final class AuthController extends Controller
 
         return match ($result) {
             Auth::OK => Response::redirect($this->intended()),
+            Auth::TWO_FACTOR => Response::redirect('/login/two-factor'),
             Auth::LOCKED => $this->back('/login', ['Too many failed attempts. Please wait a few minutes and try again.'], $old),
             // Only reached after the correct password was supplied, so this does not reveal accounts to guessers.
             Auth::PENDING => $this->back('/login', ['Your account is not active yet. Confirm your email address using the link we sent you, or ask an administrator.'], $old),
             // Same message for wrong password and unknown email: no account enumeration.
             default => $this->back('/login', ['Those credentials did not work.'], $old),
+        };
+    }
+
+    /** @param array<string,string> $params */
+    public function showTwoFactor(Request $request, array $params = []): Response
+    {
+        if (Auth::pendingTwoFactorUser() === null) {
+            return Response::redirect('/login');
+        }
+        $html = View::render('pages/login-two-factor', ['title' => 'Verification code', 'errors' => Session::pullFlash('errors', []), 'notice' => null]);
+
+        return Response::html($html);
+    }
+
+    /** @param array<string,string> $params */
+    public function twoFactor(Request $request, array $params = []): Response
+    {
+        $result = Auth::completeTwoFactor(substr((string) ($request->body['code'] ?? ''), 0, 40), $request);
+
+        return match ($result) {
+            Auth::OK => Response::redirect($this->intended()),
+            Auth::EXPIRED => $this->back('/login', ['That sign-in took too long. Enter your password again.']),
+            Auth::LOCKED => $this->back('/login/two-factor', ['Too many wrong codes. Wait ten minutes and try again.']),
+            default => $this->back('/login/two-factor', ['That code is not correct.']),
         };
     }
 

@@ -385,3 +385,12 @@ body.print-doc { background: #fff; color: #111; }
 .doc-meta { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 12px; }
 .doc-tax { margin-top: 18px; font-style: italic; }
 @media print { .no-print { display: none !important; } body.print-doc { background: #fff; } }
+
+/* Phase 9: search box, two-factor codes, plain lists */
+.portal-search { margin-left: auto; }
+.portal-search input { width: 150px; padding: 6px 10px; font-size: 0.9rem; }
+ul.plain { list-style: none; margin: 0; padding: 0; }
+ul.plain li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+ul.plain li:last-child { border-bottom: 0; }
+ul.codes { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+ul.codes code, code.key { font-size: 1.05rem; letter-spacing: 0.08em; }

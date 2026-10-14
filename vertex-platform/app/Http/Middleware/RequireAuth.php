@@ -8,6 +8,7 @@ use Vertex\Core\Request;
 use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Services\Auth;
+use Vertex\Services\TwoFactorService;
 
 final class RequireAuth implements Middleware
 {
@@ -23,6 +24,14 @@ final class RequireAuth implements Middleware
             }
 
             return Response::redirect('/login');
+        }
+
+        // Roles for which two-factor login is compulsory (TWO_FACTOR_REQUIRED_LEVEL) can only reach the setup page until it is on.
+        $id = (int) Auth::id();
+        if (!str_starts_with($request->path, '/account/two-factor') && $request->path !== '/logout' && TwoFactorService::requiredFor($id) && !TwoFactorService::isEnabled((array) Auth::user())) {
+            Session::flash('notice', 'Your role requires two-factor login. Set it up to continue.');
+
+            return Response::redirect('/account/two-factor');
         }
 
         return $next($request);

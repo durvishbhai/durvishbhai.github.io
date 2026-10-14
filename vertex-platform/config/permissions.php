@@ -31,11 +31,13 @@ $p = [
         'users.archive' => 'Archive accounts',
         'users.assign_roles' => 'Change which roles a user holds',
         'users.reset_password' => 'Send a password-reset email to a user',
+        'users.reset_2fa' => 'Reset a lower-ranked user\'s two-factor login (lost device)',
     ],
     'roles' => [
         'roles.view' => 'View roles and permission grants',
         'roles.manage' => 'Edit non-sensitive permission grants of lower-ranked roles',
         'roles.manage_sensitive' => 'Grant/revoke sensitive permissions',
+        'roles.create' => 'Create and delete custom roles',
     ],
     'platform' => [
         'audit.view' => 'View audit logs',
@@ -44,6 +46,10 @@ $p = [
         'reports.operational' => 'View operational reports',
         'reports.financial' => 'View financial reports',
         'backups.manage' => 'Create/download backups',
+        'recycle.view' => 'See archived records in the recycle bin',
+        'recycle.restore' => 'Restore archived records from the recycle bin',
+        'data.export' => 'Export lists to CSV',
+        'data.import' => 'Import clients and leads from CSV',
     ],
     'projects' => [
         'projects.view_all' => 'View every project',
@@ -215,8 +221,8 @@ $p = [
 
 /** Granting/revoking these through the UI needs `roles.manage_sensitive`. */
 $sensitive = [
-    'users.assign_roles', 'roles.manage', 'roles.manage_sensitive', 'audit.view',
-    'settings.manage', 'backups.manage', 'reports.financial', 'finance.view',
+    'users.assign_roles', 'users.reset_2fa', 'roles.manage', 'roles.manage_sensitive', 'roles.create', 'audit.view',
+    'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
     'commissions.rules.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
@@ -255,7 +261,7 @@ $roles = [
         'description' => 'Runs day-to-day administration, assigns projects, approves payouts. Cannot change sensitive permission grants or system settings.',
         'level' => 90, 'locked' => false, 'assignable_in_ui' => true, 'phone_required' => false,
         'permissions' => array_values(array_diff($all, [
-            'roles.manage_sensitive', 'settings.manage', 'backups.manage',
+            'roles.manage_sensitive', 'roles.create', 'settings.manage', 'backups.manage',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
             'referrals.submit', 'referrals.view_own', 'renewals.view_own', 'quotes.respond',
@@ -286,7 +292,7 @@ $roles = [
             'support.dashboard', 'warranty.view',
             'requirements.view', 'appointments.manage',
             'renewals.view', 'renewals.manage',
-            'reports.operational',
+            'reports.operational', 'data.export',
         ],
     ],
     'finance_staff' => [
@@ -297,7 +303,7 @@ $roles = [
             'finance.view',
             'invoices.view_all', 'invoices.create', 'invoices.edit',
             'payments.view_all', 'payments.record',
-            'payouts.view_all', 'payouts.record', 'commissions.view_all',
+            'payouts.view_all', 'payouts.record', 'commissions.view_all', 'data.export',
         ],
     ],
     'support_staff' => [

@@ -433,8 +433,8 @@ final class UserService
     {
         $level = Gate::level($actorId);
         $out = [];
-        foreach (Config::get('permissions.roles', []) as $slug => $def) {
-            if (($def['assignable_in_ui'] ?? false) && $def['level'] < $level) {
+        foreach (RoleService::definitions() as $slug => $def) {
+            if ($def['assignable_in_ui'] && $def['level'] < $level) {
                 $out[] = $slug;
             }
         }
@@ -466,7 +466,7 @@ final class UserService
                 $out[$r] = $r;
             }
         }
-        $known = array_keys(Config::get('permissions.roles', []));
+        $known = array_keys(RoleService::definitions());
         foreach ($out as $r) {
             if (!in_array($r, $known, true)) {
                 throw new ValidationException(['Unknown role selected.']);
@@ -552,7 +552,7 @@ final class UserService
     private static function phoneRequiredForSlugs(array $slugs): bool
     {
         foreach ($slugs as $s) {
-            if (Config::get("permissions.roles.{$s}.phone_required")) {
+            if (RoleService::definitions()[$s]['phone_required'] ?? false) {
                 return true;
             }
         }

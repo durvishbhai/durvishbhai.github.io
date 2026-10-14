@@ -125,6 +125,8 @@ final class PermissionMatrixTest extends TestCase
             'viewing every project' => ['projects.view_all', ['administrator', 'super_admin']],
             'creating projects' => ['projects.create', ['administrator', 'super_admin']],
             'issuing invoices' => ['invoices.issue', ['administrator', 'super_admin']],
+            'creating custom roles' => ['roles.create', ['super_admin']],
+            'resetting two-factor login' => ['users.reset_2fa', ['administrator', 'super_admin']],
         ];
     }
 

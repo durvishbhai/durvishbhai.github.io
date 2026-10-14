@@ -57,6 +57,13 @@ $u = '/admin/users/' . $target['public_id'];
         <?php if (can('users.reset_password') && $status === 'active' && $mailEnabled) : ?>
             <form method="post" action="<?= e($u) ?>/send-reset" class="inline-form" data-confirm="Email a password-reset link to this user?"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Send password reset</button></form>
         <?php endif; ?>
+        <?php if (can('users.reset_2fa') && !empty($target['totp_enabled_at'])) : ?>
+            <form method="post" action="<?= e($u) ?>/reset-2fa" class="inline-form" data-confirm="Reset two-factor login for this user? Only do this after confirming who they are.">
+                <?= csrf_field() ?>
+                <input name="confirm_password" type="password" placeholder="Your password" required autocomplete="current-password" aria-label="Your password">
+                <button class="btn btn-danger btn-sm" type="submit">Reset two-factor login</button>
+            </form>
+        <?php endif; ?>
         <?php if (can('users.create') && $status === 'pending' && $mailEnabled) : ?>
             <form method="post" action="<?= e($u) ?>/resend-invite" class="inline-form"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Resend invitation</button></form>
         <?php endif; ?>
