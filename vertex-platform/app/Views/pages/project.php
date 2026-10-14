@@ -16,7 +16,7 @@ $sharedNotes = array_filter($notes, static fn ($n) => $n['kind'] !== 'internal')
 ?>
 <div class="page-head">
     <div><p class="eyebrow">Project <?= e($project['code']) ?></p><h1><?= e($project['title']) ?></h1></div>
-    <a class="btn btn-ghost" href="/projects">&larr; Projects</a>
+    <div class="actions"><?php if ($level === 'own' && can('scope.request') && !in_array($project['status'], ['completed', 'cancelled'], true) && !$project['archived_at']) : ?><a class="btn btn-ghost" href="<?= e($base) ?>/scope-request">Request a change</a><?php endif; ?><a class="btn btn-ghost" href="/projects">&larr; Projects</a></div>
 </div>
 <?= \Vertex\Core\View::partial('project-tabs', ['project' => $project, 'tab' => $tab]) ?>
 

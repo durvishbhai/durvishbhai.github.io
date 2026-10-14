@@ -70,7 +70,7 @@ abstract class DatabaseTestCase extends TestCase
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         // Every table is emptied except the catalogue that permissions:sync owns and the migration ledger, so new modules never need to be listed here.
-        $keep = ['schema_migrations', 'permissions', 'roles', 'role_permissions', 'crm_stages', 'priority_pricing_rules'];
+        $keep = ['schema_migrations', 'permissions', 'roles', 'role_permissions', 'crm_stages', 'priority_pricing_rules', 'sla_policies'];
         foreach ($pdo->query('SHOW TABLES')->fetchAll(\PDO::FETCH_COLUMN) as $t) {
             if (!in_array($t, $keep, true)) {
                 $pdo->exec('TRUNCATE TABLE `' . $t . '`');

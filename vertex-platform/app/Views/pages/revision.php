@@ -88,4 +88,6 @@ $v = static fn (string $k): string => old($k);
         <div class="field"><label for="nb">Add an internal note</label><textarea id="nb" name="body" rows="2" required maxlength="3000"><?= e($v('note')) ?></textarea></div>
         <div class="form-actions"><button class="btn btn-ghost btn-sm" type="submit">Add note</button></div></form></div>
 
+<?= View::partial('feedback-points', ['r' => $r, 'points' => $points, 'staff' => $canFeedbackResolve, 'canAdd' => false]) ?>
+
 <div class="panel"><h2>Status history</h2><?= View::partial('revision-history', ['history' => $history, 'staff' => true]) ?></div>

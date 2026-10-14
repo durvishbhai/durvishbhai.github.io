@@ -27,6 +27,7 @@ return [
         'revision' => $mb('UPLOAD_REVISION_MAX_MB', 10),
         'ticket' => $mb('UPLOAD_TICKET_MAX_MB', 10),
         'partner' => $mb('UPLOAD_PARTNER_MAX_MB', 5),
+        'agreement' => $mb('UPLOAD_AGREEMENT_MAX_MB', 15),
     ],
 
     // extension => [accepted detected MIME types, signature kind]

@@ -16,6 +16,8 @@ $considered = $t['considerations_json'] ? (json_decode((string) $t['consideratio
         <div><span class="muted">Status</span><br><?= View::partial('ticket-status', ['s' => $t['status'], 'kind' => $t['kind']]) ?></div>
         <?php if ($bug) : ?><div><span class="muted">Severity (reported by client)</span><br><?= e(config("workflow.bug_severity_short.{$t['severity']}", $t['severity'])) ?></div><?php endif; ?>
         <div><span class="muted">Priority (internal)</span><br><?= e(config("workflow.priorities.{$t['priority']}", $t['priority'])) ?></div>
+        <?php $sla = \Vertex\Services\SlaService::timers($t); if ($sla['first']['state'] !== 'none') : $fmt = static function (array $x): string { return match ($x['state']) { 'met' => 'met', 'late' => 'MISSED (due ' . local_time($x['due']) . ')', default => 'due ' . local_time($x['due']) . ' (' . ($x['minutes'] >= 60 ? intdiv($x['minutes'], 60) . ' h ' . ($x['minutes'] % 60) . ' min' : $x['minutes'] . ' min') . ' left)' }; }; ?>
+        <div><span class="muted">SLA: first reply</span><br><?= e($fmt($sla['first'])) ?></div><div><span class="muted">SLA: resolution</span><br><?= e($fmt($sla['resolution'])) ?></div><?php endif; ?>
         <div><span class="muted">Assignee</span><br><?= e($t['assignee_name'] ?? 'Unassigned') ?></div>
         <div><span class="muted">Client</span><br><?= in_array($role, ['staff'], true) ? e($t['company_name'] ?: $t['client_name']) : '—' ?></div>
         <div><span class="muted">Project</span><br><?= $t['project_code'] ? '<a href="/projects/' . e($t['project_public_id']) . '">' . e($t['project_code']) . '</a>' : '—' ?></div>

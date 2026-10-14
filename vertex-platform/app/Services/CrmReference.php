@@ -32,6 +32,8 @@ final class CrmReference
         'quotation' => ['QUO', 5],
         'invoice' => ['INV', 5],
         'credit_note' => ['CRN', 5],
+        'agreement' => ['AGR', 5],
+        'scope_request' => ['SCR', 5],
     ];
 
     public static function next(string $scope, ?int $year = null): string

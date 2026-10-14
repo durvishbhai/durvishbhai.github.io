@@ -209,6 +209,32 @@ $p = [
         'clients.notes_view' => 'View restricted client notes',
         'clients.notes_add' => 'Add restricted client notes',
     ],
+    'projectkit' => [
+        'templates.manage' => 'Create and edit project templates',
+        'templates.apply' => 'Apply a project template to a project',
+        'checklists.manage' => 'Edit a project checklist and tick items off',
+        'scope.assess' => 'Assess client scope-change requests (cost and deadline effect)',
+        'scope.request' => 'Ask for a scope change on an own project (client)',
+        'feedback.add' => 'Add timestamped feedback points to an own revision request (client)',
+        'feedback.resolve' => 'Mark feedback points as done',
+    ],
+    'automation' => [
+        'automation.manage' => 'Create and edit workflow rules',
+        'sla.manage' => 'Edit the support SLA targets',
+    ],
+    'agreements' => [
+        'agreements.view' => 'View agreements and the document vault',
+        'agreements.manage' => 'Create, send and cancel agreements and manage templates',
+        'agreements.upload' => 'Upload signed copies to the vault',
+        'agreements.sign_company' => 'Sign agreements for the company and mark paper agreements executed',
+        'agreements.view_own' => 'View own agreements (client)',
+        'agreements.sign' => 'Sign own agreements (client)',
+    ],
+    'forms' => [
+        'forms.manage' => 'Build, publish and archive forms',
+        'forms.view_submissions' => 'Read the answers sent through forms',
+        'forms.export' => 'Export form answers to CSV',
+    ],
     'commerce' => [
         'coupons.view' => 'View coupons, campaigns and redemptions',
         'coupons.manage' => 'Create and edit coupons and campaigns',
@@ -230,7 +256,7 @@ $sensitive = [
     'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
-    'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
+    'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
     'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',
@@ -270,7 +296,7 @@ $roles = [
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
             'referrals.submit', 'referrals.view_own', 'renewals.view_own', 'quotes.respond',
-            'deliverables.respond', 'revisions.respond_cost', 'revisions.request',
+            'deliverables.respond', 'revisions.respond_cost', 'revisions.request', 'agreements.view_own', 'agreements.sign', 'scope.request', 'feedback.add',
             'bugs.report', 'tickets.create', 'tickets.view_own', 'tickets.reply_own', 'warranty.view_own',
         ])),
     ],
@@ -297,7 +323,7 @@ $roles = [
             'support.dashboard', 'warranty.view',
             'requirements.view', 'appointments.manage',
             'renewals.view', 'renewals.manage',
-            'reports.operational', 'data.export',
+            'reports.operational', 'data.export', 'forms.view_submissions', 'agreements.view', 'templates.apply', 'checklists.manage', 'scope.assess', 'feedback.resolve',
         ],
     ],
     'finance_staff' => [
@@ -358,7 +384,7 @@ $roles = [
             'files.download', 'files.upload', 'deliverables.view', 'deliverables.respond', 'revisions.respond_cost',
             'invoices.view_own', 'receipts.view_own', 'payments.pay', 'quotes.view',
             'chat.use', 'revisions.request', 'bugs.report', 'warranty.view_own', 'tickets.create', 'tickets.view_own', 'tickets.reply_own',
-            'requirements.submit', 'appointments.book', 'renewals.view_own', 'quotes.respond',
+            'requirements.submit', 'appointments.book', 'renewals.view_own', 'quotes.respond', 'agreements.view_own', 'agreements.sign', 'scope.request', 'feedback.add',
         ],
     ],
 ];

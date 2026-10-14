@@ -15,6 +15,7 @@ if ($staff && Gate::can('tasks.view', $uid)) {
 if (\Vertex\Services\Gate::can('deliverables.view', $uid) && ($staff || $level === 'own')) {
     $tabs['deliverables'] = [$base . '/deliverables', 'Deliverables'];
 }
+$tabs['checklist'] = [$base . '/checklist', 'Checklist'];
 $tabs['timeline'] = [$base . '/timeline', 'Timeline'];
 if (\Vertex\Services\PriceChangeService::canView($uid, $project)) {
     $tabs['pricing'] = [$base . '/pricing', 'Pricing'];

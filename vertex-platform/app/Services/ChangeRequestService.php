@@ -96,6 +96,12 @@ final class ChangeRequestService
         });
     }
 
+    /** A draft proposal that answers a client's scope request. Runs inside the caller's transaction. @param array<string,mixed> $project @param array{scope:string,reason:string,amount:int,days:?int,due:?string} $cr */
+    public static function createDraftForScope(int $actorId, array $project, array $cr, string $title, int $scopeRequestId): int
+    {
+        return self::insert($actorId, $project, $cr, null, null, mb_substr($title, 0, 200), ['scope_request_id' => $scopeRequestId]);
+    }
+
     /** @param array{scope:string,reason:string,amount:int,days:?int,due:?string} $cr @param array<string,mixed> $project @param array<string,mixed> $meta */
     private static function insert(int $actorId, array $project, array $cr, mixed $revisionId, ?int $ticketId, string $title, array $meta): int
     {

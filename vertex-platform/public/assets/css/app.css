@@ -415,3 +415,7 @@ a.report-card:hover { border-color: var(--line-strong); }
 .form-block { border: 0; padding: 0; margin: 0; }
 .field-help { color: var(--silver-3, #8a93a3); font-size: 0.85rem; display: block; margin-top: 4px; }
 .field-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.feedback-list { padding-left: 1.2em; } .feedback-list li { margin: 8px 0; } .feedback-list li.is-done { opacity: 0.6; text-decoration: line-through; }
+.timecode { font-variant-numeric: tabular-nums; color: var(--gold); }
+.agreement-text { max-height: 420px; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.field-block { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }

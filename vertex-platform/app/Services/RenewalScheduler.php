@@ -63,6 +63,19 @@ final class RenewalScheduler
                 $summary['errors']++;
                 Logger::error('Commission release failed', ['error' => $e->getMessage()]);
             }
+            // Phase 11 jobs: each is isolated so one failing job never stops the others.
+            foreach ([
+                'sla' => static fn () => SlaService::check(),
+                'agreements' => static fn () => AgreementService::expireDue(),
+                'automation' => static fn () => AutomationService::run($today),
+            ] as $job => $fn) {
+                try {
+                    $summary[$job] = $fn();
+                } catch (\Throwable $e) {
+                    $summary['errors']++;
+                    Logger::error('Scheduled job failed', ['job' => $job, 'error' => $e->getMessage()]);
+                }
+            }
             Database::run('UPDATE scheduler_runs SET finished_at = UTC_TIMESTAMP(), ok = ?, summary = ? WHERE id = ?', [$summary['errors'] === 0 ? 1 : 0, json_encode($summary), $runId]);
         } finally {
             Database::run("SELECT RELEASE_LOCK('vertex_scheduler')");

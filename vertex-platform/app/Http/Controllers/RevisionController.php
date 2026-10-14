@@ -97,14 +97,14 @@ final class RevisionController extends Controller
             'moves' => $moves, 'canDownload' => Gate::can('files.download', $uid),
         ];
         if ($role === 'client') {
-            $page = $this->page('pages/revision-client', ['r' => RevisionAccess::forClient($r)] + $data);
+            $page = $this->page('pages/revision-client', ['r' => RevisionAccess::forClient($r), 'points' => \Vertex\Services\FeedbackPointService::forRevision($r), 'canFeedback' => Gate::can('feedback.add', $uid) && !in_array($r['status'], ['resolved', 'rejected', 'cancelled'], true)] + $data);
             Session::forget('_old');
 
             return $page;
         }
         $versions = Database::all('SELECT public_id, version_no, label, status FROM deliverable_versions WHERE deliverable_id = ? AND version_no <> ? ORDER BY version_no DESC', [$r['deliverable_id'], $r['version_no']]);
         $terms = RevisionTerms::forProject($project, (int) $r['id']);
-        $page = $this->page('pages/revision', $data + [
+        $page = $this->page('pages/revision', $data + ['points' => \Vertex\Services\FeedbackPointService::forRevision($r), 'canFeedbackResolve' => Gate::can('feedback.resolve', $uid),
             'notes' => RevisionQuery::notes($uid, $r), 'terms' => $terms, 'snapshot' => json_decode((string) $r['policy_snapshot_json'], true) ?: [], 'versions' => $versions,
             'canClassify' => Gate::can('revisions.classify', $uid) && $r['status'] === 'under_review', 'canOverride' => Gate::can('revisions.override', $uid) && $r['status'] === 'potentially_chargeable',
             'people' => Notifier::staffWith('revisions.manage', (int) $r['project_id']) === [] ? [] : self::reviewers((int) $r['project_id']),

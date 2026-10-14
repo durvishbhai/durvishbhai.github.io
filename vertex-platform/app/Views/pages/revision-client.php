@@ -24,4 +24,5 @@ $label = (string) config("workflow.revision_client_labels.{$r['status']}", $r['s
             <div class="field"><label for="n">Comment (required when sending it back)</label><textarea id="n" name="client_note" rows="3" maxlength="3000"><?= e(old('client_note')) ?></textarea></div>
             <div class="form-actions"><button class="btn btn-primary" type="submit">Submit</button></div></form></div>
 <?php endif; ?>
+<?= View::partial('feedback-points', ['r' => $r, 'points' => $points, 'staff' => false, 'canAdd' => $canFeedback]) ?>
 <div class="panel"><h2>Progress</h2><?= View::partial('revision-history', ['history' => $history, 'staff' => false]) ?></div>

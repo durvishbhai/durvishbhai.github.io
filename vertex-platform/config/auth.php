@@ -23,6 +23,8 @@ return [
         'stepup_user' => [5, 600],
         'totp_user' => [5, 600],
         'search_user' => [120, 600],
+        'scope_request_user' => [10, 3600],
+        'feedback_user' => [60, 3600],
         'token_ip' => [30, 3600],
         'public_form_ip' => [5, 3600],
         'attachment_user' => [30, 3600],

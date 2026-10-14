@@ -207,4 +207,30 @@ final class DocumentPdf
 
         return $pdf->output();
     }
+
+    /** The agreement text plus its signature record. @param array<string,mixed> $a a row from AgreementService::find */
+    public static function agreement(array $a): string
+    {
+        $biz = BusinessProfile::get();
+        $pdf = new Pdf('Agreement ' . $a['reference']);
+        self::head($pdf, 'AGREEMENT', (string) $a['reference'], $biz, $a['status'] === 'executed' ? 'EXECUTED' : strtoupper(str_replace('_', ' ', (string) $a['status'])));
+        $pdf->paragraph((string) $a['title'], 13, true);
+        $pdf->moveDown(6);
+        foreach (preg_split('/\R{2,}/', (string) $a['body']) ?: [] as $para) {
+            $pdf->paragraph(trim($para), 10);
+            $pdf->moveDown(4);
+        }
+        $pdf->ensure(110);
+        $pdf->moveDown(10);
+        $pdf->rule(self::L, self::R, $pdf->y());
+        $pdf->moveDown(4);
+        $pdf->paragraph('Signatures', 11, true);
+        foreach (AgreementService::signatures($a) as $s) {
+            $pdf->paragraph(ucfirst((string) $s['party']) . ': ' . $s['signer_name'] . ' - signed ' . local_time($s['signed_at']) . ' (' . $s['method'] . ($s['ip'] ? ', from ' . $s['ip'] : '') . ')', 9);
+        }
+        $pdf->moveDown(4);
+        $pdf->paragraph('Document fingerprint (SHA-256 of the exact text above): ' . (string) $a['body_sha256'], 8, false, null, self::L, 1.4, 0.4);
+
+        return $pdf->output();
+    }
 }

@@ -67,3 +67,42 @@
     }, { threshold: 0.12 });
     items.forEach(function (el) { io.observe(el); });
 })();
+
+/* Form builder: show/hide questions that depend on another answer. The server repeats the same rule, so this is only a convenience. */
+(function () {
+    'use strict';
+    var form = document.querySelector('form[data-dynamic-form]');
+    if (!form) { return; }
+    function value(key) {
+        var els = form.querySelectorAll('[name="a[' + key + ']"], [name="a[' + key + '][]"]');
+        var out = [];
+        els.forEach(function (el) {
+            if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked) { out.push(el.value); } }
+            else if (el.value !== '') { out.push(el.value); }
+        });
+        return out;
+    }
+    function shown(box, depth) {
+        var ctrl = box.getAttribute('data-show-field');
+        if (!ctrl || depth > 60) { return true; }
+        var parent = form.querySelector('[data-key="' + ctrl + '"]');
+        if (parent && !shown(parent, depth + 1)) { return false; }
+        var vals = value(ctrl), want = box.getAttribute('data-show-value') || '', op = box.getAttribute('data-show-op');
+        var joined = vals.join('\n').toLowerCase();
+        if (op === 'equals') { return vals.indexOf(want) !== -1; }
+        if (op === 'not_equals') { return vals.indexOf(want) === -1; }
+        if (op === 'contains') { return want !== '' && joined.indexOf(want.toLowerCase()) !== -1; }
+        if (op === 'filled') { return vals.length > 0 && joined.trim() !== '' && joined !== '0'; }
+        return true;
+    }
+    function update() {
+        form.querySelectorAll('[data-show-field]').forEach(function (box) {
+            var on = shown(box, 0);
+            box.hidden = !on;
+            box.querySelectorAll('input, select, textarea').forEach(function (el) { el.disabled = !on; });
+        });
+    }
+    form.addEventListener('input', update);
+    form.addEventListener('change', update);
+    update();
+}());
