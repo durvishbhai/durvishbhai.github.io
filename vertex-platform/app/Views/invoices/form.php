@@ -8,6 +8,7 @@
     <div class="field"><label for="d">Due date (default: 14 days after issue)</label><input id="d" name="due_date" type="date" value="<?= e($v('due_date')) ?>"></div>
     <?= \Vertex\Core\View::partial('billing-items', ['items' => $items]) ?>
     <div class="field"><label for="di">Discount (₹)</label><input id="di" name="discount" inputmode="decimal" value="<?= e($v('discount', '0')) ?>"></div>
+    <div class="field"><label for="cc">Coupon code (optional)</label><input id="cc" name="coupon_code" maxlength="30" value="<?= e($v('coupon_code')) ?>" autocomplete="off"></div>
     <div class="field"><label for="cn">Notes for the client</label><textarea id="cn" name="client_notes" rows="3" maxlength="3000"><?= e($v('client_notes')) ?></textarea></div>
     <div class="field"><label for="in">Internal notes (staff only)</label><textarea id="in" name="internal_notes" rows="2" maxlength="3000"><?= e($v('internal_notes')) ?></textarea></div>
     <div class="form-actions"><button class="btn btn-primary" type="submit">Save draft</button></div></form></div>

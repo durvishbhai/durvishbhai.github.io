@@ -57,6 +57,12 @@ final class InvoiceService
         return Database::all('SELECT position, description, quantity_x100, unit_minor, total_minor FROM invoice_items WHERE invoice_id = ? ORDER BY position', [$i['id']]);
     }
 
+    /** What the client has to pay: the total less any credit notes. */
+    public static function payable(array $i): int
+    {
+        return (int) $i['total_minor'] - (int) ($i['credited_minor'] ?? 0);
+    }
+
     /** Verified money in, refunds taken off. */
     public static function paidMinor(int $invoiceId): int
     {
@@ -74,7 +80,7 @@ final class InvoiceService
     {
         $paid = self::paidMinor((int) $i['id']);
 
-        return ['paid' => $paid, 'pending' => self::pendingMinor((int) $i['id']), 'outstanding' => max(0, (int) $i['total_minor'] - $paid),
+        return ['paid' => $paid, 'pending' => self::pendingMinor((int) $i['id']), 'outstanding' => max(0, self::payable($i) - $paid),
             'overdue' => in_array($i['status'], ['issued', 'partially_paid'], true) && $i['due_date'] !== null && $i['due_date'] < AppTime::today()];
     }
 
@@ -114,6 +120,9 @@ final class InvoiceService
         if ($items !== [] && $discount > (int) $items['subtotal_minor']) {
             $errors[] = 'The discount cannot be more than the subtotal.';
         }
+        $couponCode = CouponService::normaliseCode((string) ($in['coupon_code'] ?? ''));
+        $couponId = null;
+        $couponDiscount = 0;
         $project = null;
         $pid = trim((string) ($in['project'] ?? ''));
         if ($pid !== '') {
@@ -122,11 +131,21 @@ final class InvoiceService
                 $errors[] = 'Choose one of this client\'s projects.';
             }
         }
+        if ($couponCode !== '' && $errors === []) {
+            try {
+                $res = CouponService::evaluate($couponCode, (int) $client['id'], (int) $items['subtotal_minor'] - $discount, $project['service_category'] ?? null, isset($in['_invoice_id']) ? (int) $in['_invoice_id'] : null);
+                $couponId = (int) $res['coupon']['id'];
+                $couponDiscount = $res['discount_minor'];
+            } catch (ValidationException $e) {
+                array_push($errors, ...$e->errors);
+            }
+        }
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
 
-        return ['title' => $title, 'due' => is_string($due) ? $due : null, 'client_notes' => is_string($cn) ? $cn : null, 'internal_notes' => is_string($inn) ? $inn : null, 'items' => $items, 'discount' => $discount, 'project' => $project];
+        return ['title' => $title, 'due' => is_string($due) ? $due : null, 'client_notes' => is_string($cn) ? $cn : null, 'internal_notes' => is_string($inn) ? $inn : null, 'items' => $items, 'discount' => $discount, 'project' => $project,
+            'coupon_id' => $couponId, 'coupon_code' => $couponId === null ? null : $couponCode, 'coupon_discount' => $couponDiscount];
     }
 
     /** @param array<string,mixed> $in @return array{public_id:string} */
@@ -142,12 +161,12 @@ final class InvoiceService
 
         return Database::transaction(function () use ($actorId, $client, $v, $pub, $quotation): array {
             $subtotal = (int) $v['items']['subtotal_minor'];
-            Database::run("INSERT INTO invoices (public_id, client_id, project_id, quotation_id, status, title, due_date, subtotal_minor, discount_minor, total_minor, client_notes, internal_notes, created_by, created_at, updated_at)
-                           VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-                [$pub, $client['id'], $v['project']['id'] ?? null, $quotation['id'] ?? null, $v['title'], $v['due'], $subtotal, $v['discount'], $subtotal - $v['discount'], $v['client_notes'], $v['internal_notes'], $actorId]);
+            Database::run("INSERT INTO invoices (public_id, client_id, project_id, quotation_id, status, title, due_date, subtotal_minor, discount_minor, coupon_id, coupon_code, coupon_discount_minor, total_minor, client_notes, internal_notes, created_by, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                [$pub, $client['id'], $v['project']['id'] ?? null, $quotation['id'] ?? null, $v['title'], $v['due'], $subtotal, $v['discount'], $v['coupon_id'], $v['coupon_code'], $v['coupon_discount'], $subtotal - $v['discount'] - $v['coupon_discount'], $v['client_notes'], $v['internal_notes'], $actorId]);
             $id = Database::insertId();
             BillingItems::replace('invoice_items', 'invoice_id', $id, $v['items']['items']);
-            Audit::record('invoice.drafted', 'invoice', $id, [], ['total_minor' => $subtotal - $v['discount'], 'client_id' => (int) $client['id'], 'quotation_id' => $quotation['id'] ?? null], [], $actorId);
+            Audit::record('invoice.drafted', 'invoice', $id, [], ['total_minor' => $subtotal - $v['discount'] - $v['coupon_discount'], 'client_id' => (int) $client['id'], 'quotation_id' => $quotation['id'] ?? null], [], $actorId);
 
             return ['public_id' => $pub];
         });
@@ -173,17 +192,17 @@ final class InvoiceService
     {
         Gate::authorize('invoices.edit', $actorId);
         $client = Database::one('SELECT * FROM clients WHERE id = ?', [$i['client_id']]);
-        $v = self::validated($in, $client);
+        $v = self::validated($in + ['_invoice_id' => $i['id']], $client);
         Database::transaction(function () use ($actorId, $i, $v): void {
             $cur = Database::one('SELECT status, total_minor FROM invoices WHERE id = ? FOR UPDATE', [$i['id']]);
             if ($cur === null || $cur['status'] !== 'draft') {
                 throw new ValidationException(['Only a draft invoice can be edited. An issued invoice is never changed: void it and issue a new one.']);
             }
             $subtotal = (int) $v['items']['subtotal_minor'];
-            Database::run('UPDATE invoices SET title = ?, project_id = ?, due_date = ?, subtotal_minor = ?, discount_minor = ?, total_minor = ?, client_notes = ?, internal_notes = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
-                [$v['title'], $v['project']['id'] ?? null, $v['due'], $subtotal, $v['discount'], $subtotal - $v['discount'], $v['client_notes'], $v['internal_notes'], $i['id']]);
+            Database::run('UPDATE invoices SET title = ?, project_id = ?, due_date = ?, subtotal_minor = ?, discount_minor = ?, coupon_id = ?, coupon_code = ?, coupon_discount_minor = ?, total_minor = ?, client_notes = ?, internal_notes = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+                [$v['title'], $v['project']['id'] ?? null, $v['due'], $subtotal, $v['discount'], $v['coupon_id'], $v['coupon_code'], $v['coupon_discount'], $subtotal - $v['discount'] - $v['coupon_discount'], $v['client_notes'], $v['internal_notes'], $i['id']]);
             BillingItems::replace('invoice_items', 'invoice_id', (int) $i['id'], $v['items']['items']);
-            Audit::record('invoice.draft_updated', 'invoice', (int) $i['id'], ['total_minor' => (int) $cur['total_minor']], ['total_minor' => $subtotal - $v['discount']], [], $actorId);
+            Audit::record('invoice.draft_updated', 'invoice', (int) $i['id'], ['total_minor' => (int) $cur['total_minor']], ['total_minor' => $subtotal - $v['discount'] - $v['coupon_discount']], [], $actorId);
         });
     }
 
@@ -203,6 +222,7 @@ final class InvoiceService
             if ((int) $cur['total_minor'] < 1) {
                 throw new ValidationException(['An invoice needs at least one line and a total above zero.']);
             }
+            CouponService::redeem($cur, $actorId);
             $ref = CrmReference::next('invoice');
             $today = AppTime::today();
             $due = $cur['due_date'] ?? AppTime::todayPlus(14);
@@ -234,6 +254,7 @@ final class InvoiceService
             }
             Database::run("UPDATE invoices SET status = 'void', voided_by = ?, voided_at = UTC_TIMESTAMP(), void_reason = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [$actorId, $reason, $i['id']]);
             Audit::record('invoice.voided', 'invoice', (int) $i['id'], ['status' => $cur['status']], ['status' => 'void'], ['reference' => $cur['reference'], 'reason_recorded' => true], $actorId);
+            CouponService::release((int) $i['id'], 'invoice voided');
         });
     }
 
@@ -245,7 +266,7 @@ final class InvoiceService
             return;
         }
         $paid = self::paidMinor($invoiceId);
-        $to = $paid >= (int) $i['total_minor'] ? 'paid' : ($paid > 0 ? 'partially_paid' : 'issued');
+        $to = $paid >= self::payable($i) ? 'paid' : ($paid > 0 ? 'partially_paid' : 'issued');
         if ($to !== $i['status']) {
             Database::run('UPDATE invoices SET status = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$to, $invoiceId]);
             Audit::record('invoice.status_changed', 'invoice', $invoiceId, ['status' => $i['status']], ['status' => $to], ['paid_minor' => $paid], null);
@@ -313,7 +334,7 @@ final class InvoiceService
         $today = AppTime::today();
 
         return [
-            'outstanding_minor' => (int) Database::one("SELECT COALESCE(SUM(i.total_minor), 0) - COALESCE((SELECT SUM(GREATEST(0, cp.gross_minor - cp.refunded_minor)) FROM client_payments cp JOIN invoices ii ON ii.id = cp.invoice_id WHERE ii.status IN ('issued','partially_paid') AND cp.status IN ('verified','reversed')), 0) AS s FROM invoices i WHERE i.status IN ('issued','partially_paid')")['s'],
+            'outstanding_minor' => (int) Database::one("SELECT COALESCE(SUM(i.total_minor - i.credited_minor), 0) - COALESCE((SELECT SUM(GREATEST(0, cp.gross_minor - cp.refunded_minor)) FROM client_payments cp JOIN invoices ii ON ii.id = cp.invoice_id WHERE ii.status IN ('issued','partially_paid') AND cp.status IN ('verified','reversed')), 0) AS s FROM invoices i WHERE i.status IN ('issued','partially_paid')")['s'],
             'overdue' => (int) Database::one("SELECT COUNT(*) AS c FROM invoices WHERE status IN ('issued','partially_paid') AND due_date < ?", [$today])['c'],
             'drafts' => (int) Database::one("SELECT COUNT(*) AS c FROM invoices WHERE status = 'draft'")['c'],
             'to_verify' => (int) Database::one("SELECT COUNT(*) AS c FROM client_payments WHERE invoice_id IS NOT NULL AND status = 'pending_verification'")['c'],

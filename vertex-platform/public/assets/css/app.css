@@ -394,3 +394,24 @@ ul.plain li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 ul.plain li:last-child { border-bottom: 0; }
 ul.codes { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 ul.codes code, code.key { font-size: 1.05rem; letter-spacing: 0.08em; }
+
+/* Phase 10: charts and report cards */
+.chart { width: 100%; height: auto; max-width: 720px; display: block; }
+.chart-text { fill: var(--silver-1, #b8c0cc); font-size: 11px; font-family: inherit; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-bar, .chart-s0 { fill: #4f8cff; }
+.chart-s1 { fill: #3fb68b; } .chart-s2 { fill: #e0a93b; } .chart-s3 { fill: #d96b6b; } .chart-s4 { fill: #9b7bd8; } .chart-s5 { fill: #6fb7c9; }
+.chart-ring { stroke: #4f8cff; } .chart-r1 { stroke: #3fb68b; } .chart-r2 { stroke: #e0a93b; } .chart-r3 { stroke: #d96b6b; } .chart-r4 { stroke: #9b7bd8; } .chart-r5 { stroke: #6fb7c9; }
+.chart-line { stroke: #4f8cff; }
+.chart-total { fill: var(--silver-1, #b8c0cc); font-size: 22px; font-weight: 700; }
+.chart-panel { overflow-x: auto; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+a.report-card { text-decoration: none; color: inherit; display: block; margin-top: 0; }
+a.report-card:hover { border-color: var(--line-strong); }
+@media print { .chart-bar, .chart-s0 { fill: #333; } .portal-search, .no-print { display: none !important; } }
+.chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.chart-grid .panel { margin-top: 0; }
+[hidden] { display: none !important; }
+.form-block { border: 0; padding: 0; margin: 0; }
+.field-help { color: var(--silver-3, #8a93a3); font-size: 0.85rem; display: block; margin-top: 4px; }
+.field-row-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }

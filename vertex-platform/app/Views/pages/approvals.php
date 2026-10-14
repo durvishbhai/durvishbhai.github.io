@@ -1,0 +1,8 @@
+<?php /** @var list<array{group:string,label:string,count:int,url:string,oldest:?string}> $pending */ /** @var list<array<string,mixed>> $history */ $by = []; foreach ($pending as $p) { $by[$p['group']][] = $p; } ?>
+<p class="eyebrow">Work</p><h1>Approval centre</h1>
+<p class="muted">Everything waiting for a decision that you are allowed to make. The decision itself is made on the linked screen, with its own checks and audit entry.</p>
+<?php if ($pending === []) : ?><div class="alert alert-ok" role="status"><p>Nothing is waiting for you.</p></div><?php endif; ?>
+<?php foreach ($by as $group => $items) : ?><div class="panel"><h2><?= e($group) ?></h2><ul class="plain"><?php foreach ($items as $p) : ?><li><a href="<?= e($p['url']) ?>"><strong><?= (int) $p['count'] ?></strong> &middot; <?= e($p['label']) ?></a><?php if ($p['oldest']) : ?><br><span class="muted">oldest waiting since <?= e(local_date(substr((string) $p['oldest'], 0, 10))) ?></span><?php endif; ?></li><?php endforeach; ?></ul></div><?php endforeach; ?>
+<?php if ($history !== []) : ?><div class="panel"><h2>Recent decisions and sensitive changes</h2><div class="table-wrap"><table class="table"><thead><tr><th>When</th><th>Who</th><th>What</th><th>Reason / note</th></tr></thead><tbody>
+    <?php foreach ($history as $h) : $meta = $h['meta_json'] ? (array) json_decode((string) $h['meta_json'], true) : []; ?><tr><td><?= e(local_time($h['created_at'])) ?></td><td><?= e($h['actor'] ?? 'System') ?></td><td><?= e(ucfirst(str_replace(['_', '.'], ' ', (string) $h['action']))) ?></td><td><?= e((string) ($meta['reason'] ?? '')) ?></td></tr><?php endforeach; ?></tbody></table></div>
+    <p><a href="/admin/audit">Open the full audit log</a></p></div><?php endif; ?>

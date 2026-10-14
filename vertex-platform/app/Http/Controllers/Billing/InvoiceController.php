@@ -12,6 +12,7 @@ use Vertex\Core\Session;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\BusinessProfile;
 use Vertex\Services\ClientPaymentService;
+use Vertex\Services\CreditNoteService;
 use Vertex\Services\Gate;
 use Vertex\Services\InvoiceService;
 
@@ -56,7 +57,7 @@ final class InvoiceController extends Controller
     /** @return array<string,mixed> */
     private function fields(Request $request): array
     {
-        return ['title' => $request->string('title'), 'project' => $request->string('project'), 'due_date' => $request->string('due_date'), 'discount' => $request->string('discount'),
+        return ['title' => $request->string('title'), 'project' => $request->string('project'), 'due_date' => $request->string('due_date'), 'discount' => $request->string('discount'), 'coupon_code' => $request->string('coupon_code'),
             'client_notes' => $request->string('client_notes'), 'internal_notes' => $request->string('internal_notes'), 'items' => $request->body['items'] ?? []];
     }
 
@@ -79,7 +80,7 @@ final class InvoiceController extends Controller
         $uid = $this->actorId();
         $i = InvoiceService::requireStaff($uid, $params['invoice'] ?? '');
         $r = $this->page('invoices/show', ['title' => $i['reference'] ?? 'Draft invoice', 'i' => $i, 'items' => InvoiceService::items($i), 'bal' => InvoiceService::balance($i), 'payments' => InvoiceService::payments($i),
-            'canEdit' => Gate::can('invoices.edit', $uid), 'canIssue' => Gate::can('invoices.issue', $uid), 'canVoid' => Gate::can('invoices.void', $uid), 'canRecord' => Gate::can('payments.record', $uid),
+            'canEdit' => Gate::can('invoices.edit', $uid), 'canIssue' => Gate::can('invoices.issue', $uid), 'canVoid' => Gate::can('invoices.void', $uid), 'canRecord' => Gate::can('payments.record', $uid), 'creditNotes' => CreditNoteService::forInvoice($i), 'canCredit' => Gate::can('creditnotes.issue', $uid), 'creditable' => CreditNoteService::creditable($i),
             'profileOk' => BusinessProfile::isComplete(), 'methods' => \Vertex\Core\Config::get('referrals.payment_methods')] + $this->formData());
         Session::forget('_old');
 
@@ -118,6 +119,20 @@ final class InvoiceController extends Controller
                     InvoiceService::void($uid, $i, $request->string('reason'));
 
                     return $this->ok($to, 'The invoice was voided. Its number is not reused.');
+                case 'credit_note':
+                    $this->requireStepUp($request);
+                    $n = CreditNoteService::issue($uid, $i, $request->string('amount'), $request->string('reason'));
+
+                    return $this->ok($to, "Credit note {$n['reference']} issued. The client sees the reduced amount.");
+                case 'void_credit_note':
+                    $this->requireStepUp($request);
+                    $note = CreditNoteService::find($request->string('note')) ?? throw new HttpException(404);
+                    if ((int) $note['invoice_id'] !== (int) $i['id']) {
+                        throw new HttpException(404);
+                    }
+                    CreditNoteService::void($uid, $note, $request->string('reason'));
+
+                    return $this->ok($to, 'The credit note was voided.');
                 case 'payment':
                     $res = ClientPaymentService::record($uid, ['invoice' => $i['public_id'], 'role' => $request->string('role'), 'gross' => $request->string('gross'), 'tax' => '0', 'method' => $request->string('method'),
                         'external_ref' => $request->string('external_ref'), 'received_on' => $request->string('received_on'), 'notes' => $request->string('notes')]);

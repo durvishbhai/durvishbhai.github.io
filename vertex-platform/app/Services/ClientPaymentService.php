@@ -76,7 +76,7 @@ final class ClientPaymentService
         return Database::transaction(function () use ($actorId, $project, $invoice, $role, $gross, $tax, $method, $extRef, $key, $invoiceRef, $notes, $received, $idempotent): array {
             if ($invoice !== null) {
                 $inv = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$invoice['id']]);
-                $room = (int) $inv['total_minor'] - InvoiceService::paidMinor((int) $inv['id']) - InvoiceService::pendingMinor((int) $inv['id']);
+                $room = InvoiceService::payable($inv) - InvoiceService::paidMinor((int) $inv['id']) - InvoiceService::pendingMinor((int) $inv['id']);
                 if ($gross > $room) {
                     throw new ValidationException(['That is more than the ₹' . FieldRules::formatMinor(max(0, $room)) . ' still due on invoice ' . $inv['reference'] . '.']);
                 }
@@ -135,7 +135,7 @@ final class ClientPaymentService
             if ($received !== null) {
                 if ($row['invoice_id'] !== null) {
                     $inv = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$row['invoice_id']]);
-                    $room = (int) $inv['total_minor'] - InvoiceService::paidMinor((int) $inv['id']);
+                    $room = InvoiceService::payable($inv) - InvoiceService::paidMinor((int) $inv['id']);
                     if ($inv['status'] === 'void' || $received > $room) {
                         throw new ValidationException(['The amount is more than the ₹' . FieldRules::formatMinor(max(0, $room)) . ' still due on the invoice, or the invoice is void. Verify the correct amount or reject the submission.']);
                     }
@@ -217,7 +217,7 @@ final class ClientPaymentService
             if (Database::one('SELECT 1 AS x FROM client_payments WHERE external_key = ? FOR UPDATE', [$key]) !== null) {
                 throw new ValidationException(['That transaction number has already been submitted. If you think this is a mistake, contact us.']);
             }
-            $room = (int) $inv['total_minor'] - InvoiceService::paidMinor((int) $inv['id']) - InvoiceService::pendingMinor((int) $inv['id']);
+            $room = InvoiceService::payable($inv) - InvoiceService::paidMinor((int) $inv['id']) - InvoiceService::pendingMinor((int) $inv['id']);
             if ($amount > $room) {
                 throw new ValidationException(['That is more than the ₹' . FieldRules::formatMinor(max(0, $room)) . ' still due (payments already submitted and waiting for confirmation are counted).']);
             }

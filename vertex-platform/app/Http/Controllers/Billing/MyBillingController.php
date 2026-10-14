@@ -32,7 +32,7 @@ final class MyBillingController extends Controller
         $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
         $bal = InvoiceService::balance($i);
         $payable = in_array($i['status'], ['issued', 'partially_paid'], true) ? max(0, $bal['outstanding'] - $bal['pending']) : 0;
-        $r = $this->page('my-billing/invoice', ['title' => $i['reference'], 'i' => $i, 'items' => InvoiceService::items($i), 'bal' => $bal, 'payments' => InvoiceService::clientPayments($i),
+        $r = $this->page('my-billing/invoice', ['title' => $i['reference'], 'i' => $i, 'items' => InvoiceService::items($i), 'bal' => $bal, 'payments' => InvoiceService::clientPayments($i), 'creditNotes' => \Vertex\Services\CreditNoteService::forInvoice($i),
             'biz' => $i['business_snapshot'] ? (array) json_decode((string) $i['business_snapshot'], true) : BusinessProfile::get(), 'payable' => $payable,
             'upiLink' => GatewayConfig::upiLink($i, $payable), 'upi' => GatewayConfig::upiActive() ? GatewayConfig::get(GatewayConfig::UPI)['config'] : null, 'today' => AppTime::today(),
             'claims' => \Vertex\Core\Database::all("SELECT reference, gross_minor, method, status, received_on FROM client_payments WHERE invoice_id = ? AND source = 'client_claim' AND recorded_by = ? ORDER BY id DESC LIMIT 10", [$i['id'], $uid])]);

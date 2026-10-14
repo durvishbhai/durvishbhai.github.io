@@ -163,6 +163,7 @@ final class PermissionMatrixTest extends TestCase
         $this->assertEqualsCanonicalizing([
             'finance.view', 'invoices.view_all', 'invoices.create', 'invoices.edit',
             'payments.view_all', 'payments.record', 'payouts.view_all', 'payouts.record', 'commissions.view_all',
+            'data.export', 'coupons.view', 'reports.financial', // Phase 9-10: export their lists, see coupons, financial reports
         ], $f);
         foreach (['payouts.approve', 'commissions.approve', 'commissions.adjust', 'commissions.rules.manage', 'payments.reconcile', 'referrals.decide'] as $never) {
             $this->assertNotContains($never, $f, "finance must not hold {$never}");

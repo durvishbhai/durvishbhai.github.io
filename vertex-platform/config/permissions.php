@@ -209,6 +209,11 @@ $p = [
         'clients.notes_view' => 'View restricted client notes',
         'clients.notes_add' => 'Add restricted client notes',
     ],
+    'commerce' => [
+        'coupons.view' => 'View coupons, campaigns and redemptions',
+        'coupons.manage' => 'Create and edit coupons and campaigns',
+        'creditnotes.issue' => 'Issue and void credit notes against invoices',
+    ],
     'renewals' => [
         'renewals.view' => 'View domain/hosting renewals',
         'renewals.manage' => 'Create and edit renewal records',
@@ -225,7 +230,7 @@ $sensitive = [
     'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
-    'commissions.rules.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
+    'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
     'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',
@@ -303,7 +308,7 @@ $roles = [
             'finance.view',
             'invoices.view_all', 'invoices.create', 'invoices.edit',
             'payments.view_all', 'payments.record',
-            'payouts.view_all', 'payouts.record', 'commissions.view_all', 'data.export',
+            'payouts.view_all', 'payouts.record', 'commissions.view_all', 'data.export', 'coupons.view', 'reports.financial',
         ],
     ],
     'support_staff' => [

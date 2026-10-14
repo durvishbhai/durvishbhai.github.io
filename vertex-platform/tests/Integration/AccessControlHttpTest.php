@@ -353,7 +353,7 @@ final class AccessControlHttpTest extends HttpTestCase
 
         $this->assertStringNotContainsString('hunter2', $page);
         $this->assertStringNotContainsString(self::PASSWORD, $page);
-        foreach ($this->auditHtmlForms($page) as $action) {
+        foreach (array_filter($this->auditHtmlForms($page), static fn (string $a): bool => $a !== '/search' && $a !== '/logout') as $action) { // the header search box and sign-out are on every page
             $this->assertSame('/admin/audit/verify', $action, 'the only form on the audit page is the integrity check');
         }
 
