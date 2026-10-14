@@ -1,76 +1,33 @@
 # 16 · Go-live assessment and handover package
 
-Date of assessment: 2026-10-12 · Branch `ccr-13b48464-fpb2gp` · Environment tested: PHP 8.3.6, MariaDB 10.11, Chromium, development container. **Nothing was deployed, no live payment was enabled, no secret is in this repository or in this document.**
+Last updated: 2026-10-14 (after Phase 12) · Branch `ccr-13b48464-fpb2gp` · Environment tested: PHP 8.3.6, MariaDB 10.11, Chromium, development container. **Nothing has been deployed to a real host, no live payment has been taken, no live AI or PhonePe call has been made, and no secret is in this repository or in this document.**
 
 ## 1. Verdict: is it ready for production?
 
-**No — not as a complete system, and not yet as a pilot.** What exists is solid and heavily tested; what stands between it and production is a short list of *unbuilt features*, *missing credentials/business decisions*, and *things that have never been run on the real host*. None of the blockers is a known security flaw.
+**Feature-complete against the 37 modules (with the stated exceptions), heavily tested in a development container — but not yet proven on a real host or against the live third-party services. Treat it as "ready for a staged go-live", not "ready to take real money tomorrow".**
 
-* **Ready in code (tested):** accounts and roles, audit chain, CRM, quotations, invoices (no tax) with Google Pay by UPI and staff-verified payments, clients, projects, tasks, deliverables and client approval, revisions and chargeable-work consent, bug reports, warranty, support tickets, referral partners with 10% + 5% commissions and payouts, domain/hosting renewals with a scheduler, portable backup and restore, system status page. **Full automated suite: 695 tests, 20,982 assertions, all passing (final run after Phase 8, 2026-10-12).**
-* **Not built (so the platform cannot yet run the whole business):** card payments through Google Pay and any processor, and automatic payment confirmation (webhooks), so "duplicate webhook handling" does not exist to be tested (UPI payments are confirmed by staff against the bank); WhatsApp and general email notifications; a CMS and public website inside the platform (the existing `crazybooks.me` GitHub Pages site is separate); chat; calendar-slot appointment booking; payouts for freelancers/workers; financial reports; two-factor authentication.
-* **Never exercised on the real host:** Hostinger/cPanel deployment, cron, SMTP delivery, HTTPS cookie behaviour behind the real proxy, a restore on the real server.
+* **Ready in code (automated tests, 750+ passing):** everything in `19-REQUIREMENTS-TRACEABILITY.md` marked IT: accounts, 2FA, custom roles, audit chain, CRM, quotations, invoices, credit notes, PDFs, coupons, reports and charts, approval centre, clients, projects/tasks/templates/checklists, deliverables and client approval, revisions, scope requests, timestamp feedback, support with SLA, workflow rules, forms, agreements, referral commissions, payouts, renewals, global search, recycle bin, CSV import/export, website CMS with SEO, settings centre.
+* **Implemented but never exercised for real (labelled INT):** **PhonePe** (simulation only), **AI assistance** (simulation only), **SMTP delivery**, **Hostinger deployment and cron**, mobile layout of the Phase 9–12 screens.
+* **Not built:** third-party e-sign, registrar/hosting provider APIs, WhatsApp/SMS, 2FA QR code, automated off-site backup and error alerting, free-form page builder (see `19` "Not built").
+* **Never exercised on the real host:** the web installer, cron, SMTP, HTTPS cookie behaviour behind the proxy, a restore on the real server, the `Authorization` header reaching PHP for the PhonePe webhook.
 
-### Gate A — internal pilot (staff only, billing stays outside the system)
-Can be reached with **no new development**, in roughly this order:
-1. Deploy from a **private** location, not through GitHub Pages (`08-DEPLOYMENT.md`). Document root = `public/`.
-2. Production `.env` (names only in `.env.example`): `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL=https://…`, new `APP_KEY`, database credentials, `SESSION_FORCE_SECURE` if TLS is terminated upstream.
-3. `migrate`, `permissions:sync`, `user:create-super-admin` (password prompted). **Do not run `db:seed-dev`; if it was ever run, delete the `@example.test` users** (`doctor` warns).
-4. **SMTP**: set `MAIL_*`, send a real invitation and a password reset to yourself, confirm delivery.
-5. **Cron**: `schedule:run` daily and `backup:create` nightly (`15-PHASE7-RENEWALS-OPERATIONS.md` §3); run both once by hand; confirm `schedule:status`, `backup:status` and *System status* show OK.
-6. **Backups**: copy a backup off the server, store `APP_KEY` separately, perform one real **restore drill** into an empty database and run `audit:verify`.
-7. `php bin/console.php doctor` shows no warnings you cannot explain.
-8. Business decisions in §5 (at least D-60).
+### Gate A — internal pilot (staff only, payments stay manual/UPI)
+No new development needed:
+1. Upload the Hostinger package, run `install.php` (it removes itself), sign in as the Owner (`08-DEPLOYMENT.md`).
+2. *Integrations & settings*: SMTP (send a real invitation and reset to yourself), business name, company facts.
+3. Cron: `schedule:run` and `backup:create` (`15-PHASE7-RENEWALS-OPERATIONS.md` §3), run both once by hand, confirm *System status* is green.
+4. Backups: copy one off the server, store `APP_KEY` separately, do one real **restore drill** into an empty database and run `audit:verify`.
+5. Business decisions in §5 (at least D-60).
 
-### Gate B — public launch with customers paying through the platform
-Needs **new work and inputs that only you can provide**: **only if you want card payments**: a payment processor account and your choice of provider (sandbox first, then live; its webhook built, signature-verified, idempotent and audited; the Google Pay merchant approval for PRODUCTION); not needed for UPI payments, which work today with manual verification; legal text (Terms, Privacy Policy, Referral Partner Terms: placeholders today); two-factor authentication for Owner/Administrator; a malware scanner; a third-party penetration test; a provider/registrar workflow decision for renewals; accountant sign-off on TDS/GST for commission payouts.
+### Gate B — customers paying online through PhonePe
+Needs inputs only you can supply and a test only the real service can give: PhonePe merchant credentials, then the **sandbox checklist in `18-PHASE12-CMS-AI-PHONEPE.md` §4** end to end (including a closed-tab payment and a webhook), then one real ₹1 production payment. Until that is done, keep UPI + staff verification as the payment method.
 
-## 2. Completion matrix (exactly one label per feature)
+### Gate C — AI switched on
+Add an API key, try each helper on harmless data, confirm the monthly cap and the log (*ai_requests*). Keep it off if you do not want any record text to leave the server.
 
-Labels: **IT** Implemented and tested · **INT** Implemented but not fully tested · **PI** Partially implemented · **DEF** Deferred to a future phase · **BLK** Blocked by a missing credential or external dependency.
+## 2. Completion matrix
 
-| Area | Feature | Status | Notes |
-|---|---|---|---|
-| Foundation | Sessions, login throttling, CSRF, CSP, security headers | IT | Route sweep, HTTP tests, live header probe |
-| | Registration, email verification, password reset, invitations | IT | Tested with a local fake SMTP; real delivery not verified (see Email) |
-| | Roles, permissions, levels, step-up password, audit hash chain | IT | `PermissionMatrixTest`, `RoleServiceTest`, route sweep |
-| | Two-factor authentication | DEF | Recommended for Owner/Admin |
-| Email | SMTP delivery | BLK | Needs real SMTP credentials; only the local fake server was used |
-| Public | Request-quote, contact, book-appointment forms → CRM | IT | Honeypot, rate limit, CSRF |
-| | Public website / CMS inside the platform | DEF | The existing static site is separate |
-| | Appointment calendar with slots and double-booking prevention | DEF | The form creates an enquiry only |
-| CRM & delivery | Enquiries, stages, follow-ups, duplicates, client records, merge | IT | |
-| | Projects, assignments, milestones, tasks, time, team, board | IT | |
-| | Pricing: approved baseline, priority surcharge, client-decided changes | IT | |
-| | Deliverables, versions, QA, client approval, private downloads | IT | |
-| | Revisions, cost proposals, client consent | IT | |
-| | Bug reports, warranty, support tickets | IT | |
-| | Chat | DEF | Permission key only |
-| Money | Quotations (send, client accept/decline, expiry) | IT | `17-BILLING-AND-GOOGLE-PAY.md` |
-| | Invoices (no tax), numbering at issue, void, print view | IT | GST is not supported by design |
-| | Google Pay by UPI link + client "I have paid" + staff verification | IT | Confirmation is manual by design; the UPI ID itself must be proven with a real ₹1 payment |
-| | Google Pay API settings in the admin panel (encrypted secrets) | PI | Fields are stored; the integration is NOT active |
-| | Card payments through Google Pay / a processor, webhooks, duplicate-webhook handling | BLK | Needs your processor choice, credentials and Google's PRODUCTION approval; not built |
-| | Receipts | PI | The invoice page lists verified payments; no separate receipt document |
-| | Manual client payment recording + two-person verification | IT | `client_payments`, unique reference |
-| | Financial reports | DEF | |
-| Referral partners | Application, approval (no auto-activation), terms | IT | |
-| | Referrals, duplicate detection, attribution, locking | IT | |
-| | Commissions 10% (advance) + 5% (full payment), adjustments, reversals | IT | Formula mode needs your confirmation (D-60) |
-| | Payout requests, concurrency-safe reservation, approval ≠ payment, manual recording | IT | Subprocess race tests |
-| | Freelancer / worker payouts | DEF | Only referral-partner payouts exist |
-| Renewals | Records, 12-status workflow, price list, approval, invoice reference, payments, provider confirmation | IT | |
-| | Client portal for domains and hosting | IT | Read-only |
-| | Reminders with de-duplication, scheduler | IT | The command is tested; the host cron has never run |
-| | Registrar / hosting provider integration | DEF | Manual confirmation by design |
-| Notifications | In-app events with de-duplication | IT | |
-| | Email notifications (account flows, referral emails, optional renewal reminders) | INT | Delivery depends on SMTP |
-| | WhatsApp, SMS, push | BLK | Needs an approved integration and credentials |
-| Operations | Backup, verify, restore (CLI), retention | IT | Dev restore + automated tests |
-| | Scheduled backups, off-site copy, encryption | PI | Cron lines documented; nothing runs until you configure it |
-| | System status page, `doctor` production checks | IT | |
-| | Deployment on Hostinger/cPanel | INT | Documented; never run on the real host |
-| Security | Static scan, route sweep, dependency audit, live probe | IT | `composer audit`: no advisories on 2026-10-12 |
-| | Third-party penetration test | DEF | Not performed |
+See **`19-REQUIREMENTS-TRACEABILITY.md`** for the module-by-module table (37 modules, 12 roles) with one honest label each. Earlier-phase detail remains in docs 09–15 and 17.
 
 ## 3. Go-live checklist (tick each, with evidence)
 - [ ] Deployed from a private repository or archive; document root is `public/`; `/.env`, `/storage/…`, `/app/…`, `/vendor/…` return 404/403.
@@ -82,10 +39,11 @@ Labels: **IT** Implemented and tested · **INT** Implemented but not fully teste
 - [ ] One off-site backup copy exists, encrypted, and a **restore drill** passed on a clean database.
 - [ ] Terms, Privacy Policy and Referral Partner Terms reviewed by someone qualified; D-60 decided.
 - [ ] Staff briefed on what is manual: invoices, payments, provider renewals are recorded by hand.
-- [ ] No claim to clients that online payment, automatic invoices or WhatsApp exist.
+- [ ] PhonePe sandbox checklist completed (doc 18 §4) before telling clients they can pay online; no claim that WhatsApp or third-party e-signature exist.
+- [ ] Website pictures folder (`public_html/uploads/cms`) is writable and appears in a backup archive.
 
 ## 4. Handover package (what to give the operator; contains no secrets)
-1. **Source and layout** — repository `durvishbhai.github.io`, folder `vertex-platform/` (README.md, composer.json). 2. **Architecture** — `docs/02-ARCHITECTURE.md`. 3. **Module inventory and status** — §2 above and `docs/05-MODULES-AND-PLAN.md`. 4. **Database** — `docs/03-DATABASE.md`, `database/migrations/0001…0011` (forward-only). 5. **Roles and permissions** — `docs/04-PERMISSIONS.md` (generated matrix). 6. **Configuration reference** — `.env.example` (names and meanings only). 7. **Deployment guide** — `docs/08-DEPLOYMENT.md`. 8. **Scheduled tasks** — `docs/15-PHASE7-RENEWALS-OPERATIONS.md` §3. 9. **Backup and restore runbook** — same document §4. 10. **Security review and residual risks** — `docs/13-FINAL-AUDIT.md` and `15` §7. 11. **Tests** — `tests/` (`composer test`; needs a throwaway database named `*_phpunit`; see README). 12. **Manual smoke tests** — `docs/09…15` checklists and §6 below. 13. **Operations runbook** — §6. 14. **Decisions and open questions** — `docs/07-DECISIONS.md` (D-01 … D-83), `docs/17-BILLING-AND-GOOGLE-PAY.md` and §5.
+1. **Source and layout** — repository `durvishbhai.github.io`, folder `vertex-platform/` (README.md, composer.json). 2. **Architecture** — `docs/02-ARCHITECTURE.md`. 3. **Module inventory and status** — §2 above and `docs/05-MODULES-AND-PLAN.md`. 4. **Database** — `docs/03-DATABASE.md`, `database/migrations/0001…0017` (forward-only). 5. **Roles and permissions** — `docs/04-PERMISSIONS.md` (generated matrix). 6. **Configuration reference** — `.env.example` (names and meanings only). 7. **Deployment guide** — `docs/08-DEPLOYMENT.md`. 8. **Scheduled tasks** — `docs/15-PHASE7-RENEWALS-OPERATIONS.md` §3. 9. **Backup and restore runbook** — same document §4. 10. **Security review and residual risks** — `docs/13-FINAL-AUDIT.md` and `15` §7. 11. **Tests** — `tests/` (`composer test`; needs a throwaway database named `*_phpunit`; see README). 12. **Manual smoke tests** — `docs/09…15` checklists and §6 below. 13. **Operations runbook** — §6. 14. **Decisions and open questions** — `docs/07-DECISIONS.md` (D-01 … D-83), `docs/17-BILLING-AND-GOOGLE-PAY.md` and §5.
 Credentials, API keys, the `.env` file, `APP_KEY`, SMTP and gateway secrets are **never** part of the handover repository; hand them over through a password manager.
 
 ## 5. Open business decisions

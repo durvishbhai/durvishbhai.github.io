@@ -68,6 +68,8 @@ final class RenewalScheduler
                 'sla' => static fn () => SlaService::check(),
                 'agreements' => static fn () => AgreementService::expireDue(),
                 'automation' => static fn () => AutomationService::run($today),
+                'cms_published' => static fn () => CmsService::publishDue(),
+                'gateway_reconciled' => static fn () => PhonePeGateway::reconcilePending(),
             ] as $job => $fn) {
                 try {
                     $summary[$job] = $fn();

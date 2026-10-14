@@ -20,7 +20,11 @@ final class RouteSweepTest extends HttpTestCase
     private const PUBLIC = [
         '/', '/health', '/login', '/login/two-factor', '/register', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
         '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received', '/f/{slug}', '/f/{slug}/thanks',
+        '/sitemap.xml', '/robots.txt', '/webhooks/phonepe', '/{slug}', '/{section}/{slug}',
     ];
+
+    /** Machine-to-machine callbacks that cannot carry a CSRF token. Each one authenticates the caller by a secret signature instead (see Phase12HttpTest). */
+    private const SIGNED_WEBHOOKS = ['/webhooks/phonepe'];
 
     /** @var list<array<string,mixed>> */
     private array $routes = [];
@@ -85,7 +89,7 @@ final class RouteSweepTest extends HttpTestCase
     public function testNoRouteOptsOutOfCsrfProtection(): void
     {
         foreach ($this->routes as $r) {
-            if ($r['method'] !== 'GET') {
+            if ($r['method'] !== 'GET' && !in_array($r['pattern'], self::SIGNED_WEBHOOKS, true)) {
                 $this->assertTrue($r['csrf'], "{$r['method']} {$r['pattern']} has CSRF disabled");
             }
         }
@@ -120,7 +124,7 @@ final class RouteSweepTest extends HttpTestCase
         $c = $this->loggedIn('admin@x.test');
         $n = 0;
         foreach ($this->routes as $r) {
-            if ($r['method'] === 'GET' || $r['pattern'] === '/logout') {
+            if ($r['method'] === 'GET' || $r['pattern'] === '/logout' || in_array($r['pattern'], self::SIGNED_WEBHOOKS, true)) {
                 continue;
             }
             $this->assertSame(419, $c->postNoToken($this->concrete($r['pattern']), ['x' => 'y'])['status'], "{$r['method']} {$r['pattern']}");

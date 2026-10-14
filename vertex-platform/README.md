@@ -1,6 +1,6 @@
 # Vertex Integrated Solutions — platform
 
-Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phases 0–7 built (referral partners and commissions: `docs/14`; domain/hosting renewals, scheduler, backups: `docs/15`). Phase 8 adds quotations, invoices (no tax) and Google Pay by UPI (`docs/17`). NOT production-ready: card payments through Google Pay, automatic payment confirmation (webhooks) and several integrations are not built and the platform has never run on the real host. Read `docs/16-GO-LIVE-AND-HANDOVER.md` first. Phase 5 — bug reports, website warranty tracking and support tickets (on top of Phase 3 — deliverables with versions, secure private file storage, internal QA, client approvals, revision requests with an included-vs-chargeable policy foundation and in-app notifications; Phase 2: CRM, projects, tasks/Kanban, pricing foundation; Phase 1: accounts, RBAC, audit).** Quotations, invoices, payments, payouts, commissions, chat and the CMS are not built. See `docs/05-MODULES-AND-PLAN.md` for what is and is not built.
+Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phases 0–12 built.** All 37 modules of the requirements document are implemented except the items listed under "Not built" in `docs/19-REQUIREMENTS-TRACEABILITY.md`. **NOT yet proven in production:** PhonePe and AI assistance were tested only against simulated services, SMTP only against a local fake server, and nothing has run on the real Hostinger host. Read `docs/16-GO-LIVE-AND-HANDOVER.md` first, then `docs/18-PHASE12-CMS-AI-PHONEPE.md` (PhonePe sandbox checklist). Earlier phases: referral partners and commissions `docs/14`; renewals, scheduler, backups `docs/15`; quotations, invoices and Google Pay by UPI `docs/17`; support/warranty `docs/12`; deliverables/revisions `docs/11`; CRM/projects `docs/10`.
 
 > This folder lives inside a GitHub Pages repository only so the existing site (`../index.html`, `../CNAME`) stays untouched. Read `docs/01-INSPECTION.md` (exposure risk) before deploying; a private repository is recommended.
 
@@ -51,8 +51,10 @@ Integration tests drop every table in the configured test database and refuse an
 | `docs/08-DEPLOYMENT.md` | Hostinger/cPanel deployment |
 | `docs/09-PHASE1-ACCOUNTS-RBAC.md` | Phase 1: migrations, env vars, first Super Admin, rollback, test results, gaps |
 | `docs/11-PHASE3-DELIVERABLES-REVISIONS.md` | Phase 3: file storage and configuration, security controls, workflows, manual test checklist, limitations |
+| `docs/19-REQUIREMENTS-TRACEABILITY.md` | Every requirement module and role mapped to the code, with an honest status and the list of what is not built |
+| `docs/18-PHASE12-CMS-AI-PHONEPE.md` | Phase 12: website CMS and SEO, Integration Center, AI assistance, PhonePe payments, sandbox checklist |
 | `docs/17-BILLING-AND-GOOGLE-PAY.md` | Phase 8: quotations, invoices without tax, payments and client UPI submissions, Google Pay settings (what works, what does not), manual test script |
-| `docs/16-GO-LIVE-AND-HANDOVER.md` | Is it production-ready? (no), completion matrix, go-live gates and checklist, handover package, operations runbook |
+| `docs/16-GO-LIVE-AND-HANDOVER.md` | Is it production-ready? (staged go-live; see gates), completion matrix, go-live gates and checklist, handover package, operations runbook |
 | `docs/15-PHASE7-RENEWALS-OPERATIONS.md` | Phase 7: renewals workflow, reminders, scheduler/cron, backup and restore, system status, security and performance review, smoke test |
 | `docs/14-PHASE6-REFERRAL-COMMISSIONS.md` | Phase 6: referral partner applications, referrals and attribution, commission formula and eligibility rules, payouts, permissions, manual test script, limitations |
 | `docs/13-FINAL-AUDIT.md` | Final audit: what exists and what does not, test results, defects fixed, security review, completion matrix, prioritized issues, manual test script |

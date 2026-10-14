@@ -153,26 +153,28 @@ final class BackupService
     /** Adds the upload store to the archive in batches (a zip can hold many files open at once) and records a hash of each in the manifest. */
     private static function addUploads(string $zipPath, array &$manifest): int
     {
-        $root = FileStore::root();
-        if (!is_dir($root)) {
-            return 0;
-        }
+        // The private upload store, and the website's public pictures (public_html/uploads/cms) under the prefix "website-media/".
+        $public = (defined('VERTEX_PUBLIC') ? (string) VERTEX_PUBLIC : VERTEX_ROOT . '/public') . '/uploads/cms';
         $files = [];
-        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::LEAVES_ONLY);
-        foreach ($it as $f) {
-            if ($f->isFile() && !$f->isLink()) {
-                $files[] = $f->getPathname();
+        foreach ([[FileStore::root(), ''], [$public, 'website-media/']] as [$root, $prefix]) {
+            if (!is_dir($root)) {
+                continue;
+            }
+            $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::LEAVES_ONLY);
+            foreach ($it as $f) {
+                if ($f->isFile() && !$f->isLink() && ($prefix === '' || !str_starts_with($f->getFilename(), '.'))) {
+                    $files[$prefix . ltrim(substr($f->getPathname(), strlen($root)), '/\\')] = $f->getPathname();
+                }
             }
         }
-        sort($files);
+        ksort($files);
         $n = 0;
-        foreach (array_chunk($files, 150) as $chunk) {
+        foreach (array_chunk($files, 150, true) as $chunk) {
             $zip = new \ZipArchive();
             if ($zip->open($zipPath) !== true) {
                 throw new \RuntimeException('Cannot reopen the backup archive.');
             }
-            foreach ($chunk as $path) {
-                $rel = ltrim(substr($path, strlen($root)), '/\\');
+            foreach ($chunk as $rel => $path) {
                 $zip->addFile($path, 'uploads/' . $rel);
                 $manifest['uploads'][$rel] = hash_file('sha256', $path);
                 $n++;

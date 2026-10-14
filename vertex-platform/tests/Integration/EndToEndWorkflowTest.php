@@ -178,10 +178,10 @@ final class EndToEndWorkflowTest extends DatabaseTestCase
         }
         $this->assertSame(0, $this->scalar("SELECT COUNT(*) c FROM audit_logs WHERE after_json LIKE '%password%' OR meta_json LIKE '%password%'"));
 
-        // ---- modules that are NOT built leave no trace and nothing pretends to be money
+        // ---- modules that are still NOT built leave no trace (the payment webhook tables exist since Phase 12)
         $tables = array_column(Database::all('SHOW TABLES'), array_key_first(Database::one('SHOW TABLES')));
         foreach ($tables as $t) {
-            $this->assertDoesNotMatchRegularExpression('/webhook|gateway_event/', (string) $t, "table {$t} suggests an unbuilt module exists");
+            $this->assertDoesNotMatchRegularExpression('/^(chat|whatsapp|sms|esign|registrar)/', (string) $t, "table {$t} suggests an unbuilt module exists");
         }
     }
 

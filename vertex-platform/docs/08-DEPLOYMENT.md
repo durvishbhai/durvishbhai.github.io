@@ -85,3 +85,11 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 
 `schedule:run` moves renewals along the calendar, sends reminders and releases commission hold periods; it is idempotent. **Do not tell staff or clients that reminders or backups run until you have seen both jobs run** (`schedule:status`, `backup:status`, *Admin → System status*). Until then the dashboards show a warning. Run `php bin/console.php doctor` before launch: it lists every production warning (HTTP instead of HTTPS, debug on, SMTP not configured, no scanner, seed users, never-run cron, no backup).
 
+## Phase 12 additions (website, AI, PhonePe)
+
+* **Website pictures** are saved in `public_html/uploads/cms/` (the installer creates it with a script-blocking `.htaccess`). They are included in `backup:create` (archive path `uploads/website-media/`); after a restore copy them back into that folder.
+* **PhonePe webhook**: `https://YOUR-SITE/webhooks/phonepe`. The installer's `.htaccess` passes the `Authorization` header to PHP. If you replace the `.htaccess`, keep `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]`.
+* **Settings**: after install sign in as the Owner and open *Integrations & settings* to enter SMTP, AI and PhonePe values instead of editing `.env`. `APP_KEY` must stay the same forever (sealed secrets depend on it).
+* **Scheduled task**: the daily `schedule:run` now also publishes due website pages and re-checks pending PhonePe orders; with PhonePe on, run it more often (hourly is fine, it is idempotent).
+* Sandbox checklist for PhonePe: `docs/18-PHASE12-CMS-AI-PHONEPE.md` §4.
+

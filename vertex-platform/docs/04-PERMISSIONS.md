@@ -45,17 +45,23 @@ Users can hold several roles; permissions are the union.
 | `users.archive` — Archive accounts | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `users.assign_roles` — Change which roles a user holds | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `users.reset_password` — Send a password-reset email to a user | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `users.reset_2fa` — Reset a lower-ranked user's two-factor login (lost device) | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Roles** | | | | | | | | | | |
 | `roles.view` — View roles and permission grants | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `roles.manage` — Edit non-sensitive permission grants of lower-ranked roles | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `roles.manage_sensitive` — Grant/revoke sensitive permissions | ✔ |  |  |  |  |  |  |  |  |  |
+| `roles.create` — Create and delete custom roles | ✔ |  |  |  |  |  |  |  |  |  |
 | **Platform** | | | | | | | | | | |
 | `audit.view` — View audit logs | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `settings.view` — View system settings | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `settings.manage` — Change system settings | ✔ |  |  |  |  |  |  |  |  |  |
 | `reports.operational` — View operational reports | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
-| `reports.financial` — View financial reports | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `reports.financial` — View financial reports | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `backups.manage` — Create/download backups | ✔ |  |  |  |  |  |  |  |  |  |
+| `recycle.view` — See archived records in the recycle bin | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `recycle.restore` — Restore archived records from the recycle bin | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `data.export` — Export lists to CSV | ✔ | ✔ | ✔ | ✔ |  |  |  |  |  |  |
+| `data.import` — Import clients and leads from CSV | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Projects** | | | | | | | | | | |
 | `projects.view_all` — View every project | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `projects.view_assigned` — View projects the user is assigned to | ✔ | ✔ | ✔ |  | ✔ | ✔ | ✔ | ✔ |  |  |
@@ -101,6 +107,8 @@ Users can hold several roles; permissions are the union.
 | `cms.edit` — Edit draft website content | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `cms.publish` — Publish website content | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `legal.manage` — Edit legal pages and policies | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| **Ai** | | | | | | | | | | |
+| `ai.use` — Use the AI assistant (drafts only; sees only records the user can open) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | **Pricing** | | | | | | | | | | |
 | `pricing.view` — View pricing rules and priority charges | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `pricing.manage` — Edit pricing rules and priority charges | ✔ | ✔ |  |  |  |  |  |  |  |  |
@@ -204,6 +212,32 @@ Users can hold several roles; permissions are the union.
 | `clients.invite` — Invite a client to the portal | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `clients.notes_view` — View restricted client notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `clients.notes_add` — Add restricted client notes | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| **Projectkit** | | | | | | | | | | |
+| `templates.manage` — Create and edit project templates | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `templates.apply` — Apply a project template to a project | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `checklists.manage` — Edit a project checklist and tick items off | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `scope.assess` — Assess client scope-change requests (cost and deadline effect) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `scope.request` — Ask for a scope change on an own project (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `feedback.add` — Add timestamped feedback points to an own revision request (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `feedback.resolve` — Mark feedback points as done | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| **Automation** | | | | | | | | | | |
+| `automation.manage` — Create and edit workflow rules | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `sla.manage` — Edit the support SLA targets | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| **Agreements** | | | | | | | | | | |
+| `agreements.view` — View agreements and the document vault | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `agreements.manage` — Create, send and cancel agreements and manage templates | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `agreements.upload` — Upload signed copies to the vault | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `agreements.sign_company` — Sign agreements for the company and mark paper agreements executed | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `agreements.view_own` — View own agreements (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| `agreements.sign` — Sign own agreements (client) | ✔ |  |  |  |  |  |  |  |  | ✔ |
+| **Forms** | | | | | | | | | | |
+| `forms.manage` — Build, publish and archive forms | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `forms.view_submissions` — Read the answers sent through forms | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
+| `forms.export` — Export form answers to CSV | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| **Commerce** | | | | | | | | | | |
+| `coupons.view` — View coupons, campaigns and redemptions | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
+| `coupons.manage` — Create and edit coupons and campaigns | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `creditnotes.issue` — Issue and void credit notes against invoices | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Renewals** | | | | | | | | | | |
 | `renewals.view` — View domain/hosting renewals | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `renewals.manage` — Create and edit renewal records | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |

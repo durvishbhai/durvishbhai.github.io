@@ -37,5 +37,8 @@ return [
         'partner_referral_user' => [30, 3600],
         'payout_request_user' => [10, 3600],
         'payment_claim_user' => [10, 3600],
+        'ai_user' => [30, 3600],
+        'phonepe_start_user' => [10, 3600],
+        'cms_upload_user' => [60, 3600],
     ],
 ];

@@ -1,6 +1,8 @@
 <?php
 use Vertex\Services\Auth;
 $signedIn = Auth::user() !== null;
+$menu = \Vertex\Services\CmsService::menu('header');
+$menu = $menu !== [] ? $menu : [['label' => 'Services', 'url' => '/#services'], ['label' => 'Approach', 'url' => '/#approach'], ['label' => 'Request a quote', 'url' => '/request-quote']];
 ?>
 <header class="site-header">
     <div class="container header-inner">
@@ -12,9 +14,8 @@ $signedIn = Auth::user() !== null;
             <span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span>
         </button>
         <nav id="site-nav" class="site-nav" aria-label="Primary">
-            <a href="/#services">Services</a>
-            <a href="/#approach">Approach</a>
-            <a href="/request-quote">Request a quote</a>
+            <?php foreach ($menu as $item) : ?><a href="<?= e($item['url']) ?>"<?= str_starts_with($item['url'], 'http') ? ' rel="noopener"' : '' ?>><?= e($item['label']) ?></a>
+            <?php endforeach; ?>
             <?php if ($signedIn) : ?>
                 <a class="btn btn-primary btn-sm" href="/dashboard">Dashboard</a>
             <?php else : ?>

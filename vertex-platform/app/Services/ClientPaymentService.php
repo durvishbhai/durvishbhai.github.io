@@ -235,6 +235,49 @@ final class ClientPaymentService
         });
     }
 
+    /**
+     * A payment the gateway itself has confirmed (PhonePe answered COMPLETED for the right amount to a server-side status request). It is recorded already
+     * verified: the bank-statement check that staff do for UPI claims is replaced by the gateway's own authenticated answer. Idempotent on the reference.
+     *
+     * @param array<string,mixed> $invoice
+     * @return array{id:int,public_id:string,created:bool}
+     */
+    public static function recordGateway(array $invoice, int $amountMinor, string $reference, string $note): array
+    {
+        $key = hash('sha256', 'gateway:' . mb_strtolower($reference));
+        $row = Database::one('SELECT id, public_id, invoice_id, gross_minor FROM client_payments WHERE external_key = ? FOR UPDATE', [$key]);
+        if ($row !== null) {
+            if ((int) $row['invoice_id'] !== (int) $invoice['id'] || (int) $row['gross_minor'] !== $amountMinor) {
+                throw new \RuntimeException('A different payment already uses this gateway reference.');
+            }
+
+            return ['id' => (int) $row['id'], 'public_id' => (string) $row['public_id'], 'created' => false];
+        }
+        $inv = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$invoice['id']]);
+        if ($inv === null || $inv['status'] === 'void') {
+            throw new \RuntimeException('The invoice is void or missing; a person must refund this gateway payment.');
+        }
+        $ref = CrmReference::next('client_payment');
+        $pub = uuid_hex();
+        Database::run(
+            "INSERT INTO client_payments (public_id, reference, project_id, client_id, invoice_id, invoice_ref, payment_role, gross_minor, tax_minor, method, source, external_ref, external_key, received_on, status, notes, recorded_by, verified_by, verified_at, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, 'other', ?, 0, 'gateway', 'gateway', ?, ?, ?, 'verified', ?, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $ref, $inv['project_id'], $inv['client_id'], $inv['id'], $inv['reference'], $amountMinor, mb_substr($reference, 0, 120), $key, AppTime::today(), mb_substr($note, 0, 500)],
+        );
+        $id = Database::insertId();
+        self::event($id, 'recorded', $amountMinor, null, null);
+        self::event($id, 'verified', $amountMinor, 'Confirmed by the payment gateway', null);
+        Audit::record('client_payment.gateway_recorded', 'client_payment', $id, [], ['reference' => $ref, 'gross_minor' => $amountMinor, 'gateway_ref' => $reference], ['invoice_id' => $inv['id']], null);
+        self::afterChange(['invoice_id' => $inv['id'], 'project_id' => $inv['project_id']], 0);
+        $owner = Database::one('SELECT c.user_id FROM clients c WHERE c.id = ?', [$inv['client_id']]);
+        if ($owner !== null && $owner['user_id'] !== null) {
+            Notifier::send([(int) $owner['user_id']], 'payment.confirmed', 'Payment confirmed: ₹' . FieldRules::formatMinor($amountMinor), 'We received your payment ' . $ref . '. Thank you.', '/my/invoices/' . $inv['public_id'], null, 'client_payment', $id, "cpay:{$id}:confirmed");
+        }
+        Notifier::send(Notifier::withPermission('payments.reconcile'), 'client_payment.gateway_received', 'Online payment received', $ref . ' for invoice ' . $inv['reference'], '/client-payments/' . $pub, null, 'client_payment', $id, "cpay:{$id}:gateway");
+
+        return ['id' => $id, 'public_id' => $pub, 'created' => true];
+    }
+
     /** After a payment changed state: re-derive the invoice status and re-evaluate the commission. @param array<string,mixed> $row */
     private static function afterChange(array $row, int $actorId): void
     {

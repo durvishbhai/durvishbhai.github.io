@@ -99,6 +99,9 @@ $p = [
         'cms.publish' => 'Publish website content',
         'legal.manage' => 'Edit legal pages and policies',
     ],
+    'ai' => [
+        'ai.use' => 'Use the AI assistant (drafts only; sees only records the user can open)',
+    ],
     'pricing' => [
         'pricing.view' => 'View pricing rules and priority charges',
         'pricing.manage' => 'Edit pricing rules and priority charges',
@@ -305,7 +308,7 @@ $roles = [
         'description' => 'Operational work on assigned projects. Never inherits Administrator rights.',
         'level' => 60, 'locked' => false, 'assignable_in_ui' => true, 'phone_required' => false,
         'permissions' => [
-            'cms.view', 'cms.edit',
+            'cms.view', 'cms.edit', 'ai.use',
             'projects.view_assigned', 'projects.update_status', 'projects.edit', 'projects.complete', 'projects.set_priority',
             'projects.notes_internal', 'projects.notes_client',
             'milestones.view', 'milestones.create', 'milestones.edit', 'milestones.propose', 'milestones.approve',

@@ -268,6 +268,7 @@ if ($posted && !$alreadyInstalled) {
             @file_put_contents($appRoot . '/storage/.htaccess', "# Private storage (uploads, logs, sessions, backups). Never serve anything from here.\n" . $deny . "Options -Indexes -ExecCGI\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar\n");
             $https = str_starts_with($old['app_url'], 'https://') ? "    # Send everything to HTTPS (the AutoSSL validation path stays reachable)\n    RewriteCond %{HTTPS} off\n    RewriteCond %{HTTP:X-Forwarded-Proto} !https\n    RewriteCond %{REQUEST_URI} !^/\\.well-known/\n    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]\n\n" : '';
             $public = "# Front controller routing (Apache / LiteSpeed on Hostinger). Written by install.php.\nOptions -Indexes -MultiViews\nDirectoryIndex index.php\n\n<IfModule mod_rewrite.c>\n    RewriteEngine On\n" . $https
+                . "    # Pass the Authorization header to PHP (PhonePe webhook signature)\n    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n\n"
                 . "    # Real files (css, js, images) are served directly; everything else goes through index.php\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^ index.php [L]\n</IfModule>\n\n"
                 . "# Never expose dotfiles or leftovers\n<FilesMatch \"(^\\.|~\$|\\.(bak|old|orig|sql|log|env|ini|sh|md|lock|json)\$)\">\n    <IfModule mod_authz_core.c>\n        Require all denied\n    </IfModule>\n    <IfModule !mod_authz_core.c>\n        Order allow,deny\n        Deny from all\n    </IfModule>\n</FilesMatch>\n";
             if (@file_put_contents(__DIR__ . '/.htaccess', $public) === false) {
@@ -275,7 +276,12 @@ if ($posted && !$alreadyInstalled) {
             } else {
                 $log[] = 'Wrote the .htaccess files (routing, HTTPS redirect, private folders).';
             }
-            $log[] = 'Created the private storage folders.';
+            $media = __DIR__ . '/uploads/cms';
+            if (!is_dir($media)) {
+                @mkdir($media, 0755, true);
+            }
+            @file_put_contents($media . '/.htaccess', "# Website pictures only: nothing in here may ever run as a script.\nOptions -Indexes -ExecCGI\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar\n<FilesMatch \"\\.(php|phtml|phar|pl|py|cgi|sh)\$\">\n    Require all denied\n</FilesMatch>\n");
+            $log[] = 'Created the private storage folders and the website pictures folder.';
 
             $removed = @unlink(__FILE__);
             $done = ['log' => $log, 'email' => $email, 'url' => $old['app_url'], 'removed' => $removed, 'php' => PHP_VERSION];

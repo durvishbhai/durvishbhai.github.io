@@ -45,6 +45,11 @@ use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
 use Vertex\Http\Controllers\Admin\BillingSettingsController;
 use Vertex\Http\Controllers\Admin\SystemController;
+use Vertex\Http\Controllers\Admin\CmsController;
+use Vertex\Http\Controllers\Admin\SettingsController;
+use Vertex\Http\Controllers\AiController;
+use Vertex\Http\Controllers\PublicPageController;
+use Vertex\Http\Controllers\Billing\PhonePeController;
 use Vertex\Http\Controllers\Billing\CouponController;
 use Vertex\Http\Controllers\Billing\DocumentController;
 use Vertex\Http\Controllers\Billing\InvoiceController;
@@ -75,6 +80,10 @@ return static function (Router $router): void {
     // Public
     $router->get('/', [HomeController::class, 'index'], ['nosession']);
     $router->get('/health', [HealthController::class, 'show'], ['nosession']);
+    $router->get('/sitemap.xml', [PublicPageController::class, 'sitemap'], ['nosession']);
+    $router->get('/robots.txt', [PublicPageController::class, 'robots'], ['nosession']);
+    // PhonePe calls this with its own signature header: no session, no CSRF token. The handler rejects anything without the right Authorization value.
+    $router->post('/webhooks/phonepe', [PhonePeController::class, 'webhook'], ['nosession'], false);
 
     // Authentication
     $router->get('/login', [AuthController::class, 'showLogin'], ['guest']);
@@ -321,6 +330,13 @@ return static function (Router $router): void {
     $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
+    $router->post('/my/invoices/{invoice}/phonepe', [PhonePeController::class, 'start'], ['auth', 'can:payments.pay']);
+    $router->get('/my/invoices/{invoice}/phonepe-return', [PhonePeController::class, 'returned'], ['auth', 'can:invoices.view_own']);
+
+    // AI assistance (drafts only)
+    $router->get('/ai', [AiController::class, 'index'], ['auth', 'can:ai.use']);
+    $router->post('/ai', [AiController::class, 'run'], ['auth', 'can:ai.use']);
+    $router->post('/ai/tasks/create', [AiController::class, 'createTasks'], ['auth', 'can:ai.use']);
     $router->get('/my/quotes', [MyBillingController::class, 'quotes'], ['auth', 'can:quotes.view']);
     $router->get('/my/quotes/{quote}', [MyBillingController::class, 'quote'], ['auth', 'can:quotes.view']);
     $router->post('/my/quotes/{quote}', [MyBillingController::class, 'quoteDecision'], ['auth', 'can:quotes.respond']);
@@ -433,6 +449,33 @@ return static function (Router $router): void {
     // Administration
     $router->group('/admin', ['auth'], static function (Router $r): void {
         $r->get('/system', [SystemController::class, 'index'], ['can:settings.view']);
+        $r->get('/settings', [SettingsController::class, 'index'], ['can:settings.view']);
+        $r->post('/settings/{group}', [SettingsController::class, 'save'], ['can:settings.manage']);
+
+        // Website / CMS (static paths first: {page} would otherwise swallow them)
+        $r->get('/cms', [CmsController::class, 'index'], ['can:cms.view']);
+        $r->post('/cms', [CmsController::class, 'create'], ['can:cms.edit']);
+        $r->get('/cms/media', [CmsController::class, 'media'], ['can:cms.view']);
+        $r->post('/cms/media', [CmsController::class, 'upload'], ['can:cms.edit']);
+        $r->post('/cms/media/{media}/delete', [CmsController::class, 'deleteMedia'], ['can:cms.edit']);
+        $r->get('/cms/menus', [CmsController::class, 'menus'], ['can:cms.view']);
+        $r->post('/cms/menus/{location}', [CmsController::class, 'saveMenu'], ['can:cms.publish']);
+        $r->get('/cms/redirects', [CmsController::class, 'redirects'], ['can:cms.view']);
+        $r->post('/cms/redirects', [CmsController::class, 'addRedirect'], ['can:cms.publish']);
+        $r->post('/cms/redirects/{id}/delete', [CmsController::class, 'deleteRedirect'], ['can:cms.publish']);
+        $r->get('/cms/reusable', [CmsController::class, 'reusable'], ['can:cms.view']);
+        $r->post('/cms/reusable', [CmsController::class, 'saveReusable'], ['can:cms.edit']);
+        $r->get('/cms/reusable/{block}', [CmsController::class, 'reusable'], ['can:cms.view']);
+        $r->post('/cms/reusable/{block}', [CmsController::class, 'saveReusable'], ['can:cms.edit']);
+        $r->get('/cms/{page}', [CmsController::class, 'edit'], ['can:cms.view']);
+        $r->get('/cms/{page}/preview', [CmsController::class, 'preview'], ['can:cms.view']);
+        $r->get('/cms/{page}/versions', [CmsController::class, 'versions'], ['can:cms.view']);
+        $r->post('/cms/{page}/versions/{version}/restore', [CmsController::class, 'restore'], ['can:cms.edit']);
+        $r->post('/cms/{page}/details', [CmsController::class, 'details'], ['can:cms.edit']);
+        $r->post('/cms/{page}/blocks', [CmsController::class, 'addBlock'], ['can:cms.edit']);
+        $r->post('/cms/{page}/blocks/{index}', [CmsController::class, 'updateBlock'], ['can:cms.edit']);
+        $r->post('/cms/{page}/blocks/{index}/action', [CmsController::class, 'blockAction'], ['can:cms.edit']);
+        $r->post('/cms/{page}/status', [CmsController::class, 'status'], ['can:cms.publish']);
         $r->get('/payments', [BillingSettingsController::class, 'payments'], ['can:billing.configure']);
         $r->post('/payments', [BillingSettingsController::class, 'savePayments'], ['can:billing.configure']);
         $r->get('/business', [BillingSettingsController::class, 'business'], ['can:billing.configure']);
@@ -482,4 +525,8 @@ return static function (Router $router): void {
         $r->get('/audit', [AuditController::class, 'index'], ['can:audit.view']);
         $r->post('/audit/verify', [AuditController::class, 'verify'], ['can:audit.view']);
     });
+
+    // Website pages from the CMS. These MUST stay last: every route above wins over a page with the same address (CmsService also refuses such addresses).
+    $router->get('/{slug}', [PublicPageController::class, 'show'], ['nosession']);
+    $router->get('/{section}/{slug}', [PublicPageController::class, 'show'], ['nosession']);
 };

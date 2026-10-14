@@ -419,3 +419,28 @@ a.report-card:hover { border-color: var(--line-strong); }
 .timecode { font-variant-numeric: tabular-nums; color: var(--gold); }
 .agreement-text { max-height: 420px; overflow: auto; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .field-block { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+
+/* ---- Phase 12: website pages built from CMS blocks, the editor, AI output ---- */
+.cms-block { padding: 56px 0; }
+.cms-block .container.narrow { width: min(760px, 100% - 32px); }
+.cms-block h1 { font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1.1; margin: 0 0 16px; }
+.cms-block h2 { margin: 0 0 16px; }
+.cms-hero .container { display: grid; grid-template-columns: 1fr; gap: 32px; align-items: center; }
+.cms-hero-img img { width: 100%; height: auto; border-radius: var(--radius); border: 1px solid var(--line); }
+.cms-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.cms-card { background: linear-gradient(180deg, var(--bg-card), #0a0f1c); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+.cms-card h3 { margin: 0 0 8px; }
+.cms-cta { text-align: center; background: var(--bg-elev); border-block: 1px solid var(--line); }
+.cms-text ul { padding-left: 1.2em; }
+.cms-block figure { margin: 0; }
+.cms-block figure img { max-width: 100%; height: auto; border-radius: var(--radius); }
+.cms-block figcaption { color: var(--text-dim); margin-top: 8px; }
+.cms-faq { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.cms-faq summary { cursor: pointer; font-weight: 600; }
+.cms-edit-block { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 10px; }
+.cms-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; margin-top: 16px; }
+.cms-media-item { margin: 0; background: var(--bg-card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; }
+.cms-media-item img { max-width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.ai-output { white-space: pre-wrap; word-break: break-word; font-family: inherit; line-height: 1.55; }
+.footer-inner { flex-wrap: wrap; gap: 8px 20px; }
+@media (min-width: 860px) { .cms-hero .container { grid-template-columns: 1.1fr 0.9fr; } }

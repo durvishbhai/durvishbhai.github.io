@@ -37,6 +37,7 @@ use Vertex\Core\ErrorHandler;
 
 Env::load(VERTEX_ROOT . '/' . (getenv('VERTEX_ENV_FILE') ?: '.env'));
 Config::load(VERTEX_ROOT . '/config');
+\Vertex\Services\Settings::apply(); // values saved in Administration -> Integrations & settings (never throws)
 date_default_timezone_set((string) Config::get('app.timezone', 'UTC'));
 mb_internal_encoding('UTF-8');
 ErrorHandler::register();

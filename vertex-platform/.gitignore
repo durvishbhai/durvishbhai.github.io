@@ -12,3 +12,5 @@
 .phpunit.result.cache
 /storage/backups/*
 !/storage/backups/.gitkeep
+/public/uploads/*
+!/public/uploads/.gitkeep
