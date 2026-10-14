@@ -49,6 +49,7 @@ final class StaticSecurityScanTest extends TestCase
             'app/Services/FileStore.php' => ['proc_open'],   // the optional virus-scanner command, argument array (no shell)
             'app/Core/View.php' => ['extract'],              // EXTR_SKIP into the template scope
             'bin/console.php' => ['shell_exec'],             // `stty -echo` for the hidden password prompt
+            'bin/build-release.php' => ['exec', 'passthru'], // developer-only package builder (php -l, composer); never copied into the upload package
         ];
         foreach (self::phpFiles('app', 'bin', 'config', 'public', 'database') as $file) {
             $rel = substr($file, strlen(VERTEX_ROOT) + 1);

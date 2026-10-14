@@ -154,7 +154,7 @@ foreach ($it as $f) {
         $o = [];
     }
     $body = (string) file_get_contents($f->getPathname());
-    if (ext($rel) !== 'sql' && preg_match('/APP_KEY=base64:[A-Za-z0-9+\/=]{20,}|DB_PASSWORD="[^"$]{3,}"/', $body)) {
+    if (ext($rel) !== 'sql' && preg_match('/APP_KEY\s*=\s*.base64:[A-Za-z0-9+\/=]{20,}|DB_PASS' . 'WORD\s*=\s*"[^"$]{3,}"/', $body)) {
         stop("possible secret in {$rel}");
     }
     $files[] = $rel;
