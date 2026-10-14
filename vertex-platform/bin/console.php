@@ -21,6 +21,7 @@ declare(strict_types=1);
  *   backup:verify             Check a backup file's integrity (--file=)
  *   backup:restore            Restore a backup into an EMPTY database (--file=, --database=, optional --uploads-dir=)
  *   backup:status             When the newest backup was made
+ *   schema:export             Write the one-file SQL for a brand-new install from a freshly migrated and synced scratch database (--file=)
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -189,6 +190,16 @@ switch ($command) {
     case 'backup:status':
         $l = \Vertex\Services\BackupService::latest();
         out($l['path'] === null ? 'There is NO backup in ' . \Vertex\Services\BackupService::dir() . '. Backups are not operational.' : sprintf('Newest backup: %s (%d hour(s) ago); %d file(s) kept. %s', basename($l['path']), $l['hours'], $l['count'], $l['hours'] > (int) Config::get('backup.stale_hours', 36) ? 'It is STALE: check the cron job.' : ''));
+        break;
+
+    case 'schema:export':
+        $file = $options['file'] ?? fail('Usage: schema:export --file=PATH   (run against a scratch database after migrate and permissions:sync)');
+        try {
+            file_put_contents($file, \Vertex\Services\SchemaExporter::build(VERTEX_ROOT . '/database/migrations'));
+        } catch (Throwable $e) {
+            fail('Export FAILED: ' . $e->getMessage());
+        }
+        out('Wrote ' . $file . ' (' . filesize($file) . ' bytes).');
         break;
 
     case 'key:generate':

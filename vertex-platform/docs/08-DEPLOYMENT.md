@@ -4,6 +4,22 @@
 >
 > **Do not publish this folder through GitHub Pages.** This repository is the GitHub Pages site for `crazybooks.me`; anything under `vertex-platform/` that reaches the Pages branch is downloadable as static files (PHP does not run there, so the source, docs and migrations would be readable by anyone). No secrets are committed (verified), but deploy the platform to PHP hosting from a private location and keep it out of the Pages publishing branch (a separate private repository is the clean solution).
 
+## Hostinger upload package (php / js / css / sql only)
+
+`php bin/build-release.php --schema=FILE --out=DIR` builds the package the hosting migrator and File Manager accept: **only `.php`, `.js`, `.css` and `.sql` files** (the build fails if anything else slips in, and lints every PHP file).
+
+```
+vertex-database.sql      the complete database (also inside vertex/database/schema.sql): structure + roles + permissions, no user data
+public_html/             web root: index.php, install.php (one-time), assets/css, assets/js, assets/img.php (brand images embedded as text)
+vertex/                  the application (app, config, database/migrations, bin/console.php, vendor = PHPMailer + autoloader), never web-accessible
+```
+
+* The two folders must sit next to each other (`domains/yoursite.com/public_html` + `domains/yoursite.com/vertex`). `public_html/index.php` finds `../vertex/bootstrap.php`.
+* Dotfiles and images are not shippable under the "four extensions" rule, so **`install.php` writes them on the server**: `vertex/.env` (new random APP_KEY, mode 600), `public_html/.htaccess` (routing, HTTPS redirect, dotfile/sql/log protection), `vertex/.htaccess` and `vertex/storage/.htaccess` (deny all), and the private `storage/` folders.
+* `install.php` is unlocked by a one-time installation key (only its SHA-256 is in the file). It checks PHP/extensions/permissions, imports the database file (rolling back every table it created if anything fails), accepts a database that already holds the imported file (phpMyAdmin route) and no users, refuses any other non-empty database, creates the Super Admin through the application's own code, then deletes itself. It refuses to run when `vertex/.env` exists.
+* Regenerate the database file after adding a migration: `php bin/console.php migrate && php bin/console.php permissions:sync && php bin/console.php schema:export --file=...` against a scratch database. `SchemaExportTest` proves the file rebuilds the migrated database exactly.
+* Later updates: upload the changed `vertex/` files and run `php vertex/bin/console.php migrate` (SSH), or import only the new migration in phpMyAdmin. Never re-import the full database file over a live database.
+
 ## Preferred layout (app outside the web root)
 
 ```

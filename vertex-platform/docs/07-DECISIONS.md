@@ -124,6 +124,7 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-81 | Invoice numbers are assigned at issue, sequential, never reused; an issued invoice is never edited (void and reissue). | Audit and accounting integrity. |
 | D-82 | Gateway secrets are sealed with `SecretBox` (key derived from `APP_KEY`), written once, never shown again, never audited in clear; edits need `billing.configure` and the password. | Secrets must not live in the page, the log or the config text. |
 | D-83 | Finance Staff may draft invoices and record payments but not issue, void, verify or reject; Administrator/Owner issue and verify; the verifier of a payment is never its recorder. | Separation of duties. |
+| D-84 | The upload package contains only .php, .js, .css and .sql files: images are embedded in `assets/img.php`; `.env`, `.htaccess` and `storage/` are written by the key-gated web installer (it deletes itself and never touches a non-empty foreign database); the database ships as one generated SQL file tested equal to the migrated schema. | The hosting migrator rejects other file types. |
 
 ## External integrations and credentials
 

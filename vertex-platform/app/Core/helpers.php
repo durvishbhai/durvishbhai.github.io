@@ -40,10 +40,16 @@ if (!function_exists('asset')) {
     /** Public asset URL with a cache-busting query based on file mtime. */
     function asset(string $path): string
     {
-        $file = VERTEX_ROOT . '/public/assets/' . ltrim($path, '/');
+        $path = ltrim($path, '/');
+        $public = defined('VERTEX_PUBLIC') ? VERTEX_PUBLIC : VERTEX_ROOT . '/public';
+        $file = $public . '/assets/' . $path;
+        // The Hostinger package ships images inside assets/img.php (no binary files in the upload); use it when the PNG itself is absent.
+        if (!is_file($file) && str_starts_with($path, 'img/') && is_file($public . '/assets/img.php')) {
+            return '/assets/img.php?f=' . rawurlencode(substr($path, 4)) . '&v=' . filemtime($public . '/assets/img.php');
+        }
         $v = is_file($file) ? (string) filemtime($file) : '0';
 
-        return '/assets/' . ltrim($path, '/') . '?v=' . $v;
+        return '/assets/' . $path . '?v=' . $v;
     }
 }
 
