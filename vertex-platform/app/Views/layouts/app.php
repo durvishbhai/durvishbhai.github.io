@@ -34,7 +34,7 @@ $nav = [
     ['/reports', 'Reports', can('reports.financial') || can('reports.operational')],
     ['/client-payments', 'Client payments', can('payments.view_all') || can('payments.record') || can('payments.reconcile')],
     ['/renewals', 'Domains & hosting', can('renewals.view') || can('renewals.manage') || can('renewals.approve') || can('renewals.confirm_provider')],
-    ['/my/services', 'Domains & hosting', can('renewals.view_own')],
+    ['/my/services', 'My domains & hosting', can('renewals.view_own')],
     ['/projects', 'Projects', can('projects.view_all') || can('projects.view_assigned') || can('projects.view_own')],
     ['/team', 'Team', can('projects.view_all')],
     ['/tasks', 'Tasks', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
@@ -66,6 +66,43 @@ $nav = [
     ['/notifications', 'Notifications' . ($unread > 0 ? ' (' . $unread . ')' : ''), true],
     ['/account', 'My account', true],
 ];
+
+// Sidebar groups: every link keeps its own permission test above; a group with no visible link disappears.
+$groupOf = [
+    'Overview' => ['/dashboard', '/notifications', '/approvals', '/ai', '/reports'],
+    'Sales & clients' => ['/crm', '/clients', '/my/company', '/quotations', '/my/quotes', '/admin/pricing', '/coupons'],
+    'Projects & delivery' => ['/projects', '/tasks', '/board', '/deadlines', '/team', '/deliverables', '/qa', '/my/deliverables', '/revisions', '/scope-requests', '/my/scope-requests', '/project-templates', '/admin/revision-policies', '/warranties'],
+    'Money' => ['/invoices', '/my/invoices', '/client-payments', '/commissions', '/payouts', '/renewals', '/my/services'],
+    'Partners' => ['/partner', '/partner/referrals', '/referrals/dashboard', '/referrals'],
+    'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
+    'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
+    'Website' => ['/admin/cms'],
+    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/audit', '/admin/payments', '/admin/business', '/admin/settings', '/admin/system'],
+    'Account' => ['/account'],
+];
+$byHref = [];
+foreach ($nav as [$href, $label, $show]) {
+    $byHref[$href] = [$label, $show];
+}
+$groups = [];
+foreach ($groupOf as $gname => $hrefs) {
+    foreach ($hrefs as $href) {
+        if (isset($byHref[$href]) && $byHref[$href][1]) {
+            $groups[$gname][] = [$href, $byHref[$href][0]];
+        }
+    }
+}
+$isCurrent = static fn (string $href): bool => $path === $href || str_starts_with($path, $href . '/'); // the longest match wins below
+$currentGroup = null;
+$best = 0;
+foreach ($groups as $gname => $items) {
+    foreach ($items as [$href]) {
+        if ($isCurrent($href) && strlen($href) > $best) {
+            $best = strlen($href);
+            $currentGroup = $gname;
+        }
+    }
+}
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -81,32 +118,42 @@ $nav = [
 <body class="portal">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="portal-bar">
+    <button class="side-toggle" type="button" aria-expanded="false" aria-controls="portal-side" data-side-toggle><span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span></button>
     <a class="brand" href="/dashboard" aria-label="Vertex dashboard">
         <img src="<?= e(asset('img/vertex-mark.png')) ?>" alt="" width="40" height="35">
         <span class="brand-word">Vertex</span>
     </a>
-    <nav class="portal-nav" aria-label="Main">
-        <?php foreach ($nav as [$href, $label, $show]) : ?>
-            <?php if ($show) : ?>
-                <a href="<?= e($href) ?>"<?= str_starts_with($path, $href) ? ' aria-current="page"' : '' ?>><?= e($label) ?></a>
-            <?php endif; ?>
-        <?php endforeach; ?>
-    </nav>
-    <form class="portal-search" method="get" action="/search" role="search"><label class="sr-only" for="gs">Search</label><input id="gs" name="q" type="search" placeholder="Search" maxlength="100" autocomplete="off"></form>
+    <form class="portal-search" method="get" action="/search" role="search"><label class="sr-only" for="gs">Search</label><input id="gs" name="q" type="search" placeholder="Search everything" maxlength="100" autocomplete="off"></form>
     <div class="portal-user">
-        <span class="portal-name"><?= e($user['name'] ?? '') ?></span>
+        <a class="bell" href="/notifications" aria-label="Notifications<?= $unread > 0 ? ' (' . $unread . ' unread)' : '' ?>">&#128276;<?php if ($unread > 0) : ?><span class="bell-n"><?= $unread > 99 ? '99+' : (int) $unread ?></span><?php endif; ?></a>
+        <a class="portal-name" href="/account"><?= e($user['name'] ?? '') ?></a>
         <form method="post" action="/logout">
             <?= csrf_field() ?>
             <button class="btn btn-ghost btn-sm" type="submit">Sign out</button>
         </form>
     </div>
 </header>
-<main id="main" class="portal-main">
-    <div class="container-wide">
-        <?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?>
-        <?= $content ?>
-    </div>
-</main>
+<div class="portal-shell">
+    <aside class="portal-side" id="portal-side" aria-label="Main">
+        <form class="side-search" method="get" action="/search" role="search"><label class="sr-only" for="gs2">Search</label><input id="gs2" name="q" type="search" placeholder="Search everything" maxlength="100" autocomplete="off"></form>
+        <nav>
+        <?php foreach ($groups as $gname => $items) : $open = $gname === $currentGroup || $gname === 'Overview'; ?>
+            <details class="nav-group"<?= $open ? ' open' : '' ?>>
+                <summary><?= e($gname) ?></summary>
+                <?php foreach ($items as [$href, $label]) : ?>
+                    <a href="<?= e($href) ?>"<?= $gname === $currentGroup && $isCurrent($href) && strlen($href) === $best ? ' aria-current="page"' : '' ?>><?= e($label) ?></a>
+                <?php endforeach; ?>
+            </details>
+        <?php endforeach; ?>
+        </nav>
+    </aside>
+    <main id="main" class="portal-main">
+        <div class="container-wide">
+            <?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?>
+            <?= $content ?>
+        </div>
+    </main>
+</div>
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </body>
 </html>

@@ -6,8 +6,8 @@ namespace Vertex\Http\Controllers;
 
 use Vertex\Core\Request;
 use Vertex\Core\Response;
-use Vertex\Services\ApprovalCenter;
 use Vertex\Services\Auth;
+use Vertex\Services\DashboardService;
 use Vertex\Services\Gate;
 use Vertex\Services\ReportService;
 
@@ -26,7 +26,7 @@ final class DashboardController extends Controller
             'user' => $user,
             'roles' => Gate::roleSlugs($id),
             'permissions' => $perms,
-            'waiting' => array_sum(array_column(ApprovalCenter::pending($id), 'count')),
+            'home' => DashboardService::build($id),
             'charts' => ReportService::dashboardCharts($id),
         ]);
     }

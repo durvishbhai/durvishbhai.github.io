@@ -20,6 +20,19 @@
         });
     }
 
+    // Portal sidebar (small screens)
+    var sideBtn = document.querySelector('[data-side-toggle]');
+    var side = document.getElementById('portal-side');
+    if (sideBtn && side) {
+        sideBtn.addEventListener('click', function () {
+            var open = side.classList.toggle('is-open');
+            sideBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        side.addEventListener('click', function (e) {
+            if (e.target.tagName === 'A') { side.classList.remove('is-open'); sideBtn.setAttribute('aria-expanded', 'false'); }
+        });
+    }
+
     // Confirmation dialogs for sensitive forms. Progressive enhancement ONLY: the server independently requires the
     // actor's password for every sensitive action, so disabling JS does not bypass anything.
     document.addEventListener('submit', function (e) {
