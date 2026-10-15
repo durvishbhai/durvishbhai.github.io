@@ -93,3 +93,7 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 * **Scheduled task**: the daily `schedule:run` now also publishes due website pages and re-checks pending PhonePe orders; with PhonePe on, run it more often (hourly is fine, it is idempotent).
 * Sandbox checklist for PhonePe: `docs/18-PHASE12-CMS-AI-PHONEPE.md` §4.
 
+
+## Single-folder package (upload straight into public_html)
+
+`bin/build-release.php --layout=inside` also produces `vertex-platform-hostinger-single-folder-<date>.zip`: a folder `upload_to_public_html/` (index.php, install.php, assets/, and the `vertex/` application folder inside it) plus `vertex-database.sql` beside it. Upload the **contents** of `upload_to_public_html/` into `public_html/`, open `/install.php`. The installer writes `vertex/.htaccess` (deny all) and then probes `/vertex/bootstrap.php`, warning if the server still serves it. The sibling layout above is safer (nothing application-related is under the web root) and is preferred when possible. Keep `vertex-database.sql` out of `public_html`.

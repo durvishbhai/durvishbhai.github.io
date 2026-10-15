@@ -11,7 +11,10 @@ declare(strict_types=1);
 
 define('VERTEX_PUBLIC', __DIR__);
 
-require (is_file(dirname(__DIR__) . '/bootstrap.php') ? dirname(__DIR__) : dirname(__DIR__) . '/vertex') . '/bootstrap.php';
+// Application folder: the parent of public/ (source checkout), a "vertex" folder inside this one (single-folder upload), or a sibling "vertex" folder.
+$app = is_file(dirname(__DIR__) . '/bootstrap.php') ? dirname(__DIR__) : (is_file(__DIR__ . '/vertex/bootstrap.php') ? __DIR__ . '/vertex' : dirname(__DIR__) . '/vertex');
+
+require $app . '/bootstrap.php';
 
 use Vertex\Core\Request;
 use Vertex\Http\Kernel;

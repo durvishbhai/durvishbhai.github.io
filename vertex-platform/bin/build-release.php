@@ -164,6 +164,29 @@ foreach ($it as $f) {
 sort($files);
 $count > 100 || stop('package suspiciously small');
 
+// 6b. Single-folder layout: everything inside one folder to upload straight into public_html, with the database file beside it (not inside the web folder).
+if (($opt['layout'] ?? '') === 'inside') {
+    $inside = $out . '/package-inside';
+    exec('rm -rf ' . escapeshellarg($inside));
+    mkdir($inside . '/upload_to_public_html', 0755, true);
+    exec('cp -R ' . escapeshellarg($pkg . '/public_html') . '/. ' . escapeshellarg($inside . '/upload_to_public_html') . '/ && cp -R ' . escapeshellarg($pkg . '/vertex') . ' ' . escapeshellarg($inside . '/upload_to_public_html/vertex') . ' && cp ' . escapeshellarg($pkg . '/vertex-database.sql') . ' ' . escapeshellarg($inside . '/vertex-database.sql'), $o2, $rc2);
+    $rc2 === 0 || stop('could not assemble the single-folder layout');
+    $zipIn = $out . '/vertex-platform-hostinger-single-folder-' . gmdate('Y-m-d') . '.zip';
+    @unlink($zipIn);
+    $z = new ZipArchive();
+    $z->open($zipIn, ZipArchive::CREATE) === true || stop('cannot create the single-folder zip');
+    $itn = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($inside, FilesystemIterator::SKIP_DOTS));
+    foreach ($itn as $f) {
+        if ($f->isFile()) {
+            $relIn = substr($f->getPathname(), strlen($inside) + 1);
+            in_array(ext($relIn), ALLOWED, true) && !str_starts_with(basename($relIn), '.') || stop("forbidden file in single-folder package: {$relIn}");
+            $z->addFile($f->getPathname(), $relIn);
+        }
+    }
+    $z->close();
+    echo "Single-folder zip: {$zipIn} (" . filesize($zipIn) . " bytes)\n";
+}
+
 // 7. Zip
 $zipFile = $out . '/vertex-platform-hostinger-' . gmdate('Y-m-d') . '.zip';
 @unlink($zipFile);

@@ -17,7 +17,9 @@ if (INSTALL_KEY_HASH === '__' . 'INSTALL_KEY_HASH' . '__') {
     exit('This installer was not built with an installation key. Use the release package.');
 }
 
-$appRoot = dirname(__DIR__) . '/vertex';
+// The application folder is either inside this folder (single-folder upload) or next to it.
+$appRoot = is_file(__DIR__ . '/vertex/bootstrap.php') ? __DIR__ . '/vertex' : dirname(__DIR__) . '/vertex';
+$appInside = $appRoot === __DIR__ . '/vertex';
 $schemaFile = $appRoot . '/database/schema.sql';
 $envFile = $appRoot . '/.env';
 
@@ -68,7 +70,7 @@ function checks(string $appRoot, string $schemaFile, string $envFile): array
     foreach (['pdo_mysql' => true, 'mbstring' => true, 'openssl' => true, 'json' => true, 'ctype' => true, 'fileinfo' => false, 'zip' => false] as $ext => $blocking) {
         $rows[] = ['PHP extension ' . $ext, extension_loaded($ext), $blocking ? 'Enable it in hPanel -> PHP Configuration -> Extensions.' : 'Optional' . ($ext === 'zip' ? ' (needed only for backups)' : ' (file uploads)') . '; enable it in PHP Configuration -> Extensions.', $blocking];
     }
-    $rows[] = ['Application folder "vertex" next to public_html', is_file($appRoot . '/bootstrap.php'), 'Expected at ' . $appRoot . '. Upload the vertex folder into the same directory that contains public_html.', true];
+    $rows[] = ['Application folder "vertex" found', is_file($appRoot . '/bootstrap.php'), 'Expected at ' . $appRoot . '. Upload the vertex folder into public_html (next to install.php) or next to public_html.', true];
     $rows[] = ['Database file present (vertex/database/schema.sql)', is_file($schemaFile), 'Re-upload the vertex folder completely.', true];
     $rows[] = ['Application folder is writable', is_dir($appRoot) && is_writable($appRoot), 'Set the folder permission to 755 (or 775) so the installer can write .env and storage/.', true];
     $rows[] = ['Web folder is writable (.htaccess)', is_writable(__DIR__), 'Needed to write public_html/.htaccess. If this fails, add the rewrite rules by hand.', false];
@@ -276,6 +278,14 @@ if ($posted && !$alreadyInstalled) {
             } else {
                 $log[] = 'Wrote the .htaccess files (routing, HTTPS redirect, private folders).';
             }
+            if ($appInside) { // the app folder is under the web root: prove the server really refuses to serve it
+                $probe = @get_headers(rtrim($old['app_url'], '/') . '/vertex/bootstrap.php', false, stream_context_create(['http' => ['timeout' => 6, 'ignore_errors' => true], 'ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]));
+                if (is_array($probe) && isset($probe[0]) && str_contains($probe[0], ' 200 ')) {
+                    $log[] = 'WARNING: the vertex folder is reachable from the web. Move the vertex folder next to public_html (one level up), or ask Hostinger support to enable .htaccess rules for this site.';
+                } else {
+                    $log[] = 'Checked: the vertex folder is not served to visitors.';
+                }
+            }
             $media = __DIR__ . '/uploads/cms';
             if (!is_dir($media)) {
                 @mkdir($media, 0755, true);
@@ -356,8 +366,8 @@ code,pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;pad
         <li>Open <a href="<?= h($done['url']) ?>/login"><?= h($done['url']) ?>/login</a> and sign in as <strong><?= h($done['email']) ?></strong>. <a href="<?= h($done['url']) ?>/health">/health</a> should show <code>{"status":"ok"}</code>.</li>
         <li>Save the APP_KEY line of <code>vertex/.env</code> in a password manager.</li>
         <li><strong>Cron jobs</strong> (hPanel &rarr; Advanced &rarr; Cron Jobs; choose PHP 8.2+ if asked). Use the full path of your <code>vertex</code> folder:
-<pre>15 2 * * *  php <?= h(dirname(__DIR__)) ?>/vertex/bin/console.php schedule:run
-40 2 * * *  php <?= h(dirname(__DIR__)) ?>/vertex/bin/console.php backup:create --keep=14</pre></li>
+<pre>15 2 * * *  php <?= h($appRoot) ?>/bin/console.php schedule:run
+40 2 * * *  php <?= h($appRoot) ?>/bin/console.php backup:create --keep=14</pre></li>
         <li>In the admin area: Administration &rarr; Business details, then Administration &rarr; Payments (Google Pay UPI).</li>
         <li>Email is <?= $old['mail_driver'] === 'smtp' ? 'set to SMTP: send yourself a test password reset to prove it works' : 'off: set the MAIL_* lines in vertex/.env to your Hostinger mailbox to enable invitations and password resets' ?>.</li>
     </ol></div>
