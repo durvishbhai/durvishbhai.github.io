@@ -59,10 +59,53 @@
         f.classList.add('is-busy');
     });
 
-    // Progress bars: widths come from data-pct (inline styles are blocked by the CSP).
-    document.querySelectorAll('[data-pct]').forEach(function (el) {
-        el.style.width = Math.max(0, Math.min(100, parseInt(el.getAttribute('data-pct'), 10) || 0)) + '%';
+    var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // Progress bars: widths come from data-pct (inline styles are blocked by the CSP). They grow from zero unless motion is reduced.
+    var bars = document.querySelectorAll('[data-pct]');
+    bars.forEach(function (el) {
+        el.style.width = reduceMotion ? Math.max(0, Math.min(100, parseInt(el.getAttribute('data-pct'), 10) || 0)) + '%' : '0%';
     });
+    if (!reduceMotion && bars.length) {
+        window.requestAnimationFrame(function () { window.requestAnimationFrame(function () {
+            bars.forEach(function (el) { el.style.width = Math.max(0, Math.min(100, parseInt(el.getAttribute('data-pct'), 10) || 0)) + '%'; });
+        }); });
+    }
+
+    // Count-up for dashboard figures: the real number is already in the page; this only animates it.
+    if (!reduceMotion) {
+        document.querySelectorAll('[data-count]').forEach(function (el) {
+            var end = parseInt(el.getAttribute('data-count'), 10);
+            if (!isFinite(end) || end < 1 || end > 1000000) { return; }
+            var start = null, dur = 700;
+            el.textContent = '0';
+            function tick(t) {
+                if (start === null) { start = t; }
+                var k = Math.min(1, (t - start) / dur);
+                el.textContent = String(Math.round(end * (1 - Math.pow(1 - k, 3))));
+                if (k < 1) { window.requestAnimationFrame(tick); } else { el.textContent = String(end); }
+            }
+            window.requestAnimationFrame(tick);
+        });
+    }
+
+    // Thin loading bar at the top while a link or form navigates to the next page.
+    if (!reduceMotion) {
+        var bar = document.createElement('div');
+        bar.className = 'nav-progress';
+        bar.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(bar);
+        var start = function () { bar.classList.remove('is-running'); void bar.offsetWidth; bar.classList.add('is-running'); };
+        document.addEventListener('click', function (e) {
+            var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0 || a.target === '_blank' || a.hasAttribute('download') || a.hasAttribute('data-print')) { return; }
+            var h = a.getAttribute('href') || '';
+            if (h.charAt(0) === '#' || /^(mailto:|tel:|javascript:)/i.test(h) || (a.host && a.host !== window.location.host)) { return; }
+            start();
+        });
+        document.addEventListener('submit', function (e) { if (!e.defaultPrevented) { start(); } });
+        window.addEventListener('pageshow', function () { bar.classList.remove('is-running'); });
+    }
 
     // Scroll reveal (content stays visible if IntersectionObserver is unavailable)
     var items = document.querySelectorAll('.reveal');

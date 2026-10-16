@@ -17,7 +17,7 @@ $first = explode(' ', trim((string) $user['name']))[0] ?: (string) $user['name']
 <?php if ($home['stats'] !== []) : ?>
 <div class="kpi-grid" role="list">
     <?php foreach ($home['stats'] as $s) : ?>
-        <a class="kpi<?= $s['tone'] !== '' ? ' kpi-' . e($s['tone']) : '' ?>" role="listitem" href="<?= e($s['href']) ?>"><span class="kpi-n"><?= e($s['n']) ?></span><span class="kpi-l"><?= e($s['label']) ?></span></a>
+        <a class="kpi<?= $s['tone'] !== '' ? ' kpi-' . e($s['tone']) : '' ?>" role="listitem" href="<?= e($s['href']) ?>"><span class="kpi-n"<?= ctype_digit($s['n']) ? ' data-count="' . e($s['n']) . '"' : '' ?>><?= e($s['n']) ?></span><span class="kpi-l"><?= e($s['label']) ?></span></a>
     <?php endforeach; ?>
 </div>
 <?php endif; ?>

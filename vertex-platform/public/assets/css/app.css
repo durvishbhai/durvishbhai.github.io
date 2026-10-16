@@ -513,3 +513,95 @@ details.access summary { cursor: pointer; font-weight: 600; }
 .side-search { display: none; margin: 0 4px 14px; }
 .kpi-grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
 @media (max-width: 900px) { .portal-search { display: none; } .side-search { display: block; } .portal-user { margin-left: auto; } }
+
+/* ---- Motion pass: entrances, hover feedback, charts, loading bar. All of it is switched off for "reduce motion". ---- */
+@keyframes vx-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes vx-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vx-drop { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes vx-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes vx-slide { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+@keyframes vx-grow { from { opacity: 0.2; transform: scaleY(0.05); } to { opacity: 1; transform: none; } }
+@keyframes vx-draw { from { stroke-dashoffset: 1; opacity: 0.3; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes vx-glow { 0%, 100% { box-shadow: 0 6px 22px var(--blue-glow); } 50% { box-shadow: 0 8px 30px rgba(47, 123, 255, 0.55); } }
+@keyframes vx-wiggle { 0%, 100% { transform: rotate(0); } 15% { transform: rotate(14deg); } 30% { transform: rotate(-12deg); } 45% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } 75% { transform: rotate(0); } }
+@keyframes vx-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes vx-load { 0% { width: 0; opacity: 1; } 70% { width: 82%; } 100% { width: 92%; opacity: 1; } }
+@keyframes vx-shine { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+
+/* page entrance */
+.portal-main .container-wide > * { animation: vx-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.portal-main .container-wide > *:nth-child(2) { animation-delay: 0.05s; }
+.portal-main .container-wide > *:nth-child(3) { animation-delay: 0.1s; }
+.portal-main .container-wide > *:nth-child(4) { animation-delay: 0.15s; }
+.portal-main .container-wide > *:nth-child(n+5) { animation-delay: 0.2s; }
+.kpi-grid > .kpi { animation: vx-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.kpi-grid > .kpi:nth-child(2) { animation-delay: 0.06s; } .kpi-grid > .kpi:nth-child(3) { animation-delay: 0.12s; } .kpi-grid > .kpi:nth-child(4) { animation-delay: 0.18s; }
+.kpi-grid > .kpi:nth-child(5) { animation-delay: 0.24s; } .kpi-grid > .kpi:nth-child(6) { animation-delay: 0.3s; } .kpi-grid > .kpi:nth-child(n+7) { animation-delay: 0.36s; }
+.dash-grid > .panel, .chart-grid > .panel { animation: vx-rise 0.55s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 0.25s; }
+.dash-grid > .panel:nth-child(2), .chart-grid > .panel:nth-child(2) { animation-delay: 0.32s; }
+.chart-grid > .panel:nth-child(3) { animation-delay: 0.39s; } .chart-grid > .panel:nth-child(4) { animation-delay: 0.46s; }
+.todo-list > .todo { animation: vx-slide 0.4s ease both; }
+.todo-list > .todo:nth-child(2) { animation-delay: 0.05s; } .todo-list > .todo:nth-child(3) { animation-delay: 0.1s; } .todo-list > .todo:nth-child(4) { animation-delay: 0.15s; }
+.todo-list > .todo:nth-child(5) { animation-delay: 0.2s; } .todo-list > .todo:nth-child(n+6) { animation-delay: 0.25s; }
+.table tbody tr { animation: vx-fade 0.4s ease both; }
+.table tbody tr:nth-child(2) { animation-delay: 0.04s; } .table tbody tr:nth-child(3) { animation-delay: 0.08s; } .table tbody tr:nth-child(4) { animation-delay: 0.12s; }
+.table tbody tr:nth-child(5) { animation-delay: 0.16s; } .table tbody tr:nth-child(6) { animation-delay: 0.2s; } .table tbody tr:nth-child(n+7) { animation-delay: 0.24s; }
+.alert { animation: vx-drop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.card-grid > .card, .card-grid > a.tile { animation: vx-rise 0.45s ease both; }
+.auth-card { animation: vx-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.auth-card img, .hero-art img { animation: vx-float 6s ease-in-out infinite; }
+
+.stat-grid > .stat { animation: vx-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stat-grid > .stat:nth-child(2) { animation-delay: 0.06s; } .stat-grid > .stat:nth-child(3) { animation-delay: 0.12s; } .stat-grid > .stat:nth-child(4) { animation-delay: 0.18s; } .stat-grid > .stat:nth-child(n+5) { animation-delay: 0.24s; }
+
+/* sidebar */
+.portal-side { animation: vx-fade 0.4s ease both; }
+.nav-group[open] > a { animation: vx-slide 0.28s ease both; }
+.nav-group[open] > a:nth-of-type(2) { animation-delay: 0.03s; } .nav-group[open] > a:nth-of-type(3) { animation-delay: 0.06s; } .nav-group[open] > a:nth-of-type(4) { animation-delay: 0.09s; }
+.nav-group[open] > a:nth-of-type(n+5) { animation-delay: 0.12s; }
+.nav-group summary::after { transition: transform 0.25s ease; }
+.nav-group[open] summary::after { transform: rotate(180deg); }
+.nav-group a { transition: background-color 0.18s ease, color 0.18s ease, padding-left 0.18s ease; }
+.nav-group a:hover { padding-left: 20px; }
+.portal-side.is-open { animation: vx-drop 0.25s ease both; }
+
+/* hover and press feedback */
+.btn { transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0) scale(0.97); }
+.btn-primary { animation: vx-glow 3.2s ease-in-out infinite; }
+.btn-primary:hover { animation: none; box-shadow: 0 10px 30px rgba(47, 123, 255, 0.5); }
+.btn:disabled, .is-busy .btn { animation: none; }
+.kpi { transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
+.kpi:hover { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); }
+.panel, .card, .cms-card { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.card:hover, .cms-card:hover { border-color: var(--line-strong); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3); }
+.table tbody tr { transition: background-color 0.15s ease; }
+input, select, textarea { transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease; }
+a { transition: color 0.15s ease; }
+.bell-n { animation: vx-pop 0.4s ease both; }
+.bell:has(.bell-n) { animation: vx-wiggle 1.2s ease 0.6s 2; transform-origin: 50% 0; }
+.chip, .badge { transition: transform 0.15s ease; }
+.chip:hover, .badge:hover { transform: translateY(-1px); }
+
+/* progress bars and charts */
+.progress-bar { transition: width 0.9s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.chart-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: vx-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.chart-bar:nth-of-type(2) { animation-delay: 0.05s; } .chart-bar:nth-of-type(3) { animation-delay: 0.1s; } .chart-bar:nth-of-type(4) { animation-delay: 0.15s; }
+.chart-bar:nth-of-type(5) { animation-delay: 0.2s; } .chart-bar:nth-of-type(6) { animation-delay: 0.25s; } .chart-bar:nth-of-type(n+7) { animation-delay: 0.3s; }
+.chart-bar:hover { filter: brightness(1.25); }
+.chart-line { stroke-dasharray: 1; stroke-dashoffset: 0; animation: vx-fade 0.9s ease both; }
+.chart-ring { transform-origin: 100px 100px; animation: vx-fade 0.8s ease both; }
+
+/* top loading bar while the next page loads (added by app.js) */
+.nav-progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 100; background: linear-gradient(90deg, var(--blue), var(--blue-bright), var(--blue)); background-size: 200% 100%; box-shadow: 0 0 12px var(--blue-glow); pointer-events: none; }
+.nav-progress.is-running { animation: vx-load 8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards, vx-shine 1.2s linear infinite; }
+
+/* skeleton shimmer helper for any future lazy block */
+.skeleton { background: linear-gradient(90deg, #0d1220 25%, #151d33 50%, #0d1220 75%); background-size: 200% 100%; animation: vx-shine 1.4s linear infinite; border-radius: 8px; min-height: 1em; }
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    .nav-progress { display: none; }
+}
+@media print { * { animation: none !important; transition: none !important; } }
