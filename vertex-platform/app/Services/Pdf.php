@@ -140,7 +140,7 @@ final class Pdf
         $objs[2] = '<< /Type /Pages /Kids [' . implode(' ', $kids) . '] /Count ' . $total . ' >>';
         $objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
         $objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
-        $objs[5] = '<< /Title (' . self::escape(self::encode($this->title)) . ') /Producer (Vertex Integrated Solutions) /CreationDate (D:' . gmdate('YmdHis') . 'Z) >>';
+        $objs[5] = '<< /Title (' . self::escape(self::encode($this->title)) . ') /Producer (Krazy Integrated Solutions) /CreationDate (D:' . gmdate('YmdHis') . 'Z) >>';
         foreach ($pages as $i => $content) {
             $footer = sprintf("BT /F1 8 Tf 0.45 g %.2F %.2F Td (%s) Tj ET\n", self::W / 2 - 20, 24, self::escape('Page ' . ($i + 1) . ' of ' . $total));
             $stream = $content . $footer;

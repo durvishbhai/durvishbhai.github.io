@@ -442,7 +442,7 @@ final class CrmServiceTest extends DatabaseTestCase
         $this->assertSame('Win Co website', $p['title']);
         $this->assertSame((int) $e['id'], (int) $p['enquiry_id']);
         $this->assertSame('2027-01-31', $p['target_date']);
-        $this->assertMatchesRegularExpression('/^VIS-\d{4}-\d{4}$/', $p['code']);
+        $this->assertMatchesRegularExpression('/^KIS-\d{4}-\d{4}$/', $p['code']);
 
         $after = EnquiryPolicy::find($e['public_id']);
         $this->assertSame((int) $r['project_id'], (int) $after['converted_project_id']);

@@ -27,7 +27,7 @@ final class SchemaExporter
         }
         $pdo = Database::connection();
         $out = [];
-        $out[] = '-- Vertex Integrated Solutions: database structure and initial roles/permissions.';
+        $out[] = '-- Krazy Integrated Solutions: database structure and initial roles/permissions.';
         $out[] = '-- Generated ' . gmdate('Y-m-d H:i') . ' UTC from ' . count($files) . ' migrations. Contains no user data, no audit log and no secrets.';
         $out[] = '-- IMPORT THIS FILE INTO AN EMPTY DATABASE ONLY (phpMyAdmin -> Import, or the web installer does it for you).';
         $out[] = '-- It creates tables and fails safely ("table already exists") if the database is not empty. Never import it over live data.';

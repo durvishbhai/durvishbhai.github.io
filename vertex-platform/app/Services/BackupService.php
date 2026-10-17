@@ -58,7 +58,7 @@ final class BackupService
             if ($zip->open($partial, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
                 throw new \RuntimeException('Cannot create the backup archive.');
             }
-            $manifest = ['format' => self::FORMAT, 'created_at' => gmdate('c'), 'app' => (string) Config::get('app.name', 'Vertex'), 'migrations' => $info['migrations'], 'tables' => $info['tables'],
+            $manifest = ['format' => self::FORMAT, 'created_at' => gmdate('c'), 'app' => (string) Config::get('app.name', 'Krazy'), 'migrations' => $info['migrations'], 'tables' => $info['tables'],
                 'sql_sha256' => hash_file('sha256', $tmp), 'uploads' => []];
             $zip->addFile($tmp, 'database.sql');
             $zip->close();
@@ -100,7 +100,7 @@ final class BackupService
         }
         $counts = [];
         try {
-            fwrite($out, "-- Vertex backup, format " . self::FORMAT . ", " . gmdate('c') . "\nSET NAMES utf8mb4;\nSET time_zone = '+00:00';\nSET FOREIGN_KEY_CHECKS = 0;\nSET UNIQUE_CHECKS = 0;\n");
+            fwrite($out, "-- Krazy backup, format " . self::FORMAT . ", " . gmdate('c') . "\nSET NAMES utf8mb4;\nSET time_zone = '+00:00';\nSET FOREIGN_KEY_CHECKS = 0;\nSET UNIQUE_CHECKS = 0;\n");
             $tables = $pdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN);
             foreach ($tables as $table) {
                 $q = '`' . str_replace('`', '``', (string) $table) . '`';

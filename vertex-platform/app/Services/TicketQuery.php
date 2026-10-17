@@ -194,7 +194,7 @@ final class TicketQuery
         );
         foreach ($rows as &$r) {
             if ($role === 'client' && $r['author_role'] === 'staff') {
-                $r['author_name'] = 'Vertex support team';
+                $r['author_name'] = 'Krazy support team';
             }
             $r['files'] = self::filesOf($role, (int) $t['id'], (int) $r['id']);
         }
@@ -257,7 +257,7 @@ final class TicketQuery
         );
         if ($role === 'client') {
             foreach ($rows as &$r) {
-                $r['actor_name'] = (int) $r['actor_id'] === $userId ? 'You' : 'Vertex support team';
+                $r['actor_name'] = (int) $r['actor_id'] === $userId ? 'You' : 'Krazy support team';
                 unset($r['actor_id'], $r['visibility']);
             }
         }

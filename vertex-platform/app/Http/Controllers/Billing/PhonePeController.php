@@ -32,7 +32,7 @@ final class PhonePeController extends Controller
         $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
         $to = '/my/invoices/' . $i['public_id'];
         $mid = $request->string('o');
-        $order = preg_match('/^VIS\d+X[A-F0-9]{12}$/', $mid) ? Database::one('SELECT * FROM gateway_orders WHERE merchant_order_id = ? AND invoice_id = ?', [$mid, $i['id']]) : null;
+        $order = preg_match('/^(KIS|VIS)\d+X[A-F0-9]{12}$/', $mid) ? Database::one('SELECT * FROM gateway_orders WHERE merchant_order_id = ? AND invoice_id = ?', [$mid, $i['id']]) : null;
         if ($order === null) {
             throw new HttpException(404);
         }

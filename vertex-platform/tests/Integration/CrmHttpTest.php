@@ -259,7 +259,7 @@ final class CrmHttpTest extends HttpTestCase
         $this->assertStringStartsWith('/projects/', (string) $r['location']);
         $p = Database::one("SELECT * FROM projects WHERE title = 'Bravo website'");
         $this->assertSame('draft', $p['status']);
-        $this->assertStringContainsString('VIS-', $a->get((string) $r['location'])['body']);
+        $this->assertStringContainsString('KIS-', $a->get((string) $r['location'])['body']);
         $after = $a->get($u)['body'];
         $this->assertStringContainsString('Converted on', $after);
         $this->assertStringContainsString('CONFIDENTIAL internal pricing note', $after, 'original history preserved');

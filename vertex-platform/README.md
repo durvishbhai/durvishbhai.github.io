@@ -1,4 +1,4 @@
-# Vertex Integrated Solutions — platform
+# Krazy Integrated Solutions — platform
 
 Agency management platform (PHP 8.2+, MySQL/MariaDB, HTML/CSS/JS). **Status: Phases 0–12 built.** All 37 modules of the requirements document are implemented except the items listed under "Not built" in `docs/19-REQUIREMENTS-TRACEABILITY.md`. **NOT yet proven in production:** PhonePe and AI assistance were tested only against simulated services, SMTP only against a local fake server, and nothing has run on the real Hostinger host. Read `docs/16-GO-LIVE-AND-HANDOVER.md` first, then `docs/18-PHASE12-CMS-AI-PHONEPE.md` (PhonePe sandbox checklist). Earlier phases: referral partners and commissions `docs/14`; renewals, scheduler, backups `docs/15`; quotations, invoices and Google Pay by UPI `docs/17`; support/warranty `docs/12`; deliverables/revisions `docs/11`; CRM/projects `docs/10`.
 

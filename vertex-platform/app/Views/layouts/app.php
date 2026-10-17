@@ -109,7 +109,7 @@ foreach ($groups as $gname => $items) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($pageTitle) ?></title>
-    <meta name="theme-color" content="#05070d">
+    <meta name="theme-color" content="#050818">
     <meta name="robots" content="noindex,nofollow">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
@@ -119,9 +119,9 @@ foreach ($groups as $gname => $items) {
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="portal-bar">
     <button class="side-toggle" type="button" aria-expanded="false" aria-controls="portal-side" data-side-toggle><span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span></button>
-    <a class="brand" href="/dashboard" aria-label="Vertex dashboard">
-        <img src="<?= e(asset('img/vertex-mark.png')) ?>" alt="" width="40" height="35">
-        <span class="brand-word">Vertex</span>
+    <a class="brand" href="/dashboard" aria-label="Krazy dashboard">
+        <img src="<?= e(asset('img/krazy-mark.png')) ?>" alt="" width="82" height="34">
+        <span class="brand-word">Krazy</span>
     </a>
     <form class="portal-search" method="get" action="/search" role="search"><label class="sr-only" for="gs">Search</label><input id="gs" name="q" type="search" placeholder="Search everything" maxlength="100" autocomplete="off"></form>
     <div class="portal-user">

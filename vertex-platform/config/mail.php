@@ -19,5 +19,5 @@ return [
     'username' => (string) Env::get('MAIL_USERNAME', ''),
     'password' => (string) Env::get('MAIL_PASSWORD', ''),
     'from_address' => (string) Env::get('MAIL_FROM_ADDRESS', ''),
-    'from_name' => (string) Env::get('MAIL_FROM_NAME', (string) Env::get('APP_NAME', 'Vertex Integrated Solutions')),
+    'from_name' => (string) Env::get('MAIL_FROM_NAME', (string) Env::get('APP_NAME', 'Krazy Integrated Solutions')),
 ];

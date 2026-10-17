@@ -4,7 +4,7 @@
             <p class="eyebrow">Integrated digital delivery</p>
             <h1>Websites and video, <span class="silver">built to a standard.</span></h1>
             <p class="lead">
-                Vertex Integrated Solutions plans, builds and supports websites and video work for businesses,
+                Krazy Integrated Solutions plans, builds and supports websites and video work for businesses,
                 with a secure client portal for milestones, files, invoices and support in one place.
             </p>
             <div class="hero-actions">
@@ -14,7 +14,7 @@
             </div>
         </div>
         <div class="hero-art reveal" aria-hidden="true">
-            <img src="<?= e(asset('img/vertex-logo.png')) ?>" alt="" width="720" height="690">
+            <img src="<?= e(asset('img/krazy-logo.png')) ?>" alt="" width="720" height="479">
         </div>
     </div>
 </section>

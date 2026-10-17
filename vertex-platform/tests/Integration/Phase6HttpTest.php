@@ -148,7 +148,7 @@ final class Phase6HttpTest extends HttpTestCase
         $this->assertSame(200, $p1->get('/partner/r/' . $mine['public_id'])['status']);
         $this->assertSame(404, $p1->get('/partner/r/' . $theirs['public_id'])['status'], 'IDOR on another partner\'s referral');
         $detail = $p1->get('/partner/r/' . $mine['public_id'])['body'];
-        foreach (['INTERNAL-NOTE-MINE-SECRET', 'attribution', 'duplicate_status', 'Alpha Website', 'VIS-2026'] as $leak) {
+        foreach (['INTERNAL-NOTE-MINE-SECRET', 'attribution', 'duplicate_status', 'Alpha Website', 'VIS-2026', 'KIS-2026'] as $leak) {
             $this->assertStringNotContainsStringIgnoringCase($leak, $detail, "{$leak} must not reach the partner");
         }
         $this->assertSame(404, $this->loggedIn('partner2@x.test')->get('/partner/r/' . $mine['public_id'])['status']);

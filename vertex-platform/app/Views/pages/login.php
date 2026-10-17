@@ -1,9 +1,9 @@
 <?php use Vertex\Core\Config; use Vertex\Services\Mailer; ?>
 <section class="auth">
     <div class="auth-card reveal">
-        <img class="auth-mark" src="<?= e(asset('img/vertex-mark.png')) ?>" alt="" width="72" height="62">
+        <img class="auth-mark" src="<?= e(asset('img/krazy-mark.png')) ?>" alt="" width="170" height="70">
         <h1>Sign in</h1>
-        <p class="muted">Access your Vertex portal.</p>
+        <p class="muted">Access your Krazy portal.</p>
 
         <form method="post" action="/login" novalidate>
             <?= csrf_field() ?>

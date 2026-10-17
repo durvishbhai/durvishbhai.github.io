@@ -32,7 +32,7 @@ final class ReferralMailService
         $subject = "Update on your referral {$referral['reference']}: {$status}";
         $body = "Hello {$name},\n\nYour referral {$referral['reference']} ({$referral['prospect_name']}) is now: {$status}.\n"
             . ($h['note'] ? "\nMessage from our team:\n{$h['note']}\n" : '')
-            . "\nYou can see the details in the Partner portal after signing in.\n\nVertex Integrated Solutions\n";
+            . "\nYou can see the details in the Partner portal after signing in.\n\nKrazy Integrated Solutions\n";
 
         return ['history_id' => (int) $h['id'], 'to' => (string) $referral['partner_email'], 'subject' => $subject, 'body' => $body, 'hash' => hash('sha256', $subject . "\n" . $body),
             'already_sent' => Database::one('SELECT 1 AS x FROM referral_email_log WHERE sent_key = ?', [self::key($referral, (int) $h['id'])]) !== null, 'mail_enabled' => Mailer::enabled()];

@@ -11,7 +11,7 @@ $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= e($pageTitle) ?></title>
-    <meta name="theme-color" content="#05070d">
+    <meta name="theme-color" content="#050818">
     <meta name="robots" content="<?= isset($noindex) && $noindex ? 'noindex,nofollow' : 'index,follow' ?>">
     <?php if ($metaDesc !== '') : ?><meta name="description" content="<?= e($metaDesc) ?>">
     <meta property="og:description" content="<?= e($metaDesc) ?>"><?php endif; ?>

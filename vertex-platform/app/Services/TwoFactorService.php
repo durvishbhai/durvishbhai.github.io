@@ -46,7 +46,7 @@ final class TwoFactorService
         $secret = Totp::generateSecret();
         Session::put('twofa_setup', ['uid' => $userId, 'secret' => $secret]);
 
-        return ['secret' => $secret, 'uri' => Totp::uri($secret, (string) $user['email'], (string) Config::get('app.name', 'Vertex'))];
+        return ['secret' => $secret, 'uri' => Totp::uri($secret, (string) $user['email'], (string) Config::get('app.name', 'Krazy'))];
     }
 
     /** @return array{secret:string,uri:string}|null */
@@ -58,7 +58,7 @@ final class TwoFactorService
         }
         $user = self::user($userId);
 
-        return ['secret' => $p['secret'], 'uri' => Totp::uri($p['secret'], (string) $user['email'], (string) Config::get('app.name', 'Vertex'))];
+        return ['secret' => $p['secret'], 'uri' => Totp::uri($p['secret'], (string) $user['email'], (string) Config::get('app.name', 'Krazy'))];
     }
 
     /** @return list<string> the recovery codes, shown once */

@@ -6,9 +6,9 @@ $menu = $menu !== [] ? $menu : [['label' => 'Services', 'url' => '/#services'], 
 ?>
 <header class="site-header">
     <div class="container header-inner">
-        <a class="brand" href="/" aria-label="Vertex Integrated Solutions home">
-            <img src="<?= e(asset('img/vertex-mark.png')) ?>" alt="" width="44" height="38">
-            <span class="brand-word">Vertex <small>Integrated Solutions</small></span>
+        <a class="brand" href="/" aria-label="Krazy Integrated Solutions home">
+            <img src="<?= e(asset('img/krazy-mark.png')) ?>" alt="" width="86" height="35">
+            <span class="brand-word">Krazy <small>Integrated Solutions</small></span>
         </a>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
             <span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span>

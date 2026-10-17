@@ -96,7 +96,7 @@ final class ProjectServiceTest extends DatabaseTestCase
         $this->assertSame('draft', $row['status']);
         $this->assertSame('high', $row['priority']);
         $this->assertSame(12500050, (int) $row['budget_minor'], 'money is stored as integer paise');
-        $this->assertMatchesRegularExpression('/^VIS-\d{4}-\d{4}$/', $p['code']);
+        $this->assertMatchesRegularExpression('/^KIS-\d{4}-\d{4}$/', $p['code']);
         $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'project.created'")['c']);
         $tl = ProjectActivity::timeline($p['id'], false)['rows'];
         $this->assertSame('project.created', $tl[0]['event_type']);

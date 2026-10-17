@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * Vertex Integrated Solutions - one-time web installer (Hostinger / cPanel).
+ * Krazy Integrated Solutions - one-time web installer (Hostinger / cPanel).
  *
  * Upload, open https://YOUR-DOMAIN/install.php, enter the installation key you were given, fill in the database and the first Super Admin.
  * It imports the database structure, writes vertex/.env, creates the Super Admin, creates the private storage folders, writes the .htaccess files
@@ -96,7 +96,7 @@ if (empty($_SESSION['csrf'])) {
 
 $errors = [];
 $done = null;
-$old = ['app_name' => 'Vertex Integrated Solutions', 'app_url' => (is_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? ''), 'timezone' => 'Asia/Kolkata', 'db_host' => 'localhost', 'db_port' => '3306', 'db_name' => '', 'db_user' => '', 'admin_name' => '', 'admin_email' => '', 'mail_driver' => 'none', 'mail_host' => '', 'mail_port' => '587', 'mail_enc' => 'tls', 'mail_user' => '', 'mail_from' => '', 'mail_from_name' => 'Vertex Integrated Solutions'];
+$old = ['app_name' => 'Krazy Integrated Solutions', 'app_url' => (is_https() ? 'https://' : 'http://') . ($_SERVER['HTTP_HOST'] ?? ''), 'timezone' => 'Asia/Kolkata', 'db_host' => 'localhost', 'db_port' => '3306', 'db_name' => '', 'db_user' => '', 'admin_name' => '', 'admin_email' => '', 'mail_driver' => 'none', 'mail_host' => '', 'mail_port' => '587', 'mail_enc' => 'tls', 'mail_user' => '', 'mail_from' => '', 'mail_from_name' => 'Krazy Integrated Solutions'];
 
 $alreadyInstalled = file_exists($envFile);
 $posted = $_SERVER['REQUEST_METHOD'] === 'POST';
@@ -351,7 +351,7 @@ code,pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;pad
 </head>
 <body>
 <main>
-<h1>Vertex Integrated Solutions &middot; installer</h1>
+<h1>Krazy Integrated Solutions &middot; installer</h1>
 
 <?php if ($alreadyInstalled && $done === null): ?>
     <div class="card"><p><strong>This site is already installed.</strong> <code>vertex/.env</code> exists, so the installer is disabled.</p>

@@ -1,6 +1,6 @@
 <section class="auth">
     <div class="auth-card reveal">
-        <img class="auth-mark" src="<?= e(asset('img/vertex-mark.png')) ?>" alt="" width="72" height="62">
+        <img class="auth-mark" src="<?= e(asset('img/krazy-mark.png')) ?>" alt="" width="170" height="70">
         <h1>Verification code</h1>
         <p class="muted">Open your authenticator app and enter the 6-digit code for this account. Lost your phone? Enter one of your recovery codes instead.</p>
         <form method="post" action="/login/two-factor" novalidate>

@@ -960,7 +960,7 @@ final class TicketServiceTest extends DatabaseTestCase
         $t = $this->bug();
         TicketService::reply($this->manager, $t, 'A reply from the manager');
         $c = TicketQuery::conversation($this->client, $t);
-        $this->assertSame('Vertex support team', $c[0]['author_name']);
+        $this->assertSame('Krazy support team', $c[0]['author_name']);
         $s = TicketQuery::conversation($this->admin, $t);
         $this->assertStringContainsString('mgr@x.test', $s[0]['author_name']);
         $act = json_encode(TicketQuery::activity($this->client, $this->fresh($t)));

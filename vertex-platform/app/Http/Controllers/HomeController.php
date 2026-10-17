@@ -24,6 +24,6 @@ final class HomeController
             return PublicPageController::render($page);
         }
 
-        return Response::html(View::render('pages/home', ['title' => 'Vertex Integrated Solutions']));
+        return Response::html(View::render('pages/home', ['title' => 'Krazy Integrated Solutions']));
     }
 }

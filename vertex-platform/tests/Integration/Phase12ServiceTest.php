@@ -616,7 +616,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->assertStringStartsWith('https://mercury-uat.phonepe.com/', $url);
         $o = Database::one('SELECT * FROM gateway_orders');
         $this->assertSame(['pending', 100000, (int) $inv['id']], [$o['status'], (int) $o['amount_minor'], (int) $o['invoice_id']]);
-        $this->assertMatchesRegularExpression('/^VIS\d+X[A-F0-9]{12}$/', $o['merchant_order_id']);
+        $this->assertMatchesRegularExpression('/^KIS\d+X[A-F0-9]{12}$/', $o['merchant_order_id']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c'], 'starting is not paying');
         // http (non-https) site address is refused
         Config::set('app.url', 'http://vis.test');

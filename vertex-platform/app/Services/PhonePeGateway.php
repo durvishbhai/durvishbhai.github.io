@@ -104,7 +104,7 @@ final class PhonePeGateway
         if ($due < 100) {
             throw new ValidationException(['Nothing is due on this invoice, or a payment is already waiting to be checked.']);
         }
-        $mid = 'VIS' . $invoice['id'] . 'X' . strtoupper(bin2hex(random_bytes(6)));
+        $mid = 'KIS' . $invoice['id'] . 'X' . strtoupper(bin2hex(random_bytes(6)));
         $ttl = max(5, (int) Config::get('phonepe.order_ttl_minutes', 30));
         $return = rtrim((string) Config::get('app.url'), '/') . '/my/invoices/' . $invoice['public_id'] . '/phonepe-return?o=' . $mid;
         try {
@@ -210,7 +210,7 @@ final class PhonePeGateway
         $event = mb_substr((string) ($d['event'] ?? ''), 0, 60);
         $key = hash('sha256', $body);
         $dup = Database::run('INSERT IGNORE INTO gateway_webhook_events (provider, event_key, merchant_order_id, event, received_at) VALUES (\'phonepe\', ?, ?, ?, UTC_TIMESTAMP())', [$key, $mid === '' ? null : mb_substr($mid, 0, 64), $event])->rowCount() === 0;
-        if ($mid === '' || !preg_match('/^VIS\d+X[A-F0-9]{12}$/', $mid)) {
+        if ($mid === '' || !preg_match('/^(KIS|VIS)\d+X[A-F0-9]{12}$/', $mid)) {
             return ['status' => 200, 'outcome' => 'ignored'];
         }
         try {

@@ -108,7 +108,7 @@ foreach (glob($root . '/public/assets/img/*.png') ?: [] as $png) {
     $images[basename($png)] = base64_encode((string) file_get_contents($png));
 }
 count($images) === 4 || stop('expected 4 brand images, found ' . count($images));
-$php = "<?php\n\ndeclare(strict_types=1);\n\n/*\n * Serves the brand images. They are stored here as text so the upload package contains only .php, .js, .css and .sql files.\n * Usage: /assets/img.php?f=vertex-mark.png\n */\n\nconst IMAGES = [\n";
+$php = "<?php\n\ndeclare(strict_types=1);\n\n/*\n * Serves the brand images. They are stored here as text so the upload package contains only .php, .js, .css and .sql files.\n * Usage: /assets/img.php?f=krazy-mark.png\n */\n\nconst IMAGES = [\n";
 foreach ($images as $name => $b64) {
     $php .= "    '" . $name . "' => '" . $b64 . "',\n";
 }

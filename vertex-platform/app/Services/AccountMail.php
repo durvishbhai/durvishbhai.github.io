@@ -21,7 +21,7 @@ final class AccountMail
 
     private static function app(): string
     {
-        return (string) Config::get('app.name', 'Vertex Integrated Solutions');
+        return (string) Config::get('app.name', 'Krazy Integrated Solutions');
     }
 
     public static function verify(string $to, string $name, string $token): bool

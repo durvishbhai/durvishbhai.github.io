@@ -198,7 +198,7 @@ final class RenewalScheduler
         }
         $result = 'not_configured';
         if (Mailer::enabled()) {
-            $result = Mailer::send((string) $user['email'], "Your {$type} {$s['identifier']} {$text}", "Hello {$user['name']},\n\nYour {$type} {$s['identifier']} {$text} (expiry date {$s['expires_on']}).\nOur team will contact you about renewing it. You can follow its status after signing in to the client portal.\n\nVertex Integrated Solutions\n") ? 'sent' : 'failed';
+            $result = Mailer::send((string) $user['email'], "Your {$type} {$s['identifier']} {$text}", "Hello {$user['name']},\n\nYour {$type} {$s['identifier']} {$text} (expiry date {$s['expires_on']}).\nOur team will contact you about renewing it. You can follow its status after signing in to the client portal.\n\nKrazy Integrated Solutions\n") ? 'sent' : 'failed';
         }
         if ($row === null) {
             self::claim($s, 'expiry', $offset, 'client', 'email', $result);
