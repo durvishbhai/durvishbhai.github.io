@@ -1,0 +1,1 @@
+<nav class="tabs" aria-label="Website"><a href="/admin/cms">Pages</a><a href="/admin/cms/media">Media library</a><a href="/admin/cms/menus">Menus</a><a href="/admin/cms/reusable">Reusable blocks</a><a href="/admin/cms/redirects">Redirects</a><a href="/admin/settings#website">Company facts &amp; social links</a></nav>

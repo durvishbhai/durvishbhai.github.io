@@ -1,0 +1,68 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Vertex\Http\Controllers\Crm;
+
+use Vertex\Core\Config;
+use Vertex\Core\HttpException;
+use Vertex\Core\Request;
+use Vertex\Core\Response;
+use Vertex\Core\Session;
+use Vertex\Http\Controllers\Controller;
+use Vertex\Services\EnquiryPolicy;
+use Vertex\Services\EnquiryQuery;
+use Vertex\Services\EnquiryService;
+
+/**
+ * Referral partner area. A partner sees ONLY enquiries they submitted, with a deliberately coarse view: submitted
+ * details plus a simple status. No internal notes, owner, pipeline stage names, duplicates or other partners' records.
+ */
+final class PartnerReferralController extends Controller
+{
+    private const PER_PAGE = 20;
+
+    /** @param array<string,string> $params */
+    public function index(Request $request, array $params = []): Response
+    {
+        $page = $request->page();
+        $res = EnquiryQuery::paginate($this->actorId(), ['q' => mb_substr($request->string('q'), 0, 100)], $page, self::PER_PAGE);
+
+        return $this->page('partner/index', ['title' => 'My referrals', 'rows' => $res['rows'], 'total' => $res['total'], 'page' => $page, 'perPage' => self::PER_PAGE, 'filters' => ['q' => $request->string('q')]]);
+    }
+
+    /**
+     * Retired in Phase 6: new referrals go through the referral service (duplicate detection, attribution, partner-scoped history). The old form
+     * created a CRM enquiry directly and so bypassed all of that. Existing enquiries stay readable below; nothing is created here any more.
+     *
+     * @param array<string,string> $params
+     */
+    public function create(Request $request, array $params = []): Response
+    {
+        return Response::redirect('/partner/submit');
+    }
+
+    /** @param array<string,string> $params */
+    public function store(Request $request, array $params = []): Response
+    {
+        return Response::redirect('/partner/submit');
+    }
+
+    /** @param array<string,string> $params */
+    public function show(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $enq = EnquiryPolicy::requireView($uid, $params['enquiry'] ?? '');
+        if (EnquiryPolicy::level($uid, $enq) !== 'own') {
+            // staff are sent to the full CRM view; this page is the partner's restricted view only
+            return Response::redirect('/crm/enquiries/' . $enq['public_id']);
+        }
+        $status = match ($enq['stage_kind']) {
+            'won' => 'Accepted',
+            'lost' => 'Not proceeding',
+            default => 'In progress',
+        };
+
+        return $this->page('partner/show', ['title' => $enq['reference'], 'e' => $enq, 'status' => $status]);
+    }
+}
