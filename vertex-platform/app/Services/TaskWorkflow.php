@@ -66,7 +66,7 @@ final class TaskWorkflow
         if ($task['status'] === 'in_progress' && $to === 'completed' && (int) $task['review_required'] === 1 && !TaskPolicy::can($userId, $task, 'tasks.review')) {
             return 'This task needs review: send it to In Review instead of completing it.';
         }
-        if ($task['status'] === 'in_review' && $to === 'completed' && $task['assignee_id'] !== null && (int) $task['assignee_id'] === $userId) {
+        if ($task['status'] === 'in_review' && $to === 'completed' && $task['assignee_id'] !== null && (int) $task['assignee_id'] === $userId && !Gate::canSelfApprove($userId)) {
             return 'You cannot approve your own work. Another reviewer must complete this task.';
         }
 

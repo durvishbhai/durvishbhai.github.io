@@ -540,14 +540,18 @@ final class CommissionEngineTest extends DatabaseTestCase
         $line = Database::one('SELECT * FROM commission_entries WHERE id = ?', [$up]);
         $this->assertSame('eligible_for_review', $line['status']);
         $this->assertSame(480000, $this->partnerBalance()['available'], 'not payable until approved');
-        $this->expectInvalid(fn () => CommissionService::approve($this->owner, $line), 'created an adjustment');
-        CommissionService::approve($this->admin, $line);
+        // the Owner may approve an adjustment they created themselves; an administrator may not
+        CommissionService::approve($this->owner, $line);
         $this->assertSame(490000, $this->partnerBalance()['available']);
+        $adminLine = Database::one('SELECT * FROM commission_entries WHERE id = ?', [CommissionService::adjust($this->admin, Database::one('SELECT * FROM commission_entries WHERE id = ?', [$e['id']]), 5000, 'Another small restoration after review.')]);
+        $this->expectInvalid(fn () => CommissionService::approve($this->admin, $adminLine), 'created an adjustment');
+        CommissionService::approve($this->owner, $adminLine);
+        $this->assertSame(495000, $this->partnerBalance()['available']);
         // reversal: the original and its lines are closed, nothing is deleted
         CommissionService::reverse($this->owner, Database::one('SELECT * FROM commission_entries WHERE id = ?', [$e['id']]), 'The referral agreement was breached by the partner.');
         $this->assertSame(0, $this->partnerBalance()['available']);
         $this->assertSame(['reversed', 500000], [Database::one('SELECT status FROM commission_entries WHERE id = ?', [$e['id']])['status'], (int) Database::one('SELECT amount_minor FROM commission_entries WHERE id = ?', [$e['id']])['amount_minor']]);
-        $this->assertSame(3, (int) Database::one('SELECT COUNT(*) c FROM commission_entries WHERE referral_id = ? AND milestone IN (\'advance\', \'adjustment\')', [$ref['id']])['c']);
+        $this->assertSame(4, (int) Database::one('SELECT COUNT(*) c FROM commission_entries WHERE referral_id = ? AND milestone IN (\'advance\', \'adjustment\')', [$ref['id']])['c']);
         $this->assertGreaterThanOrEqual(5, (int) Database::one('SELECT COUNT(*) c FROM commission_history')['c']);
         $this->assertTrue(Audit::verify()['ok']);
     }

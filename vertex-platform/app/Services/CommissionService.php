@@ -369,7 +369,7 @@ final class CommissionService
                 throw new ValidationException(['Only an entry that is Eligible for Review can be approved.']);
             }
             $rules = CommissionRules::current()['rules'];
-            if (!empty($rules['separation_of_duties'])) {
+            if (!empty($rules['separation_of_duties']) && !Gate::canSelfApprove($actorId)) {
                 $people = Database::all('SELECT DISTINCT p.recorded_by, p.verified_by FROM commission_entry_payments cep JOIN client_payments p ON p.id = cep.payment_id WHERE cep.entry_id = ?', [$row['id']]);
                 foreach ($people as $p) {
                     if ((int) $p['recorded_by'] === $actorId || (int) $p['verified_by'] === $actorId) {

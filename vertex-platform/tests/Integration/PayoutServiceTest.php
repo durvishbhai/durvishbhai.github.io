@@ -255,11 +255,20 @@ final class PayoutServiceTest extends DatabaseTestCase
     {
         $this->earn();
         $a = $this->requestPayout('1000');
-        PayoutService::approve($this->owner, $this->payout($a['public_id']));
-        $this->expectInvalid(fn () => $this->bankPay($a['public_id'], $this->owner, ['amount' => '1000']), 'cannot also record');
+        PayoutService::approve($this->admin, $this->payout($a['public_id']));
+        $this->expectInvalid(fn () => $this->bankPay($a['public_id'], $this->admin, ['amount' => '1000']), 'cannot also record');
         $this->useRules(['separation_of_duties' => false]);
-        $this->bankPay($a['public_id'], $this->owner, ['amount' => '1000']);
+        $this->bankPay($a['public_id'], $this->admin, ['amount' => '1000']);
         $this->assertSame('paid', $this->payout($a['public_id'])['status']);
+    }
+
+    public function testTheOwnerMayApproveAndPayTheSamePayout(): void
+    {
+        $this->earn();
+        $a = $this->requestPayout('1000');
+        PayoutService::approve($this->owner, $this->payout($a['public_id']));
+        $this->bankPay($a['public_id'], $this->owner, ['amount' => '1000']);
+        $this->assertSame('paid', $this->payout($a['public_id'])['status'], 'the Owner is exempt from the second-person rule; the audit log still names them');
     }
 
     public function testPaymentReferencesAreUniqueAcrossPayouts(): void

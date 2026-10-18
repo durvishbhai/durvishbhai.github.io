@@ -267,7 +267,7 @@ final class PayoutService
 
     private static function assertDifferentPerson(int $actorId, int $other, string $role): void
     {
-        if (!empty(CommissionRules::current()['rules']['separation_of_duties']) && $actorId === $other) {
+        if (!empty(CommissionRules::current()['rules']['separation_of_duties']) && $actorId === $other && !Gate::canSelfApprove($actorId)) {
             throw new ValidationException(["The person who {$role} this request cannot also record its payment. Ask a second authorised person."]);
         }
     }

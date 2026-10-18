@@ -7,34 +7,38 @@ $user = Auth::user();
 $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name') : (string) config('app.name');
 $path = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 $staffProjects = can('projects.view_all') || can('projects.view_assigned');
+// Links that only make sense for a customer or a partner need that record: the Owner holds every permission but has no client file, so these would only lead to a 404.
+$uid = (int) Auth::id();
+$isClient = $uid > 0 && \Vertex\Core\Database::one('SELECT 1 AS x FROM clients WHERE user_id = ?', [$uid]) !== null;
+$isPartner = $uid > 0 && \Vertex\Core\Database::one('SELECT 1 AS x FROM referral_partners WHERE user_id = ?', [$uid]) !== null;
 $unread = $user !== null ? \Vertex\Services\Notifier::unreadCount((int) Auth::id()) : 0;
 $nav = [
     ['/dashboard', 'Dashboard', true],
     ['/crm', 'CRM', can('enquiries.view_all') || can('enquiries.view_assigned')],
     ['/clients', 'Clients', can('clients.view_all') || can('clients.view_assigned')],
-    ['/my/company', 'My company', can('clients.view_own')],
-    ['/partner', 'Partner portal', can('referrals.view_own')],
-    ['/partner/referrals', 'Earlier referrals', can('enquiries.view_own') && !can('referrals.view_own')],
+    ['/my/company', 'My company', can('clients.view_own') && $isClient],
+    ['/partner', 'Partner portal', can('referrals.view_own') && $isPartner],
+    ['/partner/referrals', 'Earlier referrals', can('enquiries.view_own') && !can('referrals.view_own') && $isPartner],
     ['/referrals/dashboard', 'Referral partners', can('referrals.review') || can('commissions.view_all') || can('payouts.view_all') || can('payments.view_all')],
     ['/referrals', 'Referrals', can('referrals.review')],
     ['/commissions', 'Commissions', can('commissions.view_all')],
     ['/payouts', 'Payouts', can('payouts.view_all') || can('payouts.approve') || can('payouts.record')],
     ['/invoices', 'Invoices', can('invoices.view_all')],
     ['/quotations', 'Quotations', can('quotes.create') || can('quotes.send') || can('quotes.record_decision')],
-    ['/my/invoices', 'My invoices', can('invoices.view_own')],
-    ['/my/quotes', 'My quotations', can('quotes.view') && can('quotes.respond')],
+    ['/my/invoices', 'My invoices', can('invoices.view_own') && $isClient],
+    ['/my/quotes', 'My quotations', can('quotes.view') && can('quotes.respond') && $isClient],
     ['/approvals', 'Approvals', can('payments.reconcile') || can('invoices.issue') || can('payouts.approve') || can('payouts.record') || can('commissions.approve') || can('referrals.decide') || can('renewals.approve') || can('renewals.confirm_provider') || can('deliverables.review') || can('deliverables.publish') || can('revisions.classify')],
     ['/coupons', 'Coupons', can('coupons.view')],
     ['/scope-requests', 'Scope requests', can('scope.assess')],
-    ['/my/scope-requests', 'My scope requests', can('scope.request')],
+    ['/my/scope-requests', 'My scope requests', can('scope.request') && $isClient],
     ['/project-templates', 'Project templates', can('templates.manage') || can('templates.apply')],
     ['/agreements', 'Agreements', can('agreements.view')],
-    ['/my/agreements', 'My agreements', can('agreements.view_own')],
+    ['/my/agreements', 'My agreements', can('agreements.view_own') && $isClient],
     ['/forms', 'Forms', can('forms.manage') || can('forms.view_submissions')],
     ['/reports', 'Reports', can('reports.financial') || can('reports.operational')],
     ['/client-payments', 'Client payments', can('payments.view_all') || can('payments.record') || can('payments.reconcile')],
     ['/renewals', 'Domains & hosting', can('renewals.view') || can('renewals.manage') || can('renewals.approve') || can('renewals.confirm_provider')],
-    ['/my/services', 'My domains & hosting', can('renewals.view_own')],
+    ['/my/services', 'My domains & hosting', can('renewals.view_own') && $isClient],
     ['/projects', 'Projects', can('projects.view_all') || can('projects.view_assigned') || can('projects.view_own')],
     ['/team', 'Team', can('projects.view_all')],
     ['/tasks', 'Tasks', can('tasks.view') && (can('projects.view_all') || can('projects.view_assigned'))],
@@ -44,7 +48,7 @@ $nav = [
     ['/qa', 'QA', (can('deliverables.review') || can('deliverables.publish')) && $staffProjects],
     ['/my/deliverables', 'My deliverables', can('deliverables.view') && can('projects.view_own') && !$staffProjects],
     ['/revisions', can('revisions.manage') && $staffProjects ? 'Revisions' : 'My revisions', (can('revisions.manage') && $staffProjects) || can('revisions.request')],
-    ['/support', 'Support', can('tickets.view_own')],
+    ['/support', 'Support', can('tickets.view_own') && $isClient],
     ['/tickets', 'Tickets', can('tickets.view_all') || can('tickets.view_assigned') || can('tickets.view_technical')],
     ['/support/dashboard', 'Support dashboard', can('support.dashboard')],
     ['/warranties', 'Warranties', can('warranty.view')],

@@ -116,7 +116,7 @@ final class DashboardService
 
         // Client view
         try {
-            if (Gate::can('invoices.view_own', $userId)) {
+            if (Gate::can('invoices.view_own', $userId) && Database::one('SELECT 1 AS x FROM clients WHERE user_id = ?', [$userId]) !== null) {
                 $unpaid = 0;
                 $late = 0;
                 foreach (InvoiceService::forClient($userId) as $i) {
@@ -143,7 +143,8 @@ final class DashboardService
         // Quick actions
         foreach ([['projects.create', '/projects/create', 'New project'], ['enquiries.create', '/crm/enquiries/create', 'New enquiry'], ['clients.create', '/clients/create', 'New client'], ['quotes.create', '/quotations/new', 'New quotation'],
             ['invoices.create', '/invoices/new', 'New invoice'], ['tickets.create', '/support/tickets/new', 'Get support'], ['scope.request', '/my/scope-requests', 'Request a change'], ['cms.view', '/admin/cms', 'Edit the website'], ['ai.use', '/ai', 'Ask the AI assistant']] as [$perm, $href, $label]) {
-            if (Gate::can($perm, $userId)) {
+            $customerOnly = in_array($perm, ['tickets.create', 'scope.request'], true);
+            if (Gate::can($perm, $userId) && (!$customerOnly || Database::one('SELECT 1 AS x FROM clients WHERE user_id = ?', [$userId]) !== null)) {
                 $actions[] = ['label' => $label, 'href' => $href];
             }
         }

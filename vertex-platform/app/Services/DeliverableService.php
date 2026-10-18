@@ -152,7 +152,7 @@ final class DeliverableService
             throw new ValidationException(['Choose approve or request changes.']);
         }
         $notes = (string) FieldRules::text($notes, 'Review notes', 3, 3000, $decision === 'changes_requested');
-        if ($decision === 'approved' && $version['uploaded_by'] !== null && (int) $version['uploaded_by'] === $actorId && !(bool) Config::get('uploads.allow_self_approval', false)) {
+        if ($decision === 'approved' && $version['uploaded_by'] !== null && (int) $version['uploaded_by'] === $actorId && !(bool) Config::get('uploads.allow_self_approval', false) && !Gate::canSelfApprove($actorId)) {
             throw new ValidationException(['You uploaded this version, so someone else must approve it.']);
         }
         self::transitionVersion($deliverable, $version, ['pending_review'], function () use ($actorId, $deliverable, $version, $project, $decision, $notes): void {

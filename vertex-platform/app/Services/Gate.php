@@ -51,6 +51,15 @@ final class Gate
         }
     }
 
+    /**
+     * The Owner (Super Admin) may approve, verify and complete work they recorded, uploaded or did themselves: the "second person" rules protect the
+     * business from its staff, and the Owner is the business. Every such action is still audited under the Owner's own name.
+     */
+    public static function canSelfApprove(int $userId): bool
+    {
+        return self::hasRole('super_admin', $userId);
+    }
+
     public static function hasRole(string $slug, ?int $userId = null): bool
     {
         $userId ??= Auth::id();

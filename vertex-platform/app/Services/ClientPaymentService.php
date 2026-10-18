@@ -128,7 +128,7 @@ final class ClientPaymentService
             if ($row === null || $row['status'] !== 'pending_verification') {
                 throw new ValidationException(['This payment is not waiting for verification.']);
             }
-            if (CommissionRules::current()['rules']['separation_of_duties'] && (int) $row['recorded_by'] === $actorId) {
+            if (CommissionRules::current()['rules']['separation_of_duties'] && (int) $row['recorded_by'] === $actorId && !Gate::canSelfApprove($actorId)) {
                 throw new ValidationException(['The person who recorded a payment cannot verify it. Ask a second authorised person.']);
             }
             $gross = (int) $row['gross_minor'];
