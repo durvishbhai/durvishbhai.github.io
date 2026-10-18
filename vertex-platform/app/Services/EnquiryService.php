@@ -138,6 +138,10 @@ final class EnquiryService
             }
             Audit::record('enquiry.created', 'enquiry', $id, [], ['reference' => $ref, 'source' => $source, 'service' => $d['service']], ['possible_duplicate' => $dupOf !== null], $actorId);
 
+            if (in_array($source, ['website_requirements', 'contact_form', 'appointment_request'], true)) { // tell the people who work the enquiry queue
+                Notifier::send(Notifier::withPermission('enquiries.view_all'), 'enquiry.received', 'New ' . strtolower((string) Config::get("workflow.sources.{$source}")), $ref . ': ' . $d['contact_name'], '/crm/enquiries/' . $pub, null, 'enquiry', $id, "enquiry:{$id}:received");
+            }
+
             return ['id' => $id, 'public_id' => $pub, 'reference' => $ref, 'duplicate_of' => $dupOf === null ? null : (int) $dupOf];
         });
     }

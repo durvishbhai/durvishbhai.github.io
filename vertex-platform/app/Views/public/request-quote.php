@@ -1,19 +1,26 @@
-<?php $f = static fn (string $k): string => old($k); $services = (array) $services; $budgets = (array) $budgets; ?>
-<section class="section"><div class="container narrow">
-    <p class="eyebrow">Project requirements</p><h1>Tell us about your project</h1>
-    <p class="lead">Share what you need and we will get back to you. This is a request, not an order: no payment is taken.</p>
-    <div class="panel">
-        <?= \Vertex\Core\View::partial('public-form-open', ['action' => '/request-quote']) ?>
-            <div class="field"><label for="contact_name">Your name</label><input id="contact_name" name="contact_name" required maxlength="120" autocomplete="name" value="<?= e($f('contact_name')) ?>"></div>
-            <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required maxlength="190" autocomplete="email" value="<?= e($f('email')) ?>"></div>
-            <div class="field"><label for="phone">Phone <span class="muted">(optional)</span></label><input id="phone" name="phone" type="tel" maxlength="32" autocomplete="tel" value="<?= e($f('phone')) ?>"></div>
-            <div class="field"><label for="company_name">Business / company <span class="muted">(optional)</span></label><input id="company_name" name="company_name" maxlength="160" autocomplete="organization" value="<?= e($f('company_name')) ?>"></div>
-            <div class="field"><label for="service">What do you need?</label><select id="service" name="service" required><option value="">Choose…</option><?php foreach ($services as $c => $l) : ?><option value="<?= e($c) ?>"<?= $f('service') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
-            <div class="field"><label for="description">Project description</label><textarea id="description" name="description" rows="7" required minlength="20" maxlength="5000"><?= e($f('description')) ?></textarea></div>
-            <div class="field"><label for="budget_range">Budget range <span class="muted">(optional)</span></label><select id="budget_range" name="budget_range"><option value="">Prefer not to say</option><?php foreach ($budgets as $c => $l) : ?><option value="<?= e($c) ?>"<?= $f('budget_range') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
-            <div class="field"><label for="expected_deadline">When do you need it by? <span class="muted">(optional)</span></label><input id="expected_deadline" name="expected_deadline" type="date" value="<?= e($f('expected_deadline')) ?>"></div>
-            <?= \Vertex\Core\View::partial('public-form-consent') ?>
-            <div class="form-actions"><button class="btn btn-primary" type="submit">Send request</button></div>
-        </form>
-    </div>
-</div></section>
+<?php /** @var array<string,string> $categories */ /** @var array<string,string> $timelines */ /** @var array<string,string> $serviceChoices */ /** @var string $preselect */ /** @var string $limit */ /** @var string $extensions */
+$f = static fn (string $k): string => old($k); $services = (array) $services; $budgets = (array) $budgets;
+$choices = $serviceChoices !== [] ? $serviceChoices : $services;
+$h = \Vertex\Services\SiteSections::get('requirements', 'header'); ?>
+<section class="pub-page-head"><div class="container narrow"><p class="eyebrow">Project requirements</p><h1><?= st($h['title']) ?></h1><p class="lead"><?= st($h['intro']) ?></p></div></section>
+<section class="pub-section"><div class="container narrow"><div class="panel">
+    <form method="post" action="/request-quote" enctype="multipart/form-data" class="form-grid public-form" novalidate><?= csrf_field() ?>
+        <div class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="website_url" tabindex="-1" autocomplete="off"></label></div>
+        <div class="field"><label for="contact_name">Your name</label><input id="contact_name" name="contact_name" required maxlength="120" autocomplete="name" value="<?= e($f('contact_name')) ?>"></div>
+        <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" required maxlength="190" autocomplete="email" value="<?= e($f('email')) ?>"></div>
+        <div class="field"><label for="phone">Phone <span class="muted">(optional)</span></label><input id="phone" name="phone" type="tel" maxlength="32" autocomplete="tel" value="<?= e($f('phone')) ?>"></div>
+        <div class="field"><label for="company_name">Organization <span class="muted">(optional)</span></label><input id="company_name" name="company_name" maxlength="160" autocomplete="organization" value="<?= e($f('company_name')) ?>"></div>
+        <div class="field"><label for="project_name">Project name</label><input id="project_name" name="project_name" required minlength="2" maxlength="160" value="<?= e($f('project_name')) ?>"></div>
+        <div class="field"><label for="project_category">Project category</label><select id="project_category" name="project_category" required><option value="">Choose…</option><?php foreach ($categories as $c => $l) : ?><option value="<?= e($c) ?>"<?= $f('project_category') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+        <fieldset class="field"><legend>Services you need</legend><div class="check-grid"><?php foreach ($choices as $slug => $name) : ?><label class="check"><input type="checkbox" name="services[]" value="<?= e($slug) ?>"<?= $preselect === $slug ? ' checked' : '' ?>> <span><?= e($name) ?></span></label><?php endforeach; ?></div></fieldset>
+        <div class="field"><label for="problem_statement">What problem do you want to solve?</label><textarea id="problem_statement" name="problem_statement" rows="5" required minlength="20" maxlength="3000"><?= e($f('problem_statement')) ?></textarea></div>
+        <div class="field"><label for="expected_outcome">What outcome do you expect?</label><textarea id="expected_outcome" name="expected_outcome" rows="4" required minlength="10" maxlength="2000"><?= e($f('expected_outcome')) ?></textarea></div>
+        <div class="field"><label for="features">Feature requirements <span class="muted">(optional)</span></label><textarea id="features" name="features" rows="4" maxlength="3000"><?= e($f('features')) ?></textarea></div>
+        <div class="field"><label for="preferred_tech">Preferred technology <span class="muted">(optional)</span></label><input id="preferred_tech" name="preferred_tech" maxlength="200" value="<?= e($f('preferred_tech')) ?>"></div>
+        <div class="field"><label for="budget_range">Budget range <span class="muted">(optional)</span></label><select id="budget_range" name="budget_range"><option value="">Prefer not to say</option><?php foreach ($budgets as $c => $l) : ?><option value="<?= e($c) ?>"<?= $f('budget_range') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+        <div class="field"><label for="timeline">Desired timeline <span class="muted">(optional)</span></label><select id="timeline" name="timeline"><option value="">Not decided</option><?php foreach ($timelines as $c => $l) : ?><option value="<?= e($c) ?>"<?= $f('timeline') === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+        <div class="field"><label for="attachments">Attachments <span class="muted">(optional, up to 3 files, <?= e($limit) ?> each)</span></label><input id="attachments" name="attachments[]" type="file" multiple><p class="hint">Allowed: <?= e($extensions) ?>. Files are stored privately and only seen by the team reviewing your request.</p></div>
+        <div class="field"><label for="notes">Additional notes <span class="muted">(optional)</span></label><textarea id="notes" name="notes" rows="3" maxlength="2000"><?= e($f('notes')) ?></textarea></div>
+        <?= \Vertex\Core\View::partial('public-form-consent') ?>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Send request</button></div>
+    </form></div></div></section>

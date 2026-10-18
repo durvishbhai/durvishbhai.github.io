@@ -20,6 +20,9 @@ foreach (['contact_name', 'email', 'phone', 'company_name', 'service', 'descript
     <a class="btn btn-ghost" href="/crm/enquiries">&larr; All enquiries</a>
 </div>
 
+<?php $extra = \Vertex\Services\EnquiryExtras::details((int) $e['id']); $extraFiles = $extra === null ? [] : \Vertex\Services\EnquiryExtras::files((int) $e['id']); ?>
+<?php if ($extra !== null) : ?><div class="panel"><h2>Submitted with the form</h2><dl class="kv"><?php foreach ($extra as $label => $value) : if ($label === 'form') { continue; } ?><dt><?= e((string) $label) ?></dt><dd class="prewrap"><?= e((string) $value) ?></dd><?php endforeach; ?></dl>
+    <?php if ($extraFiles !== []) : ?><h3>Attachments</h3><ul class="plain-list"><?php foreach ($extraFiles as $xf) : ?><li><a href="<?= e($u) ?>/files/<?= e($xf['public_id']) ?>"><?= e($xf['original_name']) ?></a> <span class="muted">(<?= e(\Vertex\Services\FileStore::humanSize((int) $xf['size_bytes'])) ?>)</span></li><?php endforeach; ?></ul><?php endif; ?></div><?php endif; ?>
 <?php if ($e['archived_at']) : ?><div class="alert alert-info"><p>This enquiry is archived.</p>
     <?php if (can('enquiries.archive')) : ?><form method="post" action="<?= e($u) ?>/archive" class="inline-form"><?= csrf_field() ?><input type="hidden" name="restore" value="1"><button class="btn btn-ghost btn-sm" type="submit">Restore</button></form><?php endif; ?></div><?php endif; ?>
 <?php if ($convertedProject) : ?><div class="alert alert-ok"><p>Converted on <?= e(local_time($e['converted_at'])) ?> to project <a href="/projects/<?= e($convertedProject['public_id']) ?>"><?= e($convertedProject['code']) ?> — <?= e($convertedProject['title']) ?></a>. This enquiry and its history are locked and preserved.</p></div><?php endif; ?>

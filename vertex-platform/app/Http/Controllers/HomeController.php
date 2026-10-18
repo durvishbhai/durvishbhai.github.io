@@ -6,7 +6,6 @@ namespace Vertex\Http\Controllers;
 
 use Vertex\Core\Request;
 use Vertex\Core\Response;
-use Vertex\Core\View;
 use Vertex\Services\CmsService;
 use Vertex\Services\Settings;
 
@@ -24,6 +23,6 @@ final class HomeController
             return PublicPageController::render($page);
         }
 
-        return Response::html(View::render('pages/home', ['title' => 'Krazy Integrated Solutions']));
+        return (new SitePageController())->home($request, $params);
     }
 }

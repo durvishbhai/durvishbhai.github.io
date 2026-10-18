@@ -136,6 +136,14 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-93 | Settings overlay: a fixed list of settings may be saved in the database and override `.env`; secrets are write-only and sealed; only the Owner may save. | Module 35 without exposing secrets or letting the database override security-critical config. |
 | D-94 | AI assistance only drafts; it sees only records the user may open; every call is logged without content; limits per user and per month. | Safe AI use. |
 | D-95 | PhonePe payments are recorded only after a server-side order-status check says COMPLETED for the exact amount; the webhook is authenticated by the dashboard-defined credentials and only triggers that check. | Never trust the browser or an unverified callback with money. |
+| D-96 | Public copy uses `{company}`/`{abbr}` tokens resolved from the configured company name; the brief's "Vertex/VIS" wording is not hard-coded. | The brand changed to Krazy Integrated Solutions; one setting renames the whole site. |
+| D-97 | Website lists (services, team, partners, portfolio, openings, FAQs, policies) are definition-driven (`SiteEntities`) with draft/published/archived states; page wording lives in `site_sections` overriding shipped defaults. | One audited editing path instead of seven hand-written CRUD modules; the site works before anything is saved. |
+| D-98 | Nothing is invented: Team, Partners, Portfolio and Openings ship empty and public sections hide or say so; prices, address and contact details show only when entered. | Honesty rule from the brief. |
+| D-99 | Policies ship as DRAFT, versioned, and cannot be published while an `[ADMIN TO COMPLETE]` note remains. | Legal text must be completed and reviewed by the business. |
+| D-100 | Contact and Project Requirements reuse CRM enquiries (extra answers in `enquiry_details`, attachments in `enquiry_files`); job applications get their own table. | No duplicate lead pipeline; careers data is not a sales lead. |
+| D-101 | Visitor uploads (enquiry attachments, résumés) go to the private store and are served only to authorised staff as forced downloads. | Private uploads; no public file URLs. |
+| D-102 | An already-installed site is upgraded by a key-gated `upgrade.php` that runs the forward-only migrations and adds new permissions, then deletes itself. | Hostinger customers without SSH can still apply database changes. |
+| D-103 | The Owner (super admin) may approve items they recorded or uploaded themselves (`Gate::canSelfApprove`); every other role stays bound by separation of duties. | Requested by the business owner; the action is still audited. |
 
 ## External integrations and credentials
 

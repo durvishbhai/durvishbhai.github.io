@@ -325,9 +325,25 @@ final class CmsService
     public static function sitemapEntries(): array
     {
         $base = rtrim((string) Config::get('app.url'), '/');
-        $out = [['loc' => $base . '/', 'lastmod' => gmdate('Y-m-d')]];
-        foreach (['/request-quote', '/contact', '/book-appointment', '/partners/apply'] as $p) {
-            $out[] = ['loc' => $base . $p, 'lastmod' => gmdate('Y-m-d')];
+        $today = gmdate('Y-m-d');
+        $out = [['loc' => $base . '/', 'lastmod' => $today]];
+        $paths = ['/about', '/services', '/our-partners', '/careers', '/contact', '/request-quote', '/faq', '/partners/apply', '/sitemap'];
+        if (SiteContent::hasPublished('team')) {
+            $paths[] = '/our-team';
+        }
+        if (SiteContent::hasPublished('portfolio')) {
+            $paths[] = '/portfolio';
+        }
+        foreach ($paths as $p) {
+            $out[] = ['loc' => $base . $p, 'lastmod' => $today];
+        }
+        foreach ([['services', '/services/'], ['portfolio', '/portfolio/'], ['jobs', '/careers/']] as [$entity, $prefix]) {
+            foreach (SiteContent::published($entity) as $r) {
+                $out[] = ['loc' => $base . $prefix . $r['slug'], 'lastmod' => substr((string) $r['updated_at'], 0, 10)];
+            }
+        }
+        foreach (SiteContent::published('policies') as $r) {
+            $out[] = ['loc' => $base . '/' . $r['slug'], 'lastmod' => substr((string) $r['updated_at'], 0, 10)];
         }
         foreach (Database::all("SELECT slug, updated_at FROM cms_pages WHERE archived_at IS NULL AND noindex = 0 AND (status = 'published' OR (status = 'scheduled' AND publish_at <= UTC_TIMESTAMP())) ORDER BY slug") as $p) {
             if ($p['slug'] !== 'home') {
@@ -352,38 +368,87 @@ final class CmsService
         return $r === null ? [] : array_values(array_filter((array) json_decode((string) $r['items_json'], true), static fn ($i): bool => is_array($i) && isset($i['label'], $i['url'])));
     }
 
+    /** True when an administrator has saved this menu (an empty saved menu means "show nothing", an unsaved one means "use the built-in links"). */
+    public static function menuSaved(string $location): bool
+    {
+        try {
+            return Database::one('SELECT 1 AS x FROM cms_menus WHERE location = ?', [$location]) !== null;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public const MENU_LOCATIONS = ['header' => 'Header menu', 'footer_explore' => 'Footer: Explore', 'footer_opportunities' => 'Footer: Opportunities', 'footer_support' => 'Footer: Support', 'footer_legal' => 'Footer: Legal', 'footer' => 'Footer: extra links under the columns'];
+
     public static function menuText(string $location): string
     {
-        return implode("\n", array_map(static fn (array $i): string => $i['label'] . ' | ' . $i['url'], self::menu($location)));
+        $lines = [];
+        foreach (self::menu($location) as $i) {
+            $lines[] = $i['label'] . ' | ' . $i['url'];
+            foreach ((array) ($i['children'] ?? []) as $c) {
+                $lines[] = '- ' . $c['label'] . ' | ' . $c['url'];
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     public static function saveMenu(int $actorId, string $location, string $text): void
     {
         Gate::authorize('cms.publish', $actorId);
-        if (!in_array($location, ['header', 'footer'], true)) {
+        if (!isset(self::MENU_LOCATIONS[$location])) {
             throw new HttpException(404);
         }
         $items = [];
         $errors = [];
+        $top = -1;
         foreach (preg_split('/\R/', trim($text)) ?: [] as $n => $line) {
             if (trim($line) === '') {
                 continue;
             }
+            $child = str_starts_with(ltrim($line), '- ');
+            $line = $child ? substr(ltrim($line), 2) : $line;
             [$label, $url] = array_pad(array_map('trim', explode('|', $line, 2)), 2, '');
-            if (mb_strlen($label) < 1 || mb_strlen($label) > 40 || preg_match('/[<>]/', $label) || CmsText::safeUrl($url) === null) {
-                $errors[] = 'Line ' . ($n + 1) . ': write "Label | /address" with a label up to 40 characters and an address starting with /, https://, mailto: or tel:.';
+            $special = $url === '@services';
+            if (mb_strlen($label) < 1 || mb_strlen($label) > 40 || preg_match('/[<>]/', $label) || (!$special && CmsText::safeUrl($url) === null)) {
+                $errors[] = 'Line ' . ($n + 1) . ': write "Label | /address" with a label up to 40 characters and an address starting with /, https://, mailto: or tel: (use "- " before a link to put it under the one above).';
                 continue;
             }
-            $items[] = ['label' => $label, 'url' => $url];
+            if ($child) {
+                if ($top < 0 || $special) {
+                    $errors[] = 'Line ' . ($n + 1) . ': a "- " link must come after a main link.';
+                    continue;
+                }
+                $items[$top]['children'][] = ['label' => $label, 'url' => $url];
+                continue;
+            }
+            $items[] = ['label' => $label, 'url' => $special ? '/services' : $url] + ($special ? ['auto' => 'services'] : []);
+            $top = count($items) - 1;
         }
         if (count($items) > 12) {
-            $errors[] = 'A menu can have at most 12 links.';
+            $errors[] = 'A menu can have at most 12 main links.';
+        }
+        foreach ($items as $it) {
+            if (count((array) ($it['children'] ?? [])) > 12) {
+                $errors[] = 'A dropdown can have at most 12 links.';
+            }
         }
         if ($errors !== []) {
             throw new ValidationException(array_slice($errors, 0, 6));
         }
         Database::run('INSERT INTO cms_menus (location, items_json, updated_by, updated_at) VALUES (?, ?, ?, UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE items_json = VALUES(items_json), updated_by = VALUES(updated_by), updated_at = UTC_TIMESTAMP()', [$location, json_encode($items, JSON_UNESCAPED_UNICODE), $actorId]);
         Audit::record('cms.menu_saved', 'cms_menu', null, [], ['location' => $location, 'links' => count($items)], [], $actorId);
+    }
+
+    /** Puts the built-in links back for one menu. */
+    public static function resetMenu(int $actorId, string $location): void
+    {
+        Gate::authorize('cms.publish', $actorId);
+        if (!isset(self::MENU_LOCATIONS[$location])) {
+            throw new HttpException(404);
+        }
+        Database::run('DELETE FROM cms_menus WHERE location = ?', [$location]);
+        Audit::record('cms.menu_reset', 'cms_menu', null, [], ['location' => $location], [], $actorId);
     }
 
     /** @return list<array<string,mixed>> */

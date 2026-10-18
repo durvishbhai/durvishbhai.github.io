@@ -91,8 +91,8 @@ final class Phase12HttpTest extends HttpTestCase
     {
         $m = $this->loggedIn('mgr@x.test');
         $m->formPage = '/admin/cms';
-        $m->post('/admin/cms', ['title' => 'Services', 'slug' => 'services'], '/admin/cms');
-        $p = Database::one("SELECT * FROM cms_pages WHERE slug = 'services'");
+        $m->post('/admin/cms', ['title' => 'Services', 'slug' => 'what-we-offer'], '/admin/cms');
+        $p = Database::one("SELECT * FROM cms_pages WHERE slug = 'what-we-offer'");
         $this->assertNotNull($p);
         $this->assertSame('draft', $p['status']);
         $edit = '/admin/cms/' . $p['public_id'];
@@ -107,7 +107,7 @@ final class Phase12HttpTest extends HttpTestCase
 
         // the draft is invisible to visitors and to staff on the public address; staff can preview it
         $visitor = $this->client();
-        $this->assertSame(404, $visitor->get('/services')['status']);
+        $this->assertSame(404, $visitor->get('/what-we-offer')['status']);
         $prev = $m->get($edit . '/preview');
         $this->assertSame(200, $prev['status']);
         $this->assertStringContainsString('What we do', $prev['body']);
@@ -116,12 +116,12 @@ final class Phase12HttpTest extends HttpTestCase
 
         // a manager cannot publish
         $this->assertSame(403, $m->post($edit . '/status', ['action' => 'publish'], $edit)['status']);
-        $this->assertSame(404, $visitor->get('/services')['status']);
+        $this->assertSame(404, $visitor->get('/what-we-offer')['status']);
 
         $a = $this->loggedIn('admin@x.test');
         $a->formPage = $edit;
         $this->assertSame(303, $a->post($edit . '/status', ['action' => 'publish'], $edit)['status']);
-        $pub = $visitor->get('/services');
+        $pub = $visitor->get('/what-we-offer');
         $this->assertSame(200, $pub['status']);
         $this->assertSame([], $visitor->setCookies, 'a public page does not start a session');
         $this->assertStringContainsString('What we do', $pub['body']);
@@ -132,27 +132,27 @@ final class Phase12HttpTest extends HttpTestCase
 
         // unpublish (password required) removes it again
         $a->post($edit . '/status', ['action' => 'unpublish', 'confirm_password' => 'wrong'], $edit);
-        $this->assertSame(200, $visitor->get('/services')['status']);
+        $this->assertSame(200, $visitor->get('/what-we-offer')['status']);
         $a->post($edit . '/status', ['action' => 'unpublish', 'confirm_password' => self::PASSWORD], $edit);
-        $this->assertSame(404, $visitor->get('/services')['status']);
+        $this->assertSame(404, $visitor->get('/what-we-offer')['status']);
     }
 
     public function testSeoFieldsSitemapRobotsAndRedirectsWorkPublicly(): void
     {
-        $id = $this->publish('about', 'About us', 'We are a small studio.', ['seo_title' => 'About Vertex Studio', 'seo_description' => 'A small studio building websites and video.', 'canonical_url' => 'https://vis.example/about']);
+        $id = $this->publish('studio', 'About us', 'We are a small studio.', ['seo_title' => 'About Vertex Studio', 'seo_description' => 'A small studio building websites and video.', 'canonical_url' => 'https://vis.example/studio']);
         $this->publish('private-page', 'Hidden', 'Not for search engines.', ['noindex' => '1']);
         $v = $this->client();
-        $html = $v->get('/about')['body'];
+        $html = $v->get('/studio')['body'];
         $this->assertStringContainsString('<title>About Vertex Studio', $html);
         $this->assertStringContainsString('name="description" content="A small studio building websites and video."', $html);
-        $this->assertStringContainsString('<link rel="canonical" href="https://vis.example/about">', $html);
+        $this->assertStringContainsString('<link rel="canonical" href="https://vis.example/studio">', $html);
         $this->assertStringContainsString('property="og:title"', $html);
         $this->assertStringContainsString('noindex', $v->get('/private-page')['body']);
 
         $sm = $v->get('/sitemap.xml');
         $this->assertSame(200, $sm['status']);
         $this->assertStringContainsString('<urlset', $sm['body']);
-        $this->assertStringContainsString('/about</loc>', $sm['body']);
+        $this->assertStringContainsString('/studio</loc>', $sm['body']);
         $this->assertStringNotContainsString('private-page', $sm['body']);
         $this->assertNotFalse(simplexml_load_string($sm['body']), 'the sitemap is well-formed XML');
         $robots = $v->get('/robots.txt');
@@ -162,8 +162,8 @@ final class Phase12HttpTest extends HttpTestCase
 
         // renaming a live page keeps the old address working through a redirect
         $page = CmsService::find($id);
-        CmsService::updateDetails($this->admin, $page, ['title' => 'About us', 'slug' => 'company', 'seo_title' => 'About Vertex Studio', 'seo_description' => 'A small studio building websites and video.', 'canonical_url' => 'https://vis.example/about']);
-        $r = $v->get('/about');
+        CmsService::updateDetails($this->admin, $page, ['title' => 'About us', 'slug' => 'company', 'seo_title' => 'About Vertex Studio', 'seo_description' => 'A small studio building websites and video.', 'canonical_url' => 'https://vis.example/studio']);
+        $r = $v->get('/studio');
         $this->assertSame(301, $r['status']);
         $this->assertSame('/company', $r['location']);
         $this->assertSame(200, $v->get('/company')['status']);
@@ -176,7 +176,7 @@ final class Phase12HttpTest extends HttpTestCase
     public function testAPublishedHomePageReplacesTheFrontPageAndNestedAddressesWork(): void
     {
         $v = $this->client();
-        $this->assertStringContainsString('Websites and video', $v->get('/')['body'], 'the built-in front page until a home page is published');
+        $this->assertStringContainsString('Build Better. Create Smarter. Grow Faster.', $v->get('/')['body'], 'the built-in front page until a home page is published');
         $this->publish('home', 'Welcome', 'Custom welcome text from the CMS.');
         $home = $v->get('/');
         $this->assertSame(200, $home['status']);
@@ -203,11 +203,11 @@ final class Phase12HttpTest extends HttpTestCase
 
     public function testMenusAndCompanyFactsShowOnEveryPublicPage(): void
     {
-        $this->publish('about', 'About', 'About text.');
-        CmsService::saveMenu($this->admin, 'header', "Our work | /about\nContact | /contact");
+        $this->publish('studio', 'About', 'About text.');
+        CmsService::saveMenu($this->admin, 'header', "Our work | /studio\nContact | /contact");
         CmsService::saveMenu($this->admin, 'footer', "Privacy | /legal/privacy");
         Settings::save($this->owner, 'website', ['site__email' => 'hello@vis.example', 'site__footer_text' => 'Made with care.', 'site__instagram' => 'https://instagram.com/vis']);
-        $html = $this->client()->get('/about')['body'];
+        $html = $this->client()->get('/studio')['body'];
         $this->assertStringContainsString('>Our work<', $html);
         $this->assertStringContainsString('href="/legal/privacy"', $html);
         $this->assertStringContainsString('hello@vis.example', $html);

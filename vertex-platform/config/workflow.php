@@ -12,6 +12,10 @@ return [
     'services' => [
         'website_development' => 'Website development',
         'video_editing' => 'Video editing',
+        'graphic_design' => 'Graphic design (thumbnails, posters, creatives)',
+        'social_media' => 'Social media management',
+        'content_writing' => 'Content writing',
+        'ai_solutions' => 'AI solutions and automation',
         'domain_hosting' => 'Domain & hosting',
         'other' => 'Other / not sure yet',
     ],

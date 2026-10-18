@@ -4,7 +4,7 @@
 $meta = isset($meta) && is_array($meta) ? $meta : [];
 $siteDesc = (string) config('site.default_seo_description', '');
 $metaDesc = (string) ($meta['description'] ?? '') !== '' ? (string) $meta['description'] : $siteDesc;
-$pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name') : (string) config('app.name');
+$pageTitle = isset($title) && $title !== '' && $title !== config('app.name') ? $title . ' · ' . config('app.name') : (string) config('app.name');
 ?><!doctype html>
 <html lang="en">
 <head>
@@ -21,6 +21,7 @@ $pageTitle = isset($title) && $title !== '' ? $title . ' · ' . config('app.name
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
     <link rel="apple-touch-icon" href="<?= e(asset('img/apple-touch-icon.png')) ?>">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
+    <?php if (!empty($jsonld)) : ?><script type="application/ld+json"><?= $jsonld ?></script><?php endif; ?>
 </head>
 <body class="site">
 <a class="skip-link" href="#main">Skip to content</a>

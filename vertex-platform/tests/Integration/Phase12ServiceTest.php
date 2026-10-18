@@ -131,7 +131,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
     // ------------------------------------------------------------------------------------------------ CMS
 
     /** @return array{public_id:string,id:int} */
-    private function page(string $title = 'About us', string $slug = 'about'): array
+    private function page(string $title = 'About us', string $slug = 'studio'): array
     {
         return CmsService::create($this->manager, $title, $slug);
     }
@@ -178,7 +178,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->invalid(fn () => CmsService::create($this->manager, 'Odd', '../etc'), 'letters');
         $this->invalid(fn () => CmsService::create($this->manager, 'Deep', 'a/b/c'), 'letters');
         $this->page();
-        $this->invalid(fn () => CmsService::create($this->manager, 'Again', 'about'), 'already');
+        $this->invalid(fn () => CmsService::create($this->manager, 'Again', 'studio'), 'already');
         $this->assertNotNull(CmsService::create($this->manager, 'Home', 'home'));
         $this->invalid(fn () => CmsService::create($this->manager, 'Home again', 'home'), 'already');
         $this->forbidden(fn () => CmsService::create($this->support, 'Nope', 'nope'));
@@ -191,16 +191,16 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->forbidden(fn () => CmsService::setStatus($this->manager, $this->row($p['public_id']), 'published')); // a manager drafts, an administrator publishes
         $this->invalid(fn () => CmsService::setStatus($this->admin, $this->row($p['public_id']), 'published'), 'at least one block');
         CmsService::addBlock($this->manager, $this->row($p['public_id']), 'text', ['body' => 'Hello visitors.']);
-        $this->assertNull(CmsService::findLive('about'), 'a draft is not public');
+        $this->assertNull(CmsService::findLive('studio'), 'a draft is not public');
         CmsService::setStatus($this->admin, $this->row($p['public_id']), 'published');
-        $this->assertNotNull(CmsService::findLive('about'));
+        $this->assertNotNull(CmsService::findLive('studio'));
         // the manager may not change a live page
         $this->forbidden(fn () => CmsService::addBlock($this->manager, $this->row($p['public_id']), 'text', ['body' => 'Sneaky edit']));
         CmsService::addBlock($this->admin, $this->row($p['public_id']), 'text', ['body' => 'Admin edit']);
         CmsService::setStatus($this->admin, $this->row($p['public_id']), 'draft');
-        $this->assertNull(CmsService::findLive('about'));
+        $this->assertNull(CmsService::findLive('studio'));
         CmsService::setStatus($this->admin, $this->row($p['public_id']), 'archived');
-        $this->assertNull(CmsService::findLive('about'));
+        $this->assertNull(CmsService::findLive('studio'));
         $this->assertNotNull(Database::one("SELECT 1 x FROM audit_logs WHERE action = 'cms.page_published'"));
     }
 
@@ -212,10 +212,10 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->invalid(fn () => CmsService::schedule($this->admin, $this->row($p['public_id']), 'tomorrow'), 'date');
         CmsService::schedule($this->admin, $this->row($p['public_id']), gmdate('Y-m-d H:i', time() + 86400 * 3));
         $this->assertSame('scheduled', $this->row($p['public_id'])['status']);
-        $this->assertNull(CmsService::findLive('about'), 'not live before its time');
+        $this->assertNull(CmsService::findLive('studio'), 'not live before its time');
         $this->assertSame(0, CmsService::publishDue());
         Database::run("UPDATE cms_pages SET publish_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) WHERE id = ?", [$p['id']]);
-        $this->assertNotNull(CmsService::findLive('about'), 'due pages are live even before the scheduler runs');
+        $this->assertNotNull(CmsService::findLive('studio'), 'due pages are live even before the scheduler runs');
         $this->assertSame(1, CmsService::publishDue());
         $this->assertSame('published', $this->row($p['public_id'])['status']);
         $this->assertSame(0, CmsService::publishDue(), 'idempotent');
@@ -228,9 +228,9 @@ final class Phase12ServiceTest extends DatabaseTestCase
         CmsService::setStatus($this->admin, $this->row($p['public_id']), 'published');
         CmsService::updateDetails($this->admin, $this->row($p['public_id']), ['title' => 'About us', 'slug' => 'who-we-are']);
         $this->assertNotNull(CmsService::findLive('who-we-are'));
-        $this->assertNull(CmsService::findLive('about'));
-        $this->assertSame(['code' => 301, 'to' => '/who-we-are'], CmsService::redirectFor('/about'));
-        $this->assertSame(1, (int) Database::one("SELECT hits FROM cms_redirects WHERE from_path = '/about'")['hits']);
+        $this->assertNull(CmsService::findLive('studio'));
+        $this->assertSame(['code' => 301, 'to' => '/who-we-are'], CmsService::redirectFor('/studio'));
+        $this->assertSame(1, (int) Database::one("SELECT hits FROM cms_redirects WHERE from_path = '/studio'")['hits']);
     }
 
     public function testRedirectsAreValidatedAndCannotShadowThePlatformOrOpenRedirectToHttp(): void
@@ -304,13 +304,13 @@ final class Phase12ServiceTest extends DatabaseTestCase
                 CmsService::setStatus($this->admin, CmsService::find($p['public_id']), 'published');
             }
         };
-        $mk('Services', 'services', true);
+        $mk('Services', 'what-we-offer', true);
         $mk('Secret draft', 'secret-draft', false);
         $mk('Hidden', 'hidden', true, true);
         $mk('Legal', 'legal/privacy', true);
         $locs = array_column(CmsService::sitemapEntries(), 'loc');
         $this->assertContains('https://vis.test/', $locs);
-        $this->assertContains('https://vis.test/services', $locs);
+        $this->assertContains('https://vis.test/what-we-offer', $locs);
         $this->assertContains('https://vis.test/legal/privacy', $locs);
         $this->assertNotContains('https://vis.test/secret-draft', $locs);
         $this->assertNotContains('https://vis.test/hidden', $locs);

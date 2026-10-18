@@ -178,3 +178,34 @@ if (!function_exists('format_minutes')) {
         return ($m >= 60 ? intdiv($m, 60) . 'h' . ($m % 60 > 0 ? ' ' . ($m % 60) . 'm' : '') : $m . 'm');
     }
 }
+
+if (!function_exists('st')) {
+    /** Public website text: escaped, with {company} and {abbr} replaced. */
+    function st(?string $s): string
+    {
+        return \Vertex\Services\SiteText::line($s);
+    }
+}
+
+if (!function_exists('sr')) {
+    /** Public website rich text: escaped first, then paragraphs, lists, bold, italic and safe links only. */
+    function sr(?string $s): string
+    {
+        return \Vertex\Services\SiteText::rich($s);
+    }
+}
+
+if (!function_exists('sicon')) {
+    function sicon(string $name): string
+    {
+        return \Vertex\Services\SiteText::icon($name);
+    }
+}
+
+if (!function_exists('shref')) {
+    /** A safe link target for editable buttons and menus. */
+    function shref(?string $url): string
+    {
+        return e(\Vertex\Services\SiteText::href($url));
+    }
+}

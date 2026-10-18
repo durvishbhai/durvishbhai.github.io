@@ -49,6 +49,10 @@ use Vertex\Http\Controllers\Admin\CmsController;
 use Vertex\Http\Controllers\Admin\SettingsController;
 use Vertex\Http\Controllers\AiController;
 use Vertex\Http\Controllers\PublicPageController;
+use Vertex\Http\Controllers\SitePageController;
+use Vertex\Http\Controllers\EnquiryFileController;
+use Vertex\Http\Controllers\Admin\SiteAdminController;
+use Vertex\Http\Controllers\Admin\CareerAdminController;
 use Vertex\Http\Controllers\Billing\PhonePeController;
 use Vertex\Http\Controllers\Billing\CouponController;
 use Vertex\Http\Controllers\Billing\DocumentController;
@@ -80,6 +84,24 @@ return static function (Router $router): void {
     // Public
     $router->get('/', [HomeController::class, 'index'], ['nosession']);
     $router->get('/health', [HealthController::class, 'show'], ['nosession']);
+    // The corporate website (all content is editable in Administration -> Website). Pages with a form start a session for the CSRF token; the rest do not.
+    $router->get('/about', [SitePageController::class, 'about'], ['nosession']);
+    $router->get('/services', [SitePageController::class, 'services'], ['nosession']);
+    $router->get('/services/{slug}', [SitePageController::class, 'service'], ['nosession']);
+    $router->get('/our-team', [SitePageController::class, 'team'], ['nosession']);
+    $router->get('/our-partners', [SitePageController::class, 'partners'], ['nosession']);
+    $router->get('/portfolio', [SitePageController::class, 'portfolio'], ['nosession']);
+    $router->get('/portfolio/{slug}', [SitePageController::class, 'project'], ['nosession']);
+    $router->get('/careers', [SitePageController::class, 'careers']);
+    $router->get('/careers/received', [SitePageController::class, 'applied']);
+    $router->get('/careers/{slug}', [SitePageController::class, 'job'], ['nosession']);
+    $router->post('/careers/apply', [SitePageController::class, 'apply']);
+    $router->get('/faq', [SitePageController::class, 'faq'], ['nosession']);
+    $router->get('/sitemap', [SitePageController::class, 'sitemap'], ['nosession']);
+    $router->get('/project-requirements', [SitePageController::class, 'requirementsAlias'], ['nosession']);
+    foreach (['privacy-policy', 'terms-and-conditions', 'refund-and-cancellation-policy', 'payment-policy', 'cookie-policy'] as $policy) {
+        $router->get('/' . $policy, [SitePageController::class, 'policy'], ['nosession']);
+    }
     $router->get('/sitemap.xml', [PublicPageController::class, 'sitemap'], ['nosession']);
     $router->get('/robots.txt', [PublicPageController::class, 'robots'], ['nosession']);
     // PhonePe calls this with its own signature header: no session, no CSRF token. The handler rejects anything without the right Authorization value.
@@ -413,6 +435,7 @@ return static function (Router $router): void {
     $router->get('/crm/enquiries', [EnquiryController::class, 'index'], $crm);
     $router->get('/crm/enquiries/create', [EnquiryController::class, 'create'], ['auth', 'can:enquiries.create']);
     $router->post('/crm/enquiries', [EnquiryController::class, 'store'], ['auth', 'can:enquiries.create']);
+    $router->get('/crm/enquiries/{enquiry}/files/{file}', [EnquiryFileController::class, 'download'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned']);
     $router->get('/crm/enquiries/{enquiry}', [EnquiryController::class, 'show'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned,enquiries.view_own']);
     $router->post('/crm/enquiries/{enquiry}', [EnquiryController::class, 'update'], ['auth', 'can:enquiries.edit']);
     $router->post('/crm/enquiries/{enquiry}/stage', [EnquiryController::class, 'stage'], ['auth', 'can:enquiries.move_stage']);
@@ -451,6 +474,29 @@ return static function (Router $router): void {
         $r->get('/system', [SystemController::class, 'index'], ['can:settings.view']);
         $r->get('/settings', [SettingsController::class, 'index'], ['can:settings.view']);
         $r->post('/settings/{group}', [SettingsController::class, 'save'], ['can:settings.manage']);
+
+        // Website content (services, team, partners, portfolio, openings, FAQs, policies, page sections) and job applications
+        $r->get('/site', [SiteAdminController::class, 'index'], ['can:cms.view']);
+        $r->post('/site/seed', [SiteAdminController::class, 'seed'], ['can:cms.publish']);
+        $r->get('/site/sections/{page}', [SiteAdminController::class, 'sections'], ['can:cms.view']);
+        $r->post('/site/sections/{page}', [SiteAdminController::class, 'saveSections'], ['can:cms.edit']);
+        $r->post('/site/sections/{page}/reset', [SiteAdminController::class, 'resetSections'], ['can:cms.publish']);
+        $r->get('/site/menus', [SiteAdminController::class, 'menus'], ['can:cms.view']);
+        $r->post('/site/menus/{location}', [SiteAdminController::class, 'saveMenu'], ['can:cms.publish']);
+        $r->post('/site/menus/{location}/reset', [SiteAdminController::class, 'resetMenu'], ['can:cms.publish']);
+        $r->get('/site/{entity}', [SiteAdminController::class, 'list'], ['can:cms.view']);
+        $r->get('/site/{entity}/new', [SiteAdminController::class, 'form'], ['can:cms.edit,legal.manage']);
+        $r->post('/site/{entity}', [SiteAdminController::class, 'save'], ['can:cms.edit,legal.manage']);
+        $r->get('/site/{entity}/{id}', [SiteAdminController::class, 'form'], ['can:cms.view,legal.manage']);
+        $r->post('/site/{entity}/{id}', [SiteAdminController::class, 'save'], ['can:cms.edit,legal.manage']);
+        $r->post('/site/{entity}/{id}/status', [SiteAdminController::class, 'status'], ['can:cms.publish,legal.manage']);
+        $r->post('/site/{entity}/{id}/move', [SiteAdminController::class, 'move'], ['can:cms.edit,legal.manage']);
+        $r->get('/site/policies/{id}/versions', [SiteAdminController::class, 'versions'], ['can:legal.manage,cms.view']);
+        $r->post('/site/policies/{id}/versions/{version}/restore', [SiteAdminController::class, 'restoreVersion'], ['can:legal.manage']);
+        $r->get('/careers', [CareerAdminController::class, 'index'], ['can:careers.view,careers.manage']);
+        $r->get('/careers/{app}', [CareerAdminController::class, 'show'], ['can:careers.view,careers.manage']);
+        $r->post('/careers/{app}', [CareerAdminController::class, 'status'], ['can:careers.manage']);
+        $r->get('/careers/{app}/file', [CareerAdminController::class, 'file'], ['can:careers.view,careers.manage']);
 
         // Website / CMS (static paths first: {page} would otherwise swallow them)
         $r->get('/cms', [CmsController::class, 'index'], ['can:cms.view']);

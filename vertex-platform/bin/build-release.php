@@ -134,6 +134,9 @@ $key = $opt['key'] ?? implode('-', str_split(strtoupper(substr(strtr(base64_enco
 $installer = (string) file_get_contents($root . '/tools/release/install.php');
 str_contains($installer, '__INSTALL_KEY_HASH__') || stop('installer template lost its placeholder');
 file_put_contents($pkg . '/public_html/install.php', str_replace('__INSTALL_KEY_HASH__', hash('sha256', $key), $installer));
+$upgrader = (string) file_get_contents($root . '/tools/release/upgrade.php');
+str_contains($upgrader, '__INSTALL_KEY_HASH__') || stop('upgrader template lost its placeholder');
+file_put_contents($pkg . '/public_html/upgrade.php', str_replace('__INSTALL_KEY_HASH__', hash('sha256', $key), $upgrader));
 
 // 6. Verify: allow-list, syntax, secrets
 $count = 0;

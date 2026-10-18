@@ -98,6 +98,8 @@ $p = [
         'cms.edit' => 'Edit draft website content',
         'cms.publish' => 'Publish website content',
         'legal.manage' => 'Edit legal pages and policies',
+        'careers.view' => 'View job applications',
+        'careers.manage' => 'Review job applications and change their status',
     ],
     'ai' => [
         'ai.use' => 'Use the AI assistant (drafts only; sees only records the user can open)',
@@ -259,7 +261,7 @@ $sensitive = [
     'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
-    'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
+    'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'careers.manage', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
     'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',

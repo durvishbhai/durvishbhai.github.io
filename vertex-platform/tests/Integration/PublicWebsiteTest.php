@@ -1,0 +1,385 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Vertex\Tests\Integration;
+
+use Vertex\Core\Database;
+use Vertex\Services\SiteContent;
+use Vertex\Services\SiteSeeder;
+
+/**
+ * The public corporate website and its admin: pages render, only published content is visible, drafts and unfinished policies stay private,
+ * editing changes what visitors see, forms store their answers, uploads stay private, and permissions hold.
+ */
+final class PublicWebsiteTest extends HttpTestCase
+{
+    use Phase3Fixtures;
+
+    protected static function extraEnv(): array
+    {
+        return ['APP_KEY' => 'base64:' . base64_encode(str_repeat('k', 32))];
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->setUpPhase3();
+    }
+
+    protected function tearDown(): void
+    {
+        $this->tearDownPhase3();
+    }
+
+    private function seed(): void
+    {
+        SiteSeeder::run($this->admin, true);
+    }
+
+    /** @return array<string,mixed> */
+    private function svc(string $name, string $status = 'draft', string $slug = ''): array
+    {
+        $row = SiteContent::save($this->admin, 'services', null, ['name' => $name, 'icon' => 'web', 'summary' => 'A short summary of ' . $name]);
+        if ($slug !== '') {
+            Database::run('UPDATE site_services SET slug = ? WHERE id = ?', [$slug, $row['id']]);
+        }
+        if ($status !== 'draft') {
+            SiteContent::setStatus($this->admin, 'services', SiteContent::find('services', $row['public_id']), $status);
+        }
+
+        return SiteContent::find('services', $row['public_id']);
+    }
+
+    // ------------------------------------------------------------------------------------------------ public pages
+
+    public function testEveryPublicPageRendersAndHasTheBasicsOfAGoodPage(): void
+    {
+        $this->seed();
+        $c = $this->client();
+        foreach (['/', '/about', '/services', '/our-team', '/our-partners', '/portfolio', '/careers', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
+            $r = $c->get($path);
+            $this->assertSame(200, $r['status'], $path);
+            $this->assertSame(1, preg_match_all('#<h1[ >]#', $r['body']), "{$path} has exactly one h1");
+            $this->assertMatchesRegularExpression('#<title>[^<]{3,}</title>#', $r['body'], $path);
+            $this->assertStringContainsString('<meta name="description"', $r['body'], $path);
+            $this->assertStringContainsString('rel="canonical"', $r['body'], $path);
+            $this->assertStringContainsString('property="og:title"', $r['body'], $path);
+            $this->assertStringNotContainsString('[ADMIN TO COMPLETE', $r['body'], $path);
+            $this->assertStringNotContainsString('onclick=', $r['body'], $path);
+        }
+        $this->assertSame(404, $c->get('/no-such-page-here')['status']);
+        $this->assertStringContainsString('<h1', $c->get('/no-such-page-here')['body'], 'the 404 page is a designed page');
+    }
+
+    public function testStartingContentIsLoadedOnceAndNeverInventsPeoplePartnersOrWork(): void
+    {
+        $this->seed();
+        $this->assertSame(10, (int) Database::one('SELECT COUNT(*) c FROM site_services')['c']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_team')['c'], 'no invented employees');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_partners')['c'], 'no invented partners');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_portfolio')['c'], 'no invented projects');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_jobs')['c'], 'no invented openings');
+        $this->assertSame(5, (int) Database::one("SELECT COUNT(*) c FROM site_policies WHERE status = 'draft'")['c']);
+        $this->assertSame(0, (int) Database::one("SELECT COUNT(*) c FROM site_policies WHERE status = 'published'")['c']);
+
+        $c = $this->client();
+        $team = $c->get('/our-team')['body'];
+        $this->assertStringContainsString('<h1', $team);
+        $this->assertSame(0, preg_match_all('#class="team-card#', $team), 'an empty team page lists nobody');
+        $this->assertSame(0, preg_match_all('#class="portfolio-card#', $c->get('/portfolio')['body']));
+
+        SiteSeeder::run($this->admin, false);
+        $this->assertSame(10, (int) Database::one('SELECT COUNT(*) c FROM site_services')['c'], 'running it again adds nothing');
+        Database::run("DELETE FROM site_services WHERE slug = 'ai-solutions'");
+        SiteSeeder::run($this->admin, false);
+        $this->assertSame(9, (int) Database::one('SELECT COUNT(*) c FROM site_services')['c'], 'a deleted item is not brought back');
+    }
+
+    public function testOnlyPublishedServicesAreVisibleAndListedAndTheSitemapFollowsThem(): void
+    {
+        $c = $this->client();
+        $draft = $this->svc('Secret Draft Service', 'draft', 'secret-draft');
+        $live = $this->svc('Visible Service', 'published', 'visible-service');
+        $this->assertSame(404, $c->get('/services/secret-draft')['status'], 'a draft has no public page');
+        $this->assertSame(200, $c->get('/services/visible-service')['status']);
+        $list = $c->get('/services')['body'];
+        $this->assertStringContainsString('Visible Service', $list);
+        $this->assertStringNotContainsString('Secret Draft Service', $list);
+        $xml = $c->get('/sitemap.xml')['body'];
+        $this->assertStringContainsString('/services/visible-service', $xml);
+        $this->assertStringNotContainsString('secret-draft', $xml);
+
+        SiteContent::setStatus($this->admin, 'services', SiteContent::find('services', $live['public_id']), 'archived');
+        $this->assertSame(404, $c->get('/services/visible-service')['status'], 'archiving takes it off the site at once');
+        $this->assertStringNotContainsString('visible-service', $c->get('/sitemap.xml')['body']);
+        $this->assertSame($draft['status'], 'draft');
+    }
+
+    public function testStoredMarkupIsEscapedEverywhereItIsShown(): void
+    {
+        try {
+            SiteContent::save($this->admin, 'services', null, ['name' => 'Fancy <script>alert(1)</script> Work', 'icon' => 'web', 'summary' => 'x']);
+            $this->fail('Markup in a name must be refused.');
+        } catch (\Vertex\Core\ValidationException $e) {
+            $this->assertNotEmpty($e->errors);
+        }
+        $row = SiteContent::save($this->admin, 'services', null, ['name' => 'Markup Work', 'icon' => 'web', 'summary' => 'Plain summary',
+            'description' => "Hello <b>there</b> <script>alert(1)</script>\n\n[bad](javascript:alert(3))\n\n<img src=x onerror=alert(2)>"]);
+        SiteContent::setStatus($this->admin, 'services', SiteContent::find('services', $row['public_id']), 'published');
+        $c = $this->client();
+        foreach (['/services', '/services/' . $row['slug'], '/sitemap'] as $path) {
+            $html = $c->get($path)['body'];
+            $this->assertStringNotContainsString('<script>alert(1)', $html, $path);
+            $this->assertStringNotContainsString('<img src=x', $html, $path);
+            $this->assertStringNotContainsString('<b>there', $html, $path);
+            $this->assertStringNotContainsString('href="javascript:', $html, $path);
+        }
+        $this->assertStringContainsString('&lt;script&gt;', $c->get('/services/' . $row['slug'])['body']);
+    }
+
+    public function testPricesAreHiddenUnlessTheEditorTurnsThemOn(): void
+    {
+        $row = SiteContent::save($this->admin, 'services', null, ['name' => 'Priced Work', 'icon' => 'web', 'summary' => 'Priced', 'starting_price' => '4999']);
+        SiteContent::setStatus($this->admin, 'services', SiteContent::find('services', $row['public_id']), 'published');
+        $c = $this->client();
+        $this->assertStringNotContainsString('4,999', $c->get('/services/' . $row['slug'])['body']);
+        SiteContent::save($this->admin, 'services', $row['public_id'], ['name' => 'Priced Work', 'icon' => 'web', 'summary' => 'Priced', 'starting_price' => '4999', 'show_price' => '1']);
+        $this->assertStringContainsString('4,999', $c->get('/services/' . $row['slug'])['body']);
+    }
+
+    // ------------------------------------------------------------------------------------------------ policies
+
+    public function testPoliciesStayHiddenUntilCompletedAndEveryChangeIsAVersion(): void
+    {
+        $this->seed();
+        $c = $this->client();
+        $this->assertSame(404, $c->get('/privacy-policy')['status'], 'a draft policy is not public');
+        $this->assertStringNotContainsString('/privacy-policy', $c->get('/')['body'], 'and is not linked');
+        $this->assertStringNotContainsString('privacy-policy', $c->get('/sitemap.xml')['body']);
+
+        $p = SiteContent::find('policies', (string) Database::one("SELECT public_id FROM site_policies WHERE slug = 'privacy-policy'")['public_id']);
+        $this->assertMatchesRegularExpression('/\[ADMIN TO COMPLETE/i', (string) $p['body'], 'the draft says what is missing');
+        try {
+            SiteContent::setStatus($this->admin, 'policies', $p, 'published');
+            $this->fail('An unfinished policy must not publish.');
+        } catch (\Vertex\Core\ValidationException $e) {
+            $this->assertStringContainsString('ADMIN TO COMPLETE', implode(' ', $e->errors));
+        }
+
+        $before = (int) Database::one('SELECT COUNT(*) c FROM site_policy_versions WHERE policy_id = ?', [$p['id']])['c'];
+        $saved = SiteContent::save($this->admin, 'policies', $p['public_id'], ['title' => 'Privacy Policy', 'effective_date' => '2026-11-01', 'body' => "## What we collect\n\nOnly what you send us in our forms."]);
+        $this->assertSame($before + 1, (int) Database::one('SELECT COUNT(*) c FROM site_policy_versions WHERE policy_id = ?', [$p['id']])['c']);
+        SiteContent::setStatus($this->admin, 'policies', SiteContent::find('policies', $saved['public_id']), 'published');
+
+        $page = $c->get('/privacy-policy');
+        $this->assertSame(200, $page['status']);
+        $this->assertStringContainsString('What we collect', $page['body']);
+        $this->assertStringContainsString('/privacy-policy', $c->get('/sitemap.xml')['body']);
+        $this->assertStringContainsString('/privacy-policy', $c->get('/')['body'], 'a published policy is linked in the footer');
+
+        SiteContent::save($this->admin, 'policies', $p['public_id'], ['title' => 'Privacy Policy', 'effective_date' => '2026-11-01', 'body' => 'Second wording of the policy.']);
+        SiteContent::restorePolicy($this->admin, SiteContent::find('policies', $p['public_id']), 2);
+        $this->assertStringContainsString('What we collect', (string) SiteContent::find('policies', $p['public_id'])['body'], 'an older version can be restored');
+    }
+
+    // ------------------------------------------------------------------------------------------------ admin + permissions
+
+    public function testWebsiteAdminIsStaffOnlyAndPublishingNeedsPublishRights(): void
+    {
+        $anon = $this->client();
+        $this->assertSame(303, $anon->get('/admin/site')['status']);
+        foreach (['alpha@client.test', 'partner@x.test', 'dev@x.test'] as $email) {
+            $this->assertSame(403, $this->loggedIn($email)->get('/admin/site')['status'], $email);
+        }
+        $admin = $this->loggedIn('admin@x.test');
+        $this->assertSame(200, $admin->get('/admin/site')['status']);
+        foreach (['services', 'team', 'partners', 'portfolio', 'jobs', 'faqs', 'policies'] as $entity) {
+            $this->assertSame(200, $admin->get('/admin/site/' . $entity)['status'], $entity);
+        }
+        $this->assertSame(200, $admin->get('/admin/site/menus')['status']);
+        $this->assertSame(200, $admin->get('/admin/site/sections/home')['status']);
+
+        // A manager may edit drafts but not publish
+        $m = $this->loggedIn('mgr@x.test');
+        $r = $m->post('/admin/site/services', ['name' => 'Manager Draft', 'icon' => 'web', 'summary' => 'Drafted by a manager'], '/admin/site/services/new');
+        $this->assertSame(303, $r['status']);
+        $row = Database::one("SELECT * FROM site_services WHERE name = 'Manager Draft'");
+        $this->assertNotNull($row);
+        $this->assertSame('draft', $row['status']);
+        $this->assertSame(403, $m->post('/admin/site/services/' . $row['public_id'] . '/status', ['action' => 'publish'], '/admin/site/services/' . $row['public_id'])['status']);
+        $this->assertSame('draft', Database::one('SELECT status FROM site_services WHERE id = ?', [$row['id']])['status']);
+        $this->assertSame(403, $m->post('/admin/site/menus/header', ['items' => 'Home | /'], '/admin/site/menus')['status']);
+
+        // The administrator publishes it, and the change is audited
+        $admin->post('/admin/site/services/' . $row['public_id'] . '/status', ['action' => 'publish'], '/admin/site/services/' . $row['public_id']);
+        $this->assertSame('published', Database::one('SELECT status FROM site_services WHERE id = ?', [$row['id']])['status']);
+        $this->assertGreaterThan(0, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'site.published'")['c']);
+        $this->assertSame(200, $this->client()->get('/services/' . $row['slug'])['status']);
+    }
+
+    public function testAdminFormsRejectBadInputAndWriteNothing(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        $before = (int) Database::one('SELECT COUNT(*) c FROM site_services')['c'];
+        $admin->post('/admin/site/services', ['name' => '', 'icon' => 'web', 'summary' => ''], '/admin/site/services/new');
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_services')['c']);
+        $this->assertSame(419, $admin->postNoToken('/admin/site/services', ['name' => 'X', 'icon' => 'web', 'summary' => 'Y'])['status'], 'CSRF is enforced');
+        $this->assertSame(404, $admin->get('/admin/site/not-a-list')['status']);
+    }
+
+    public function testHeaderMenuIsEditableAndHidesUnpublishedPolicyLinks(): void
+    {
+        $this->seed();
+        $admin = $this->loggedIn('admin@x.test');
+        $admin->post('/admin/site/menus/header', ['items' => "Start | /\nOur Work | /portfolio\nTalk To Us | /contact"], '/admin/site/menus');
+        $html = $this->client()->get('/about')['body'];
+        $this->assertStringContainsString('Our Work', $html);
+        $this->assertStringContainsString('Talk To Us', $html);
+        $admin->post('/admin/site/menus/header/reset', ['confirm_password' => self::PASSWORD], '/admin/site/menus');
+        $this->assertStringContainsString('About', $this->client()->get('/about')['body']);
+    }
+
+    public function testSectionWordingIsEditableAndCanBeReset(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        $this->assertStringContainsString('name="s[header][f][title]"', $admin->get('/admin/site/sections/about')['body'], 'the editor lists the page heading fields');
+        $admin->post('/admin/site/sections/about', ['s' => ['header' => ['enabled' => '1', 'f' => ['title' => 'Our Very Own Heading', 'intro' => 'Hand written intro.']]]], '/admin/site/sections/about');
+        $this->assertStringContainsString('Our Very Own Heading', $this->client()->get('/about')['body']);
+        $admin->post('/admin/site/sections/about/reset', ['confirm_password' => self::PASSWORD], '/admin/site/sections/about');
+        $this->assertStringNotContainsString('Our Very Own Heading', $this->client()->get('/about')['body']);
+    }
+
+    // ------------------------------------------------------------------------------------------------ forms
+
+    public function testContactFormKeepsItsExtraAnswersForStaffOnly(): void
+    {
+        $c = $this->client();
+        $r = $c->post('/contact', ['contact_name' => 'Nina Contact', 'email' => 'nina@web.test', 'inquiry_type' => 'partnership', 'subject' => 'Working together', 'description' => 'We would like to talk about a partnership.', 'consent' => '1', 'website_url' => ''], '/contact');
+        $this->assertSame(303, $r['status']);
+        $e = Database::one("SELECT * FROM enquiries WHERE email = 'nina@web.test'");
+        $this->assertSame('contact_form', $e['source']);
+        $d = Database::one('SELECT details_json FROM enquiry_details WHERE enquiry_id = ?', [$e['id']]);
+        $this->assertStringContainsString('Working together', (string) $d['details_json']);
+
+        $page = $this->loggedIn('admin@x.test')->get('/crm/enquiries/' . $e['public_id'])['body'];
+        $this->assertStringContainsString('Working together', $page);
+        $this->assertStringContainsString('Partnership', $page);
+
+        $bad = $this->client();
+        $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
+        $bad->post('/contact', ['contact_name' => 'No Type', 'email' => 'nt@web.test', 'inquiry_type' => 'bogus', 'subject' => 'x', 'description' => 'Short but long enough text', 'consent' => '1', 'website_url' => ''], '/contact');
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'], 'an unknown inquiry type is refused');
+    }
+
+    public function testRequirementsFormStoresAnswersAndAPrivateAttachment(): void
+    {
+        $file = $this->png('brief.png');
+        $c = $this->client();
+        $r = $c->upload('/request-quote', [
+            'contact_name' => 'Rita Requirements', 'email' => 'rita@web.test', 'project_name' => 'Shop relaunch', 'project_category' => 'website', 'services' => ['website_development'],
+            'problem_statement' => 'Our current shop is slow and hard to update by ourselves.', 'expected_outcome' => 'A fast shop we can edit.', 'timeline' => 'one_month', 'consent' => '1', 'website_url' => '',
+        ], ['attachments[0]' => [$file['tmp_name'], 'brief.png', 'image/png']], '/request-quote');
+        $this->assertSame(303, $r['status'], $r['body']);
+        $e = Database::one("SELECT * FROM enquiries WHERE email = 'rita@web.test'");
+        $this->assertNotNull($e);
+        $files = Database::all('SELECT f.* FROM enquiry_files ef JOIN stored_files f ON f.id = ef.file_id WHERE ef.enquiry_id = ?', [$e['id']]);
+        $this->assertCount(1, $files);
+        $this->assertMatchesRegularExpression('#^\d{4}/\d{2}/[a-f0-9]{40}$#', $files[0]['stored_path'], 'stored under a random private name');
+        $this->assertStringNotContainsString($files[0]['stored_path'], $c->get('/enquiry/received')['body']);
+
+        $url = '/crm/enquiries/' . $e['public_id'] . '/files/' . $files[0]['public_id'];
+        $this->assertSame(303, $this->client()->get($url)['status'], 'visitors cannot fetch it');
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get($url)['status'], 'clients cannot fetch it');
+        $this->assertSame(200, $this->loggedIn('admin@x.test')->get($url)['status'], 'staff who can see the enquiry can');
+    }
+
+    public function testRequirementsFormRejectsADisallowedAttachmentAndStoresNothing(): void
+    {
+        $bad = $this->tmp('payload.php', "<?php echo 'x';");
+        $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
+        $c = $this->client();
+        $c->upload('/request-quote', [
+            'contact_name' => 'Evil Eve', 'email' => 'eve@web.test', 'project_name' => 'Anything', 'project_category' => 'website', 'services' => ['website_development'],
+            'problem_statement' => 'Some perfectly long problem statement here.', 'expected_outcome' => 'Some outcome', 'consent' => '1', 'website_url' => '',
+        ], ['attachments[0]' => [$bad['tmp_name'], 'payload.php', 'application/x-php']], '/request-quote');
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM enquiry_files')['c']);
+    }
+
+    // ------------------------------------------------------------------------------------------------ careers
+
+    public function testJobApplicationIsStoredPrivatelyAndReviewedByAuthorisedStaffOnly(): void
+    {
+        $job = SiteContent::save($this->admin, 'jobs', null, ['title' => 'Freelance Video Editor', 'engagement_type' => 'freelance']);
+        $c = $this->client();
+        $this->assertSame(404, $c->get('/careers/' . $job['slug'])['status'], 'a draft opening is not public');
+        SiteContent::setStatus($this->admin, 'jobs', SiteContent::find('jobs', $job['public_id']), 'published');
+        $this->assertStringContainsString('Freelance Video Editor', $c->get('/careers')['body']);
+        $this->assertSame(200, $c->get('/careers/' . $job['slug'])['status']);
+
+        $resume = $this->png('work-sample.png');
+        $r = $c->upload('/careers/apply', ['full_name' => 'Arjun Applicant', 'email' => 'arjun@web.test', 'role' => 'Freelance Video Editor', 'skills_experience' => 'Five years of editing short-form video for brands.',
+            'intro' => 'I would love to work with your team on video projects.', 'consent' => '1', 'website_url' => ''], ['resume' => [$resume['tmp_name'], 'work-sample.png', 'image/png']], '/careers');
+        $this->assertSame(303, $r['status'], $r['body']);
+        $this->assertSame('/careers/received', $r['location']);
+        $app = Database::one("SELECT * FROM site_job_applications WHERE email = 'arjun@web.test'");
+        $this->assertNotNull($app);
+        $this->assertStringContainsString($app['reference'], $c->get('/careers/received')['body']);
+        $this->assertNotNull($app['file_id']);
+
+        $this->assertSame(303, $this->client()->get('/admin/careers')['status']);
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/admin/careers')['status']);
+        $this->assertSame(403, $this->loggedIn('dev@x.test')->get('/admin/careers/' . $app['public_id'])['status']);
+        $admin = $this->loggedIn('admin@x.test');
+        $this->assertStringContainsString('Arjun Applicant', $admin->get('/admin/careers')['body']);
+        $this->assertSame(200, $admin->get('/admin/careers/' . $app['public_id'])['status']);
+        $dl = $admin->headersOf('/admin/careers/' . $app['public_id'] . '/file');
+        $this->assertStringContainsString('attachment', $dl['content-disposition'] ?? '');
+
+        $admin->post('/admin/careers/' . $app['public_id'], ['status' => 'shortlisted', 'internal_notes' => 'Strong samples'], '/admin/careers/' . $app['public_id']);
+        $this->assertSame('shortlisted', Database::one('SELECT status FROM site_job_applications WHERE id = ?', [$app['id']])['status']);
+    }
+
+    public function testJobApplicationNeedsConsentAndIsProtectedAgainstBots(): void
+    {
+        $base = ['full_name' => 'Bot Person', 'email' => 'bot@web.test', 'role' => 'Other', 'skills_experience' => 'Plenty of relevant experience in the field.', 'intro' => 'A sufficiently long introduction text.', 'website_url' => ''];
+        $c = $this->client();
+        $c->post('/careers/apply', $base, '/careers');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'no consent, nothing stored');
+        $c->post('/careers/apply', ['consent' => '1', 'website_url' => 'http://spam.example'] + $base, '/careers');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'honeypot submissions are discarded');
+        $this->assertSame(419, $c->postNoToken('/careers/apply', ['consent' => '1'] + $base)['status']);
+        $bad = $this->tmp('cv.exe', 'MZ binary');
+        $c->upload('/careers/apply', ['consent' => '1'] + $base, ['resume' => [$bad['tmp_name'], 'cv.exe', 'application/octet-stream']], '/careers');
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'an executable résumé is refused');
+    }
+
+    // ------------------------------------------------------------------------------------------------ misc
+
+    public function testFaqPageIsSearchableAndRobotsAndSitemapAreSane(): void
+    {
+        $this->seed();
+        $c = $this->client();
+        $faq = $c->get('/faq')['body'];
+        $this->assertStringContainsString('data-faq-search', $faq);
+        $this->assertGreaterThan(3, preg_match_all('#<details#', $faq));
+        $robots = $c->get('/robots.txt')['body'];
+        $this->assertStringContainsString('Sitemap:', $robots);
+        $this->assertStringContainsString('Disallow: /admin', $robots);
+        $xml = $c->get('/sitemap.xml')['body'];
+        $this->assertStringContainsString('<loc>', $xml);
+        $this->assertStringNotContainsString('/admin', $xml);
+        $this->assertStringNotContainsString('/login', $xml);
+    }
+
+    public function testCmsPagesCannotShadowTheNewWebsiteAddresses(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        foreach (['our-team', 'our-partners', 'portfolio', 'careers', 'faq', 'privacy-policy', 'terms-and-conditions', 'sitemap', 'request-quote'] as $slug) {
+            $before = (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'];
+            $admin->post('/admin/cms', ['title' => 'Shadow ' . $slug, 'slug' => $slug], '/admin/cms');
+            $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'], "{$slug} is reserved");
+        }
+    }
+}

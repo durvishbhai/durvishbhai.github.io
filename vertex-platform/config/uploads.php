@@ -28,6 +28,8 @@ return [
         'ticket' => $mb('UPLOAD_TICKET_MAX_MB', 10),
         'partner' => $mb('UPLOAD_PARTNER_MAX_MB', 5),
         'agreement' => $mb('UPLOAD_AGREEMENT_MAX_MB', 15),
+        'career' => $mb('UPLOAD_CAREER_MAX_MB', 5),
+        'enquiry' => $mb('UPLOAD_ENQUIRY_MAX_MB', 10),
     ],
 
     // extension => [accepted detected MIME types, signature kind]

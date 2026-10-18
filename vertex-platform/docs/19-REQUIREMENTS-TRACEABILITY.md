@@ -62,10 +62,15 @@ Every module and role in the requirements document, where it is built, and an ho
 
 The requirement table lists "Graphic Designer: Full Access" — this is treated as a documentation inconsistency (a contractor with full access would break the permission model); designers get assigned-records access like the other external roles.
 
+## Public website expansion
+
+Pages, CMS-managed content, forms, SEO, permissions and tests: `docs/20-PUBLIC-WEBSITE.md`. Team, Partners, Portfolio and Openings ship empty by design (no invented people, logos, clients or testimonials); the five policies ship as drafts that cannot be published until completed.
+
 ## Not built (stated plainly)
 
 * Third-party e-signature provider; domain/hosting provider APIs; WhatsApp/SMS notifications; calendar sync.
 * QR code for 2FA enrolment (the key is shown for manual entry).
 * Automated off-site backups and external error monitoring (documented procedure only).
-* Free-form page builder; members-only website pages.
+* Free-form page builder; members-only website pages. (The structured website editor in `docs/20` covers the corporate pages; arbitrary new layouts still need code.)
+* Visitor confirmation e-mails for the Contact, Project Requirements and Careers forms (the thank-you pages say so).
 * Laravel (the brief and hosting rules chose plain PHP).

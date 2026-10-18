@@ -162,3 +162,51 @@
     form.addEventListener('change', update);
     update();
 }());
+
+/* Public website: dropdown toggles (small screens), live FAQ search, portfolio category filter. The pages work without this script. */
+(function () {
+    'use strict';
+    document.querySelectorAll('[data-sub-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var li = btn.closest('.has-sub');
+            var open = li.classList.toggle('is-open');
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+    });
+    var input = document.querySelector('[data-faq-search]');
+    if (input) {
+        var items = document.querySelectorAll('[data-faq-item]');
+        var groups = document.querySelectorAll('[data-faq-group]');
+        var none = document.querySelector('[data-faq-none]');
+        var run = function () {
+            var q = input.value.trim().toLowerCase(), shown = 0;
+            items.forEach(function (el) {
+                var hit = q === '' || el.textContent.toLowerCase().indexOf(q) !== -1;
+                el.hidden = !hit;
+                if (hit) { shown++; }
+            });
+            groups.forEach(function (g) {
+                var n = g.nextElementSibling, any = false;
+                while (n && n.hasAttribute('data-faq-item')) { if (!n.hidden) { any = true; } n = n.nextElementSibling; }
+                g.hidden = !any;
+            });
+            if (none) { none.hidden = shown !== 0 || items.length === 0; }
+        };
+        input.addEventListener('input', run);
+        var form = input.form;
+        if (form) { form.addEventListener('submit', function (e) { e.preventDefault(); run(); }); }
+        run();
+    }
+    var chips = document.querySelectorAll('[data-filter-group] [data-filter]');
+    if (chips.length) {
+        chips.forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                var want = chip.getAttribute('data-filter');
+                chips.forEach(function (c) { c.classList.toggle('is-on', c === chip); });
+                document.querySelectorAll('.work-card[data-category]').forEach(function (card) {
+                    card.hidden = want !== '' && card.getAttribute('data-category') !== want;
+                });
+            });
+        });
+    }
+})();

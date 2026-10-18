@@ -48,6 +48,8 @@ Upload the whole project and set the domain's document root to `<project>/public
 
 Upload changed files, run `php bin/console.php migrate` then `permissions:sync`. Never edit an applied migration; add a new one.
 
+**Without SSH (Hostinger shared hosting):** the release package contains `public_html/upgrade.php` next to `install.php`. After uploading the new files over the old ones (do NOT re-run `install.php`; it refuses to run on an installed site), open `https://YOUR-DOMAIN/upgrade.php`, enter the installation key printed with the release, review the list of pending database updates and press *Apply updates*. It runs the same forward-only migrations and `permissions:sync`, never touches `.env`, users or content, and deletes itself afterwards (delete it by hand if it reports that it could not). Take a phpMyAdmin export first. The website expansion needs migrations `0017` and `0018`; then open *Administration -> Website* once to load the starting content.
+
 
 ## Uploads location
 
@@ -97,3 +99,7 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 ## Single-folder package (upload straight into public_html)
 
 `bin/build-release.php --layout=inside` also produces `vertex-platform-hostinger-single-folder-<date>.zip`: a folder `upload_to_public_html/` (index.php, install.php, assets/, and the `vertex/` application folder inside it) plus `vertex-database.sql` beside it. Upload the **contents** of `upload_to_public_html/` into `public_html/`, open `/install.php`. The installer writes `vertex/.htaccess` (deny all) and then probes `/vertex/bootstrap.php`, warning if the server still serves it. The sibling layout above is safer (nothing application-related is under the web root) and is preferred when possible. Keep `vertex-database.sql` out of `public_html`.
+
+## Public website (migration 0018)
+
+See `docs/20-PUBLIC-WEBSITE.md`. Deployment notes: visitor uploads are private (`storage/uploads`); two optional variables `UPLOAD_ENQUIRY_MAX_MB` and `UPLOAD_CAREER_MAX_MB`; `APP_URL` must be the public https address because canonical links, Open Graph tags and `sitemap.xml` use it. After deploying, set the company name and public contact details in *Integrations & settings -> Website*, complete and publish the five policy drafts (they are hidden until then), add real team/partner/portfolio/opening entries, and submit `https://YOUR-DOMAIN/sitemap.xml` to Google Search Console.

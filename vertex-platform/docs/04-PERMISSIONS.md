@@ -107,6 +107,8 @@ Users can hold several roles; permissions are the union.
 | `cms.edit` — Edit draft website content | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | `cms.publish` — Publish website content | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `legal.manage` — Edit legal pages and policies | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `careers.view` — View job applications | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `careers.manage` — Review job applications and change their status | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Ai** | | | | | | | | | | |
 | `ai.use` — Use the AI assistant (drafts only; sees only records the user can open) | ✔ | ✔ | ✔ |  |  |  |  |  |  |  |
 | **Pricing** | | | | | | | | | | |
