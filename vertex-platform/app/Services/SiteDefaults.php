@@ -86,6 +86,14 @@ final class SiteDefaults
                 'apply' => ['label' => 'Become a partner', 'fields' => ['heading' => self::f('Heading', 'text', 100), 'body' => self::f('Text', 'textarea', 600), 'button_label' => self::f('Button text', 'text', 60), 'button_url' => self::f('Button address', 'url')],
                     'data' => ['heading' => 'Become a partner', 'body' => 'Interested in collaborating with {company}? Submit your details and tell us how you would like to work together.', 'button_label' => 'Apply to Become a Partner', 'button_url' => '/partners/apply']],
             ]],
+            'clients' => ['label' => 'Our Clients page', 'path' => '/our-clients', 'sections' => [
+                'header' => ['label' => 'Page heading', 'fields' => ['title' => self::f('Title', 'text', 160), 'intro' => self::f('Introduction', 'textarea', 1000)],
+                    'data' => ['title' => 'Our Clients', 'intro' => '{company} works with clients from various countries. Here are some of the businesses and organisations we have had the privilege of working with.']],
+                'empty' => ['label' => 'Text shown while no client is published', 'fields' => ['body' => self::f('Text', 'textarea', 500)],
+                    'data' => ['body' => 'We work with clients from various countries. Our client list will be shown here as clients agree to be featured.']],
+                'cta' => ['label' => 'Call to action', 'fields' => ['heading' => self::f('Heading', 'text', 100), 'body' => self::f('Text', 'textarea', 400), 'button_label' => self::f('Button text', 'text', 60), 'button_url' => self::f('Button address', 'url')],
+                    'data' => ['heading' => 'Work with us', 'body' => 'Tell us about your project and we will review your requirements.', 'button_label' => 'Start Your Project', 'button_url' => '/request-quote']],
+            ]],
             'portfolio' => ['label' => 'Portfolio page', 'path' => '/portfolio', 'sections' => [
                 'header' => ['label' => 'Page heading', 'fields' => ['title' => self::f('Title', 'text', 160), 'intro' => self::f('Introduction', 'textarea', 800)],
                     'data' => ['title' => 'Selected Work', 'intro' => 'Explore selected projects that demonstrate our creative approach, technical work and range of services.']],
@@ -155,6 +163,17 @@ final class SiteDefaults
             ['category' => 'Support', 'question' => 'How can I contact support?', 'answer' => 'Use the Contact page or the support facility provided for your account, where available.'],
             ['category' => 'Opportunities', 'question' => 'How do I apply for an opportunity?', 'answer' => 'Visit the Careers page and apply to a published opening using its application instructions.'],
             ['category' => 'Opportunities', 'question' => 'Can I become a partner?', 'answer' => 'You can submit a partnership application through the Our Partners page. Applications are subject to review.'],
+        ];
+    }
+
+    /** @return array{full_name:string,designation:string,bio:string,skills:string} the founder's profile (supplied by the business; edit or replace it under Website -> Team) */
+    public static function founder(): array
+    {
+        return [
+            'full_name' => 'Durvish Jawale',
+            'designation' => 'Founder & CEO',
+            'bio' => "Durvish Jawale is the Founder and CEO of The Young Books and Northform. A professional software developer, he combines hands-on engineering with business leadership, building practical web platforms and digital systems that help organisations work more clearly and grow with confidence.\n\nHe cares about clean, secure and maintainable software, honest communication with clients, and turning ideas into products that are ready for real-world use.",
+            'skills' => 'Software development, Web applications, Product and business leadership',
         ];
     }
 

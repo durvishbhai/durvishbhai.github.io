@@ -327,7 +327,7 @@ final class CmsService
         $base = rtrim((string) Config::get('app.url'), '/');
         $today = gmdate('Y-m-d');
         $out = [['loc' => $base . '/', 'lastmod' => $today]];
-        $paths = ['/about', '/services', '/our-partners', '/careers', '/contact', '/request-quote', '/faq', '/partners/apply', '/sitemap'];
+        $paths = ['/about', '/services', '/our-clients', '/our-partners', '/careers', '/contact', '/request-quote', '/faq', '/partners/apply', '/sitemap'];
         if (SiteContent::hasPublished('team')) {
             $paths[] = '/our-team';
         }

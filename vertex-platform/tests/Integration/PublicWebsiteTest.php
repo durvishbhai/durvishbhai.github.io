@@ -57,7 +57,7 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         $this->seed();
         $c = $this->client();
-        foreach (['/', '/about', '/services', '/our-team', '/our-partners', '/portfolio', '/careers', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
+        foreach (['/', '/about', '/services', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/careers', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
             $r = $c->get($path);
             $this->assertSame(200, $r['status'], $path);
             $this->assertSame(1, preg_match_all('#<h1[ >]#', $r['body']), "{$path} has exactly one h1");
@@ -76,7 +76,9 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         $this->seed();
         $this->assertSame(10, (int) Database::one('SELECT COUNT(*) c FROM site_services')['c']);
-        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_team')['c'], 'no invented employees');
+        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM site_team')['c'], 'only the founder profile supplied by the business');
+        $this->assertSame('Durvish Jawale', Database::one('SELECT full_name FROM site_team')['full_name']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_clients')['c'], 'no invented clients');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_partners')['c'], 'no invented partners');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_portfolio')['c'], 'no invented projects');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_jobs')['c'], 'no invented openings');
@@ -86,7 +88,12 @@ final class PublicWebsiteTest extends HttpTestCase
         $c = $this->client();
         $team = $c->get('/our-team')['body'];
         $this->assertStringContainsString('<h1', $team);
-        $this->assertSame(0, preg_match_all('#class="team-card#', $team), 'an empty team page lists nobody');
+        $this->assertSame(1, preg_match_all('#class="team-card#', $team), 'the team page lists only the founder');
+        $this->assertStringContainsString('Durvish Jawale', $team);
+        $this->assertStringContainsString('Founder &amp; CEO', $team);
+        $this->assertStringContainsString('The Young Books and Northform', $team);
+        $this->assertStringContainsString('We work with clients from various countries', $c->get('/our-clients')['body'], 'an empty client list says so instead of inventing logos');
+        $this->assertSame(0, preg_match_all('#client-card#', $c->get('/our-clients')['body']));
         $this->assertSame(0, preg_match_all('#class="portfolio-card#', $c->get('/portfolio')['body']));
 
         SiteSeeder::run($this->admin, false);
@@ -148,6 +155,33 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertStringContainsString('4,999', $c->get('/services/' . $row['slug'])['body']);
     }
 
+    public function testClientsAreEditableGroupedByCountryAndOnlyPublishedOnesShow(): void
+    {
+        $a = SiteContent::save($this->admin, 'clients', null, ['name' => 'Acme Retail', 'country' => 'India', 'description' => 'Online store']);
+        $b = SiteContent::save($this->admin, 'clients', null, ['name' => 'Borealis Studio', 'country' => 'Canada']);
+        SiteContent::save($this->admin, 'clients', null, ['name' => 'Hidden Draft Ltd', 'country' => 'Norway']);
+        SiteContent::setStatus($this->admin, 'clients', SiteContent::find('clients', $a['public_id']), 'published');
+        SiteContent::setStatus($this->admin, 'clients', SiteContent::find('clients', $b['public_id']), 'published');
+        $c = $this->client();
+        $page = $c->get('/our-clients')['body'];
+        $this->assertStringContainsString('Acme Retail', $page);
+        $this->assertStringContainsString('Borealis Studio', $page);
+        $this->assertStringNotContainsString('Hidden Draft Ltd', $page);
+        $this->assertStringContainsString('>Canada<', $page);
+        $this->assertStringContainsString('>India<', $page);
+        $this->assertLessThan(strpos($page, '>India<'), strpos($page, '>Canada<'), 'countries are listed alphabetically');
+        $this->assertStringContainsString('/our-clients', $c->get('/sitemap.xml')['body']);
+
+        // editable from the dashboard
+        $admin = $this->loggedIn('admin@x.test');
+        $this->assertStringContainsString('Acme Retail', $admin->get('/admin/site/clients')['body']);
+        $admin->post('/admin/site/clients/' . $a['public_id'], ['name' => 'Acme Retail Group', 'country' => 'Japan'], '/admin/site/clients/' . $a['public_id']);
+        $this->assertStringContainsString('Acme Retail Group', $c->get('/our-clients')['body']);
+        $admin->post('/admin/site/clients/' . $a['public_id'] . '/status', ['action' => 'archive', 'confirm_password' => self::PASSWORD], '/admin/site/clients/' . $a['public_id']);
+        $this->assertStringNotContainsString('Acme Retail', $c->get('/our-clients')['body']);
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/admin/site/clients')['status']);
+    }
+
     // ------------------------------------------------------------------------------------------------ policies
 
     public function testPoliciesStayHiddenUntilCompletedAndEveryChangeIsAVersion(): void
@@ -194,7 +228,7 @@ final class PublicWebsiteTest extends HttpTestCase
         }
         $admin = $this->loggedIn('admin@x.test');
         $this->assertSame(200, $admin->get('/admin/site')['status']);
-        foreach (['services', 'team', 'partners', 'portfolio', 'jobs', 'faqs', 'policies'] as $entity) {
+        foreach (['services', 'team', 'clients', 'partners', 'portfolio', 'jobs', 'faqs', 'policies'] as $entity) {
             $this->assertSame(200, $admin->get('/admin/site/' . $entity)['status'], $entity);
         }
         $this->assertSame(200, $admin->get('/admin/site/menus')['status']);
@@ -376,7 +410,7 @@ final class PublicWebsiteTest extends HttpTestCase
     public function testCmsPagesCannotShadowTheNewWebsiteAddresses(): void
     {
         $admin = $this->loggedIn('admin@x.test');
-        foreach (['our-team', 'our-partners', 'portfolio', 'careers', 'faq', 'privacy-policy', 'terms-and-conditions', 'sitemap', 'request-quote'] as $slug) {
+        foreach (['our-team', 'our-clients', 'our-partners', 'portfolio', 'careers', 'faq', 'privacy-policy', 'terms-and-conditions', 'sitemap', 'request-quote'] as $slug) {
             $before = (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'];
             $admin->post('/admin/cms', ['title' => 'Shadow ' . $slug, 'slug' => $slug], '/admin/cms');
             $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'], "{$slug} is reserved");

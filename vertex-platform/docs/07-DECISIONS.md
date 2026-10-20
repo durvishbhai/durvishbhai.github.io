@@ -144,6 +144,7 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-101 | Visitor uploads (enquiry attachments, résumés) go to the private store and are served only to authorised staff as forced downloads. | Private uploads; no public file URLs. |
 | D-102 | An already-installed site is upgraded by a key-gated `upgrade.php` that runs the forward-only migrations and adds new permissions, then deletes itself. | Hostinger customers without SSH can still apply database changes. |
 | D-103 | The Owner (super admin) may approve items they recorded or uploaded themselves (`Gate::canSelfApprove`); every other role stays bound by separation of duties. | Requested by the business owner; the action is still audited. |
+| D-104 | Our Clients is its own editable list (`site_clients`, grouped by country) beside Our Partners; it ships empty and states only that the business works with clients from various countries. The founder's profile is seeded because the business supplied it. | The business asked for both pages; no client names or logos are invented. |
 
 ## External integrations and credentials
 

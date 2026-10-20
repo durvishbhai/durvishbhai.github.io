@@ -139,6 +139,25 @@ final class SitePageController extends Controller
     }
 
     /** @param array<string,string> $params */
+    public function clients(Request $request, array $params = []): Response
+    {
+        $this->guard();
+        $h = SiteSections::get('clients', 'header');
+        $groups = [];
+        foreach (SiteContent::published('clients') as $c) {
+            $groups[trim((string) $c['country']) !== '' ? (string) $c['country'] : ''][] = $c;
+        }
+        ksort($groups);
+        if (isset($groups[''])) { // clients without a country come last
+            $none = $groups[''];
+            unset($groups['']);
+            $groups[''] = $none;
+        }
+
+        return $this->render('site/clients', SiteText::tokens($h['title']), ['groups' => $groups], self::plain($h['intro']), '/our-clients');
+    }
+
+    /** @param array<string,string> $params */
     public function portfolio(Request $request, array $params = []): Response
     {
         $this->guard();
@@ -241,7 +260,7 @@ final class SitePageController extends Controller
     public function sitemap(Request $request, array $params = []): Response
     {
         $this->guard();
-        $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio'], ['Careers', '/careers']],
+        $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Clients', '/our-clients'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio'], ['Careers', '/careers']],
             'Get in touch' => [['Contact Us', '/contact'], ['Project Requirements', '/request-quote'], ['FAQ', '/faq'], ['Become a referral partner', '/partners/apply'], ['Client login', '/login']]];
         foreach (SiteContent::published('services') as $s) {
             $groups['Services'][] = [(string) $s['name'], '/services/' . $s['slug']];

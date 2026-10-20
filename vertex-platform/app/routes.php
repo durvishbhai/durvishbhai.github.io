@@ -89,6 +89,7 @@ return static function (Router $router): void {
     $router->get('/services', [SitePageController::class, 'services'], ['nosession']);
     $router->get('/services/{slug}', [SitePageController::class, 'service'], ['nosession']);
     $router->get('/our-team', [SitePageController::class, 'team'], ['nosession']);
+    $router->get('/our-clients', [SitePageController::class, 'clients'], ['nosession']);
     $router->get('/our-partners', [SitePageController::class, 'partners'], ['nosession']);
     $router->get('/portfolio', [SitePageController::class, 'portfolio'], ['nosession']);
     $router->get('/portfolio/{slug}', [SitePageController::class, 'project'], ['nosession']);

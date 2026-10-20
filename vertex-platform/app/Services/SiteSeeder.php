@@ -24,11 +24,11 @@ final class SiteSeeder
         }
     }
 
-    /** @return array{services:int,faqs:int,policies:int} how many items were added */
+    /** @return array{services:int,faqs:int,policies:int,team:int} how many items were added */
     public static function run(int $actorId, bool $force = false): array
     {
         Gate::authorize('cms.publish', $actorId);
-        $added = ['services' => 0, 'faqs' => 0, 'policies' => 0];
+        $added = ['services' => 0, 'faqs' => 0, 'policies' => 0, 'team' => 0];
         Database::transaction(function () use ($actorId, $force, &$added): void {
             $first = !self::done();
             $pos = 0;
@@ -48,6 +48,13 @@ final class SiteSeeder
                     Database::run("INSERT INTO site_faqs (public_id, category, question, answer, status, position, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, 'published', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())", [uuid_hex(), $f['category'], $f['question'], $f['answer'], $pos, $actorId]);
                     $added['faqs']++;
                 }
+            }
+            // The founder's profile, supplied by the business. Added on first load, or later only while the team list is empty (never brings back a profile that was deleted when others exist).
+            if (($first || $force) && (int) Database::one('SELECT COUNT(*) AS c FROM site_team')['c'] === 0) {
+                $m = SiteDefaults::founder();
+                Database::run("INSERT INTO site_team (public_id, full_name, designation, department, bio, skills, status, position, created_by, created_at, updated_at) VALUES (?, ?, ?, 'leadership', ?, ?, 'published', 10, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                    [uuid_hex(), $m['full_name'], $m['designation'], $m['bio'], $m['skills'], $actorId]);
+                $added['team']++;
             }
             foreach (SiteDefaults::policies() as $p) {
                 if ((!$first && !$force) || Database::one('SELECT 1 AS x FROM site_policies WHERE slug = ?', [$p['slug']]) !== null) {

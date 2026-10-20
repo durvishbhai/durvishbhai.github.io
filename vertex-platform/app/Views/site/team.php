@@ -12,7 +12,7 @@ $labels = ['leadership' => 'Leadership', 'creative' => 'Creative Team', 'develop
     <div class="team-grid"><?php foreach ($groups[$key] as $m) : $im = SiteContent::image($m, 'photo_media_id'); ?>
         <article class="team-card"><?php if ($im) : ?><img src="<?= e($im['url']) ?>" alt="<?= e($im['alt'] !== '' ? $im['alt'] : (string) $m['full_name']) ?>" loading="lazy" width="<?= $im['w'] ?>" height="<?= $im['h'] ?>"><?php else : ?><div class="avatar" aria-hidden="true"><?= e(mb_strtoupper(mb_substr((string) $m['full_name'], 0, 1))) ?></div><?php endif; ?>
             <h3><?= e($m['full_name']) ?></h3><p class="role"><?= e($m['designation']) ?></p>
-            <?php if ($m['bio']) : ?><p><?= e($m['bio']) ?></p><?php endif; ?>
+            <?php if ($m['bio']) : ?><div class="bio"><?= SiteText::rich((string) $m['bio']) ?></div><?php endif; ?>
             <?php if ($m['skills']) : ?><p class="chip-row"><?php foreach (array_slice(array_filter(array_map('trim', explode(',', (string) $m['skills']))), 0, 8) as $sk) : ?><span class="pub-chip"><?= e($sk) ?></span><?php endforeach; ?></p><?php endif; ?>
             <p class="social"><?php foreach (['linkedin_url' => 'LinkedIn', 'x_url' => 'X', 'website_url' => 'Website'] as $col => $lab) : if ($m[$col]) : ?><a href="<?= shref((string) $m[$col]) ?>" rel="noopener noreferrer" target="_blank"><?= $lab ?></a> <?php endif; endforeach; ?></p></article>
     <?php endforeach; ?></div>

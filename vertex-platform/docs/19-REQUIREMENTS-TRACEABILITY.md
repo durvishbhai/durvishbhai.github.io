@@ -64,7 +64,7 @@ The requirement table lists "Graphic Designer: Full Access" — this is treated 
 
 ## Public website expansion
 
-Pages, CMS-managed content, forms, SEO, permissions and tests: `docs/20-PUBLIC-WEBSITE.md`. Team, Partners, Portfolio and Openings ship empty by design (no invented people, logos, clients or testimonials); the five policies ship as drafts that cannot be published until completed.
+Pages, CMS-managed content, forms, SEO, permissions and tests: `docs/20-PUBLIC-WEBSITE.md`. Partners, Clients, Portfolio and Openings ship empty by design (no invented logos, clients or testimonials); the Team ships with only the founder profile the business supplied; the five policies ship as drafts that cannot be published until completed.
 
 ## Not built (stated plainly)
 

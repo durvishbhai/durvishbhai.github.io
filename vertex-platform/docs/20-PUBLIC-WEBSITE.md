@@ -17,6 +17,7 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 | About Us | `/about` | About sections |
 | Services | `/services`, `/services/{slug}` | Website -> Services |
 | Our Team | `/our-team` | Website -> Team (page and menu link appear only when someone is published) |
+| Our Clients | `/our-clients` | Website -> Clients (name, country, logo, description, website); shown grouped by country; page wording under Page wording -> Our Clients page |
 | Our Partners | `/our-partners` | Website -> Partners + the existing referral-partner application (`/partners/apply`) |
 | Portfolio | `/portfolio`, `/portfolio/{slug}` | Website -> Portfolio (hidden until a project is published) |
 | Careers | `/careers`, `/careers/{slug}`, `/careers/apply` | Website -> Openings; applications in Administration -> Job applications |
@@ -30,7 +31,7 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 ## What an editor controls
 
 * **Page wording and section order** for Home, About, Services, Team, Partners, Portfolio, Careers, Contact, Project Requirements and FAQ: each section can be shown/hidden, re-ordered, reworded, or reset to the shipped text.
-* **Lists** (Services, Team, Partners, Portfolio, Openings, FAQs, Policies): draft -> published -> archived (openings can also be *closed*), manual order, SEO title/description, pictures from the Media library.
+* **Lists** (Services, Team, Clients, Partners, Portfolio, Openings, FAQs, Policies): draft -> published -> archived (openings can also be *closed*), manual order, SEO title/description, pictures from the Media library.
 * **Policies** keep every saved wording as a numbered version with an effective date; an older version can be restored.
 * **Menus**: header (with an automatic *Services* dropdown) and footer. A saved menu overrides the built-in one; links to unpublished policies are never shown.
 * **Contact details and social links**: Integrations & settings -> Website. Empty values are not displayed anywhere.
@@ -38,7 +39,7 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 
 ## Content rules the code enforces
 
-* Nothing is invented. The only content shipped is the services/FAQ/principles text supplied by the business and five **draft** policies. **Team, Partners, Portfolio and Openings start empty**, and the pages say so plainly (or hide the section) instead of showing fake people, logos, clients, testimonials, awards, statistics or prices.
+* Nothing is invented. The only content shipped is the services/FAQ/principles text supplied by the business and five **draft** policies. **Partners, Clients, Portfolio and Openings start empty**; the Team starts with only the founder profile supplied by the business (Durvish Jawale, Founder & CEO), which can be edited or replaced, and the pages say so plainly (or hide the section) instead of showing fake people, logos, clients, testimonials, awards, statistics or prices.
 * A **price** is only shown when the editor ticks "Show a starting price".
 * Contact details, address and social links appear only when entered; the address needs an extra "Show address" tick.
 * **Policies cannot be published while they contain `[ADMIN TO COMPLETE ...]`.** They are starting drafts that need review by the business (and a lawyer); they are not legal advice. Until published they do not exist for visitors, are not linked, and are not in the sitemap.
@@ -68,7 +69,7 @@ Customers, partners and other staff roles get 403 on every `/admin/site*` and `/
 
 ## Database (migration `0018_public_website.sql`)
 
-New tables: `site_sections`, `site_services`, `site_team`, `site_partners`, `site_portfolio`, `site_jobs`, `site_job_applications`, `site_faqs`, `site_policies`, `site_policy_versions`, `enquiry_details`, `enquiry_files`. Migration `0017` (earlier) must also be applied. A fresh install already contains everything (`vertex-database.sql`). An existing site is upgraded with `upgrade.php` (see 08-DEPLOYMENT).
+New tables: (0019: `site_clients`) `site_sections`, `site_services`, `site_team`, `site_partners`, `site_portfolio`, `site_jobs`, `site_job_applications`, `site_faqs`, `site_policies`, `site_policy_versions`, `enquiry_details`, `enquiry_files`. Migrations `0017` and `0019` (clients) must also be applied. A fresh install already contains everything (`vertex-database.sql`). An existing site is upgraded with `upgrade.php` (see 08-DEPLOYMENT).
 
 ## Environment variables
 
@@ -76,7 +77,7 @@ Two optional ones: `UPLOAD_ENQUIRY_MAX_MB` (default 10) and `UPLOAD_CAREER_MAX_M
 
 ## Tests
 
-`tests/Integration/PublicWebsiteTest.php` (17 tests) covers: every public page renders with one `h1`, title, description, canonical and Open Graph tags; starting content and the "nothing invented" rule; drafts/archived items are invisible and absent from the sitemap; markup is escaped; prices stay hidden; policy gating and versioning; admin permissions (visitor, customer, partner, developer, manager, administrator); CSRF; menu and wording edits and reset; contact and requirements forms with extra answers and private attachments; rejected attachments store nothing; job applications, consent, honeypot, executable résumé refused, staff-only download; FAQ search markup, `robots.txt`, `sitemap.xml`; reserved addresses. Run `vendor/bin/phpunit`.
+`tests/Integration/PublicWebsiteTest.php` (18 tests) covers: every public page renders with one `h1`, title, description, canonical and Open Graph tags; starting content and the "nothing invented" rule; drafts/archived items are invisible and absent from the sitemap; markup is escaped; prices stay hidden; policy gating and versioning; admin permissions (visitor, customer, partner, developer, manager, administrator); CSRF; menu and wording edits and reset; contact and requirements forms with extra answers and private attachments; rejected attachments store nothing; job applications, consent, honeypot, executable résumé refused, staff-only download; FAQ search markup, `robots.txt`, `sitemap.xml`; reserved addresses. Run `vendor/bin/phpunit`.
 
 ## Known limits
 

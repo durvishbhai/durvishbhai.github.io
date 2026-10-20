@@ -33,6 +33,7 @@ final class SiteMenu
         if (SiteContent::hasPublished('team')) {
             $items[] = ['label' => 'Our Team', 'url' => '/our-team'];
         }
+        $items[] = ['label' => 'Our Clients', 'url' => '/our-clients'];
         $items[] = ['label' => 'Our Partners', 'url' => '/our-partners'];
         if (SiteContent::hasPublished('portfolio')) {
             $items[] = ['label' => 'Portfolio', 'url' => '/portfolio'];
@@ -57,7 +58,7 @@ final class SiteMenu
         }
         $defaults = [
             'footer_explore' => ['Explore', $explore],
-            'footer_opportunities' => ['Opportunities', [['label' => 'Our Partners', 'url' => '/our-partners'], ['label' => 'Careers', 'url' => '/careers'], ['label' => 'Project Requirements', 'url' => '/request-quote']]],
+            'footer_opportunities' => ['Opportunities', [['label' => 'Our Clients', 'url' => '/our-clients'], ['label' => 'Our Partners', 'url' => '/our-partners'], ['label' => 'Careers', 'url' => '/careers'], ['label' => 'Project Requirements', 'url' => '/request-quote']]],
             'footer_support' => ['Support', [['label' => 'Contact Us', 'url' => '/contact'], ['label' => 'FAQ', 'url' => '/faq'], ['label' => 'Client login', 'url' => '/login']]],
             'footer_legal' => ['Legal', $legal],
         ];

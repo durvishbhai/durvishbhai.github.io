@@ -21,7 +21,7 @@ final class RouteSweepTest extends HttpTestCase
         '/', '/health', '/login', '/login/two-factor', '/register', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
         '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received', '/f/{slug}', '/f/{slug}/thanks',
         '/sitemap.xml', '/robots.txt', '/webhooks/phonepe', '/{slug}', '/{section}/{slug}',
-        '/about', '/services', '/services/{slug}', '/our-team', '/our-partners', '/portfolio', '/portfolio/{slug}', '/careers', '/careers/received', '/careers/{slug}', '/careers/apply', '/faq', '/sitemap', '/project-requirements',
+        '/about', '/services', '/services/{slug}', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/portfolio/{slug}', '/careers', '/careers/received', '/careers/{slug}', '/careers/apply', '/faq', '/sitemap', '/project-requirements',
         '/privacy-policy', '/terms-and-conditions', '/refund-and-cancellation-policy', '/payment-policy', '/cookie-policy',
     ];
 

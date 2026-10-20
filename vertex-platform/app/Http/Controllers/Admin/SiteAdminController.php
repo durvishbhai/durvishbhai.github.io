@@ -53,7 +53,7 @@ final class SiteAdminController extends Controller
         return $this->guarded(function (): Response {
             $a = SiteSeeder::run($this->actorId(), true);
 
-            return $this->ok('/admin/site', "Starting content loaded: {$a['services']} service(s), {$a['faqs']} FAQ(s), {$a['policies']} draft policy(ies). Nothing you already have was changed.");
+            return $this->ok('/admin/site', "Starting content loaded: {$a['services']} service(s), {$a['faqs']} FAQ(s), {$a['policies']} draft policy(ies) and {$a['team']} team profile(s). Nothing you already have was changed.");
         }, '/admin/site');
     }
 

@@ -47,6 +47,12 @@ final class SiteEntities
                     'name' => self::t('Organisation name', 160, true), 'logo' => ['label' => 'Logo', 'kind' => 'media', 'col' => 'logo_media_id'], 'description' => self::t('Short description', 500),
                     'category' => self::t('Partnership category', 60), 'website_url' => ['label' => 'Website address', 'kind' => 'url'], 'contact_url' => ['label' => 'Public contact link', 'kind' => 'url'],
                 ]],
+            'clients' => ['label' => 'Clients', 'singular' => 'client', 'table' => 'site_clients', 'title' => 'name', 'slug' => false, 'statuses' => ['draft', 'published', 'archived'], 'public' => '/our-clients', 'edit' => 'cms.edit', 'publish' => 'cms.publish',
+                'help' => 'Add only clients who have agreed to be shown (name and logo). The country is shown with each client, and visitors see them grouped by country. Nothing appears until you publish it.',
+                'fields' => [
+                    'name' => self::t('Client or organisation name', 160, true), 'country' => self::t('Country', 80, false, 'For example India, United Arab Emirates, United Kingdom'), 'logo' => ['label' => 'Logo', 'kind' => 'media', 'col' => 'logo_media_id'],
+                    'description' => self::t('Short description (optional)', 500), 'website_url' => ['label' => 'Website address', 'kind' => 'url'],
+                ]],
             'portfolio' => ['label' => 'Portfolio', 'singular' => 'project', 'table' => 'site_portfolio', 'title' => 'title', 'slug' => true, 'statuses' => ['draft', 'published', 'archived'], 'public' => '/portfolio/', 'edit' => 'cms.edit', 'publish' => 'cms.publish',
                 'help' => 'Only real projects you are authorised to show. Never use confidential client files.',
                 'fields' => [
