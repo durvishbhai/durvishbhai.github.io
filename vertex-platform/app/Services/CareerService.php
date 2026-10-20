@@ -17,10 +17,18 @@ final class CareerService
 {
     public const STATUSES = ['new' => 'New', 'reviewing' => 'Under review', 'shortlisted' => 'Shortlisted', 'not_selected' => 'Not selected', 'withdrawn' => 'Withdrawn', 'archived' => 'Archived'];
 
+    public const EXPERIENCE = ['fresher' => 'Fresher or student', 'lt1' => 'Less than 1 year', '1to3' => '1 to 3 years', '3to5' => '3 to 5 years', '5plus' => 'More than 5 years'];
+    public const AVAILABILITY = ['immediate' => 'Immediately', '2weeks' => 'Within 2 weeks', '1month' => 'Within a month', 'flexible' => 'Flexible / to be discussed'];
+
     /** @return array<string,string> the roles a visitor may apply for: published openings, the listed categories and "Other" */
     public static function roleChoices(): array
     {
         $out = [];
+        if (SiteHiring::isOpen()) {
+            foreach (SiteHiring::roleTitles() as $t) {
+                $out[$t] = $t;
+            }
+        }
         foreach (SiteContent::published('jobs') as $j) {
             $out[(string) $j['title']] = (string) $j['title'];
         }
@@ -55,6 +63,14 @@ final class CareerService
         $role = $try(fn () => FieldRules::choice($in['role'] ?? '', self::roleChoices(), 'role', true));
         $skills = $try(fn () => FieldRules::text($in['skills_experience'] ?? '', 'Skills and experience', 20, 4000));
         $intro = $try(fn () => FieldRules::text($in['intro'] ?? '', 'Short introduction', 20, 2000));
+        $exp = (string) ($in['experience'] ?? '');
+        $avail = (string) ($in['availability'] ?? '');
+        if (($exp !== '' && !isset(self::EXPERIENCE[$exp])) || ($avail !== '' && !isset(self::AVAILABILITY[$avail]))) {
+            $errors[] = 'Please choose from the listed experience and availability options.';
+        }
+        if (is_string($skills) && ($exp !== '' || $avail !== '') && !in_array('Please choose from the listed experience and availability options.', $errors, true)) {
+            $skills = trim(($exp !== '' ? 'Experience: ' . self::EXPERIENCE[$exp] . ".\n" : '') . ($avail !== '' ? 'Available: ' . self::AVAILABILITY[$avail] . ".\n" : '') . "\n" . $skills);
+        }
         $url = trim((string) ($in['portfolio_url'] ?? ''));
         if ($url !== '' && (!preg_match('#^https://[A-Za-z0-9][A-Za-z0-9.\-]*(:\d+)?(/\S*)?$#', $url) || mb_strlen($url) > 300 || preg_match('/[<>"\']/', $url))) {
             $errors[] = 'The portfolio address must start with https://';

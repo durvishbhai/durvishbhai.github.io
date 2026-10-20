@@ -15,6 +15,7 @@ use Vertex\Services\Gate;
 use Vertex\Services\SiteContent;
 use Vertex\Services\SiteDefaults;
 use Vertex\Services\SiteEntities;
+use Vertex\Services\SiteHiring;
 use Vertex\Services\SiteSeeder;
 use Vertex\Services\SiteSections;
 
@@ -103,6 +104,28 @@ final class SiteAdminController extends Controller
 
             return $this->ok($to, 'The original wording is back.');
         }, $to);
+    }
+
+    // ------------------------------------------------------------------------------------------------ hiring
+
+    /** @param array<string,string> $params */
+    public function hiring(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $apps = (Gate::can('careers.view', $uid) || Gate::can('careers.manage', $uid)) ? (int) \Vertex\Core\Database::one("SELECT COUNT(*) AS c FROM site_job_applications WHERE status = 'new'")['c'] : null;
+
+        return $this->page('admin/site/hiring', ['title' => 'Hiring', 'state' => SiteHiring::state(), 'states' => SiteHiring::STATES, 'roles' => SiteHiring::roles(), 'canPublish' => Gate::can('cms.publish', $uid), 'newApplications' => $apps]);
+    }
+
+    /** @param array<string,string> $params */
+    public function hiringState(Request $request, array $params = []): Response
+    {
+        return $this->guarded(function () use ($request): Response {
+            SiteHiring::set($this->actorId(), $request->string('state'));
+            $msg = ['open' => 'Hiring is open: the page shows the roles and the form.', 'closed' => 'Hiring is closed: the page says so and takes no applications.', 'hidden' => 'The Hiring page is hidden from visitors.'];
+
+            return $this->ok('/admin/site/hiring', $msg[SiteHiring::state()] ?? 'Saved.');
+        }, '/admin/site/hiring');
     }
 
     // ------------------------------------------------------------------------------------------------ menus

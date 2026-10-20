@@ -57,7 +57,7 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         $this->seed();
         $c = $this->client();
-        foreach (['/', '/about', '/services', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/careers', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
+        foreach (['/', '/about', '/services', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/careers', '/hiring', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
             $r = $c->get($path);
             $this->assertSame(200, $r['status'], $path);
             $this->assertSame(1, preg_match_all('#<h1[ >]#', $r['body']), "{$path} has exactly one h1");
@@ -389,6 +389,118 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'an executable résumé is refused');
     }
 
+    // ------------------------------------------------------------------------------------------------ hiring page
+
+    /** @return array<string,string> */
+    private function hiringForm(array $over = []): array
+    {
+        return $over + ['role' => 'Video Editor', 'full_name' => 'Hira Hiring', 'email' => 'hira@web.test', 'experience' => '1to3', 'availability' => '2weeks',
+            'skills_experience' => 'Premiere Pro and DaVinci Resolve, short-form and YouTube edits.', 'portfolio_url' => 'https://example.com/reel', 'intro' => 'I would like to edit videos for your team.', 'consent' => '1', 'website_url' => ''];
+    }
+
+    public function testHiringPageListsTheFourRolesWithTheSalaryNoteAndAnInteractiveForm(): void
+    {
+        $c = $this->client();
+        $r = $c->get('/hiring');
+        $this->assertSame(200, $r['status']);
+        foreach (['Full Stack Developer', 'Frontend Developer', 'Backend Developer', 'Video Editor'] as $role) {
+            $this->assertStringContainsString('data-role="' . $role . '"', $r['body'], $role);
+            $this->assertStringContainsString('<option value="' . $role . '"', $r['body'], $role);
+        }
+        $this->assertStringContainsString('Salary will be decided after the meeting', $r['body']);
+        $this->assertStringContainsString('data-hire-form', $r['body']);
+        $this->assertStringContainsString('action="/hiring/apply"', $r['body']);
+        $this->assertStringContainsString('/hiring', $c->get('/sitemap.xml')['body']);
+        $this->assertStringContainsString("We're hiring", $c->get('/about')['body'], 'an announcement bar shows on other pages while hiring is open');
+        $this->assertStringNotContainsString('announce', $r['body'], 'but not on the hiring page itself');
+        $this->assertStringContainsString('href="/hiring"', $c->get('/')['body']);
+        $this->assertStringContainsString('role-card is-selected', $c->get('/hiring?role=Backend+Developer')['body'], 'a role can be pre-selected from a link');
+    }
+
+    public function testHiringApplicationIsStoredWithTheRoleExperienceAndAvailability(): void
+    {
+        $c = $this->client();
+        $resume = $this->png('reel.png');
+        $r = $c->upload('/hiring/apply', $this->hiringForm(), ['resume' => [$resume['tmp_name'], 'reel.png', 'image/png']], '/hiring');
+        $this->assertSame(303, $r['status'], $r['body']);
+        $this->assertSame('/hiring/received', $r['location']);
+        $app = Database::one("SELECT * FROM site_job_applications WHERE email = 'hira@web.test'");
+        $this->assertNotNull($app);
+        $this->assertSame('Video Editor', $app['role_applied']);
+        $this->assertStringContainsString('Experience: 1 to 3 years', $app['skills_experience']);
+        $this->assertStringContainsString('Available: Within 2 weeks', $app['skills_experience']);
+        $this->assertStringContainsString($app['reference'], $c->get('/hiring/received')['body']);
+        $this->assertStringContainsString('Hira Hiring', $this->loggedIn('admin@x.test')->get('/admin/careers/' . $app['public_id'])['body']);
+
+        $before = (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'];
+        $c->post('/hiring/apply', $this->hiringForm(['role' => 'Astronaut', 'email' => 'x@web.test']), '/hiring');
+        $c->post('/hiring/apply', $this->hiringForm(['experience' => 'forever', 'email' => 'y@web.test']), '/hiring');
+        $c->post('/hiring/apply', $this->hiringForm(['consent' => '', 'email' => 'z@web.test']), '/hiring');
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'unknown role, bad option and missing consent store nothing');
+        $this->assertSame(419, $c->postNoToken('/hiring/apply', $this->hiringForm(['email' => 'w@web.test']))['status']);
+    }
+
+    public function testAdminCanOpenCloseOrHideTheHiringPage(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        $c = $this->client();
+        $this->assertSame(200, $admin->get('/admin/site/hiring')['status']);
+        $this->assertStringContainsString('Hiring page status', $admin->get('/admin/site/hiring')['body']);
+
+        // Closed: the page stays, says so, and has no form; applications are refused
+        $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
+        $closed = $c->get('/hiring');
+        $this->assertSame(200, $closed['status']);
+        $this->assertStringContainsString('Hiring is currently closed', $closed['body']);
+        $this->assertStringNotContainsString('data-hire-form', $closed['body']);
+        $this->assertStringNotContainsString("We're hiring", $c->get('/about')['body'], 'no announcement while closed');
+        $before = (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'];
+        $r = $c->post('/hiring/apply', $this->hiringForm(['email' => 'late@web.test']));
+        $this->assertSame('/hiring', $r['location']);
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'no application is taken while closed');
+        $this->assertStringContainsString('/hiring', $c->get('/sitemap.xml')['body'], 'a closed page is still a page');
+
+        // Hidden: gone for visitors, menus, footer and sitemap
+        $admin->post('/admin/site/hiring/state', ['state' => 'hidden'], '/admin/site/hiring');
+        $this->assertSame(404, $c->get('/hiring')['status']);
+        $home = $c->get('/')['body'];
+        $this->assertStringNotContainsString('href="/hiring"', $home);
+        $this->assertStringNotContainsString('/hiring', $c->get('/sitemap.xml')['body']);
+        $this->assertStringNotContainsString('/hiring', $c->get('/sitemap')['body']);
+
+        // Open again
+        $admin->post('/admin/site/hiring/state', ['state' => 'open'], '/admin/site/hiring');
+        $this->assertSame(200, $c->get('/hiring')['status']);
+        $this->assertStringContainsString('data-hire-form', $c->get('/hiring')['body']);
+        $this->assertGreaterThan(0, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'site.hiring_state'")['c']);
+        $this->assertSame('invalid', $admin->post('/admin/site/hiring/state', ['state' => 'bogus'], '/admin/site/hiring')['status'] === 422 ? 'invalid' : 'other');
+    }
+
+    public function testOnlyPublishersCanChangeTheHiringStatus(): void
+    {
+        $m = $this->loggedIn('mgr@x.test');
+        $this->assertSame(200, $m->get('/admin/site/hiring')['status'], 'a manager can see the screen');
+        $this->assertSame(403, $m->post('/admin/site/hiring/state', ['state' => 'hidden'], '/admin/site/hiring')['status']);
+        $this->assertSame(200, $this->client()->get('/hiring')['status'], 'unchanged');
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/admin/site/hiring')['status']);
+        $this->assertSame(303, $this->client()->get('/admin/site/hiring')['status']);
+    }
+
+    public function testHiringWordingAndRolesAreEditableAndSurviveAWordingReset(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
+        $admin->post('/admin/site/sections/hiring', ['s' => ['roles' => ['enabled' => '1', 'f' => ['heading' => 'Where we need people', 'items' => "Data Analyst | Make sense of numbers.\nVideo Editor | Edit videos."]]]], '/admin/site/sections/hiring');
+        $admin->post('/admin/site/hiring/state', ['state' => 'open'], '/admin/site/hiring');
+        $page = $this->client()->get('/hiring')['body'];
+        $this->assertStringContainsString('Where we need people', $page);
+        $this->assertStringContainsString('data-role="Data Analyst"', $page);
+        $this->assertStringNotContainsString('data-role="Backend Developer"', $page);
+        $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
+        $admin->post('/admin/site/sections/hiring/reset', ['confirm_password' => self::PASSWORD], '/admin/site/sections/hiring');
+        $this->assertStringContainsString('Hiring is currently closed', $this->client()->get('/hiring')['body'], 'resetting the wording keeps the status');
+    }
+
     // ------------------------------------------------------------------------------------------------ misc
 
     public function testFaqPageIsSearchableAndRobotsAndSitemapAreSane(): void
@@ -410,7 +522,7 @@ final class PublicWebsiteTest extends HttpTestCase
     public function testCmsPagesCannotShadowTheNewWebsiteAddresses(): void
     {
         $admin = $this->loggedIn('admin@x.test');
-        foreach (['our-team', 'our-clients', 'our-partners', 'portfolio', 'careers', 'faq', 'privacy-policy', 'terms-and-conditions', 'sitemap', 'request-quote'] as $slug) {
+        foreach (['our-team', 'hiring', 'our-clients', 'our-partners', 'portfolio', 'careers', 'faq', 'privacy-policy', 'terms-and-conditions', 'sitemap', 'request-quote'] as $slug) {
             $before = (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'];
             $admin->post('/admin/cms', ['title' => 'Shadow ' . $slug, 'slug' => $slug], '/admin/cms');
             $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM cms_pages')['c'], "{$slug} is reserved");

@@ -93,6 +93,9 @@ return static function (Router $router): void {
     $router->get('/our-partners', [SitePageController::class, 'partners'], ['nosession']);
     $router->get('/portfolio', [SitePageController::class, 'portfolio'], ['nosession']);
     $router->get('/portfolio/{slug}', [SitePageController::class, 'project'], ['nosession']);
+    $router->get('/hiring', [SitePageController::class, 'hiring']);
+    $router->get('/hiring/received', [SitePageController::class, 'hiringReceived']);
+    $router->post('/hiring/apply', [SitePageController::class, 'hiringApply']);
     $router->get('/careers', [SitePageController::class, 'careers']);
     $router->get('/careers/received', [SitePageController::class, 'applied']);
     $router->get('/careers/{slug}', [SitePageController::class, 'job'], ['nosession']);
@@ -485,6 +488,8 @@ return static function (Router $router): void {
         $r->get('/site/menus', [SiteAdminController::class, 'menus'], ['can:cms.view']);
         $r->post('/site/menus/{location}', [SiteAdminController::class, 'saveMenu'], ['can:cms.publish']);
         $r->post('/site/menus/{location}/reset', [SiteAdminController::class, 'resetMenu'], ['can:cms.publish']);
+        $r->get('/site/hiring', [SiteAdminController::class, 'hiring'], ['can:cms.view']);
+        $r->post('/site/hiring/state', [SiteAdminController::class, 'hiringState'], ['can:cms.publish']);
         $r->get('/site/{entity}', [SiteAdminController::class, 'list'], ['can:cms.view']);
         $r->get('/site/{entity}/new', [SiteAdminController::class, 'form'], ['can:cms.edit,legal.manage']);
         $r->post('/site/{entity}', [SiteAdminController::class, 'save'], ['can:cms.edit,legal.manage']);

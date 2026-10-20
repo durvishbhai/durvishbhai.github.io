@@ -209,4 +209,90 @@
             });
         });
     }
+    // Hiring page: pick a role, live progress, counters, file name, role-aware hints
+    (function () {
+        var form = document.querySelector('[data-hire-form]');
+        if (!form) { return; }
+        var select = form.querySelector('[data-hire-role]');
+        var cards = document.querySelectorAll('[data-hire-roles] .role-card');
+        var linkLabel = form.querySelector('[data-hire-link-label]');
+        var skillsLabel = form.querySelector('[data-hire-skills-label]');
+        var skills = form.querySelector('#skills_experience');
+        var fileInput = form.querySelector('#resume');
+        var fileName = form.querySelector('[data-hire-file-name]');
+        var drop = form.querySelector('[data-hire-drop]');
+        var bar = form.parentNode.querySelector('[data-hire-bar]');
+        var barText = form.parentNode.querySelector('[data-hire-progress-text]');
+        var required = form.querySelectorAll('[required]');
+        var update = function () {
+            var done = 0;
+            required.forEach(function (el) {
+                if ((el.type === 'checkbox' ? el.checked : el.value.trim() !== '') && el.checkValidity()) { done++; }
+            });
+            var pct = Math.round(done * 100 / required.length);
+            if (bar) { bar.style.width = pct + '%'; }
+            if (barText) { barText.textContent = pct + '% complete'; }
+        };
+        var family = function () {
+            var o = select.options[select.selectedIndex];
+            return o ? o.getAttribute('data-family') : '';
+        };
+        var sync = function () {
+            var fam = family();
+            cards.forEach(function (c) {
+                var on = c.getAttribute('data-role') === select.value;
+                c.classList.toggle('is-selected', on);
+                c.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+            if (linkLabel) {
+                linkLabel.textContent = fam === 'video' ? 'Showreel or portfolio link (optional, https://…)' : 'GitHub or portfolio link (optional, https://…)';
+            }
+            if (skillsLabel) {
+                skillsLabel.textContent = fam === 'video' ? 'Editing tools and experience' : 'Tech stack and experience';
+            }
+            if (skills) {
+                skills.placeholder = fam === 'video' ? 'For example: editing software you use, kinds of videos you have edited, how fast you work.' : 'For example: languages, frameworks, databases and the projects you have built.';
+            }
+            update();
+        };
+        cards.forEach(function (c) {
+            c.addEventListener('click', function () {
+                select.value = c.getAttribute('data-role');
+                sync();
+                var target = document.getElementById('apply');
+                if (target) {
+                    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    target.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+                }
+                var first = form.querySelector('#full_name');
+                if (first) { window.setTimeout(function () { first.focus({ preventScroll: true }); }, 400); }
+            });
+        });
+        select.addEventListener('change', sync);
+        form.querySelectorAll('[data-hire-count]').forEach(function (ta) {
+            var out = ta.parentNode.querySelector('[data-hire-count-out]');
+            var upd = function () { if (out) { out.textContent = String(ta.value.length); } };
+            ta.addEventListener('input', upd); upd();
+        });
+        if (fileInput && fileName) {
+            fileInput.addEventListener('change', function () {
+                var f = fileInput.files && fileInput.files[0];
+                fileName.textContent = f ? f.name + ' (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)' : 'Choose a file or drop it here';
+            });
+            if (drop) {
+                ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('is-over'); }); });
+                ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('is-over'); }); });
+                drop.addEventListener('drop', function (e) {
+                    if (e.dataTransfer && e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; fileInput.dispatchEvent(new Event('change')); }
+                });
+            }
+        }
+        form.addEventListener('input', update);
+        form.addEventListener('change', update);
+        form.addEventListener('submit', function () {
+            var b = form.querySelector('[data-hire-submit]');
+            if (b) { b.disabled = true; b.textContent = 'Sending…'; }
+        });
+        sync();
+    })();
 })();

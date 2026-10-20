@@ -20,6 +20,7 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 | Our Clients | `/our-clients` | Website -> Clients (name, country, logo, description, website); shown grouped by country; page wording under Page wording -> Our Clients page |
 | Our Partners | `/our-partners` | Website -> Partners + the existing referral-partner application (`/partners/apply`) |
 | Portfolio | `/portfolio`, `/portfolio/{slug}` | Website -> Portfolio (hidden until a project is published) |
+| Hiring | `/hiring`, `/hiring/apply` | Administration -> Website -> Hiring (status switch) and Page wording -> Hiring page (roles, salary note, steps) |
 | Careers | `/careers`, `/careers/{slug}`, `/careers/apply` | Website -> Openings; applications in Administration -> Job applications |
 | Contact Us | `/contact` | Contact form; staff see it in CRM -> Enquiries |
 | Project Requirements | `/request-quote` (alias `/project-requirements`) | Requirements form; staff see it in CRM -> Enquiries |
@@ -36,6 +37,12 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 * **Menus**: header (with an automatic *Services* dropdown) and footer. A saved menu overrides the built-in one; links to unpublished policies are never shown.
 * **Contact details and social links**: Integrations & settings -> Website. Empty values are not displayed anywhere.
 * **Form settings**: wording of both forms; inquiry types, project categories and timelines are fixed lists in code (`EnquiryExtras`), services offered come from published Services.
+
+## Hiring page
+
+`/hiring` lists the open roles (shipped: Full Stack Developer, Frontend Developer, Backend Developer, Video Editor), states that **salary is decided after the meeting**, explains the steps and has an interactive application form (click a role card to select it, live progress bar, character counters, drag-and-drop file box, hints that change for developer vs video roles). Submissions are ordinary job applications (Administration -> Job applications) with the role, experience and availability recorded.
+
+**Admin switch** (Website -> Hiring, needs `cms.publish`): *Open* shows roles and form and a small "We're hiring" bar on the other pages; *Closed* keeps the page but shows "Hiring is currently closed" (editable) with no form and refuses applications; *Hidden* makes the page return 404 and removes it from the header, footer and sitemaps. The state is stored separately from the wording, so "reset wording" never changes it. A header menu saved by hand under Menus overrides the built-in links; add or remove the Hiring link there yourself (a link to `/hiring` is dropped automatically while the page is hidden). Roles, intro, salary note, steps and closed message are edited under Page wording -> Hiring page (one role per line: `Title | Short description`).
 
 ## Content rules the code enforces
 
@@ -77,7 +84,7 @@ Two optional ones: `UPLOAD_ENQUIRY_MAX_MB` (default 10) and `UPLOAD_CAREER_MAX_M
 
 ## Tests
 
-`tests/Integration/PublicWebsiteTest.php` (18 tests) covers: every public page renders with one `h1`, title, description, canonical and Open Graph tags; starting content and the "nothing invented" rule; drafts/archived items are invisible and absent from the sitemap; markup is escaped; prices stay hidden; policy gating and versioning; admin permissions (visitor, customer, partner, developer, manager, administrator); CSRF; menu and wording edits and reset; contact and requirements forms with extra answers and private attachments; rejected attachments store nothing; job applications, consent, honeypot, executable résumé refused, staff-only download; FAQ search markup, `robots.txt`, `sitemap.xml`; reserved addresses. Run `vendor/bin/phpunit`.
+`tests/Integration/PublicWebsiteTest.php` (23 tests) covers: every public page renders with one `h1`, title, description, canonical and Open Graph tags; starting content and the "nothing invented" rule; drafts/archived items are invisible and absent from the sitemap; markup is escaped; prices stay hidden; policy gating and versioning; admin permissions (visitor, customer, partner, developer, manager, administrator); CSRF; menu and wording edits and reset; contact and requirements forms with extra answers and private attachments; rejected attachments store nothing; job applications, consent, honeypot, executable résumé refused, staff-only download; FAQ search markup, `robots.txt`, `sitemap.xml`; reserved addresses. Run `vendor/bin/phpunit`.
 
 ## Known limits
 

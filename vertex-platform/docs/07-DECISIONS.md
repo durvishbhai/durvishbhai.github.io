@@ -145,6 +145,7 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-102 | An already-installed site is upgraded by a key-gated `upgrade.php` that runs the forward-only migrations and adds new permissions, then deletes itself. | Hostinger customers without SSH can still apply database changes. |
 | D-103 | The Owner (super admin) may approve items they recorded or uploaded themselves (`Gate::canSelfApprove`); every other role stays bound by separation of duties. | Requested by the business owner; the action is still audited. |
 | D-104 | Our Clients is its own editable list (`site_clients`, grouped by country) beside Our Partners; it ships empty and states only that the business works with clients from various countries. The founder's profile is seeded because the business supplied it. | The business asked for both pages; no client names or logos are invented. |
+| D-105 | The Hiring page has a three-state switch (open / closed / hidden) kept outside the editable wording; applications reuse the careers pipeline and are refused unless the page is open. Salary is never stated beyond "decided after the meeting". | The business must be able to stop hiring instantly without losing its wording or past applications. |
 
 ## External integrations and credentials
 

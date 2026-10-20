@@ -25,6 +25,7 @@ $pageTitle = isset($title) && $title !== '' && $title !== config('app.name') ? $
 </head>
 <body class="site">
 <a class="skip-link" href="#main">Skip to content</a>
+<?= \Vertex\Core\View::partial('site-announce') ?>
 <?= \Vertex\Core\View::partial('site-header') ?>
 <main id="main">
     <div class="container flash-wrap"><?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?></div>

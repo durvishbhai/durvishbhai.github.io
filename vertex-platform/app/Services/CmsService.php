@@ -328,6 +328,9 @@ final class CmsService
         $today = gmdate('Y-m-d');
         $out = [['loc' => $base . '/', 'lastmod' => $today]];
         $paths = ['/about', '/services', '/our-clients', '/our-partners', '/careers', '/contact', '/request-quote', '/faq', '/partners/apply', '/sitemap'];
+        if (SiteHiring::isVisible()) {
+            $paths[] = '/hiring';
+        }
         if (SiteContent::hasPublished('team')) {
             $paths[] = '/our-team';
         }

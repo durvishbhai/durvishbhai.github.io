@@ -18,6 +18,7 @@ use Vertex\Services\FileStore;
 use Vertex\Services\RateLimiter;
 use Vertex\Services\Settings;
 use Vertex\Services\SiteContent;
+use Vertex\Services\SiteHiring;
 use Vertex\Services\SiteSections;
 use Vertex\Services\SiteText;
 
@@ -199,30 +200,70 @@ final class SitePageController extends Controller
     /** @param array<string,string> $params */
     public function apply(Request $request, array $params = []): Response
     {
+        return $this->submitApplication($request, '/careers#apply', '/careers/received');
+    }
+
+    /** The Hiring page's form. Applications are only taken while the page is Open. @param array<string,string> $params */
+    public function hiringApply(Request $request, array $params = []): Response
+    {
+        if (!SiteHiring::isOpen()) {
+            return Response::redirect('/hiring');
+        }
+
+        return $this->submitApplication($request, '/hiring#apply', '/hiring/received');
+    }
+
+    private function submitApplication(Request $request, string $back, string $done): Response
+    {
         $this->guard();
         $ip = $request->ip();
         if ($request->string('website_url') !== '') { // honeypot: bots get the same page and nothing is stored
             Logger::security('Career application honeypot triggered', ['ip' => $ip]);
             Session::put('career_ref', null);
 
-            return Response::redirect('/careers/received');
+            return Response::redirect($done);
         }
         if (!RateLimiter::hit('career_ip', $ip)) {
             throw new HttpException(429);
         }
         $in = [];
-        foreach (['full_name', 'email', 'phone', 'role', 'skills_experience', 'portfolio_url', 'intro'] as $f) {
+        foreach (['full_name', 'email', 'phone', 'role', 'skills_experience', 'portfolio_url', 'intro', 'experience', 'availability'] as $f) {
             $in[$f] = $request->string($f);
         }
         $file = self::uploadedFiles($request->files['resume'] ?? null)[0] ?? null;
         try {
             $r = CareerService::apply($in, $file, $request->string('consent') === '1', $ip);
         } catch (ValidationException $e) {
-            return $this->back('/careers#apply', $e->errors, $in);
+            return $this->back($back, $e->errors, $in);
         }
         Session::put('career_ref', $r['reference']);
 
-        return Response::redirect('/careers/received');
+        return Response::redirect($done);
+    }
+
+    /** @param array<string,string> $params */
+    public function hiring(Request $request, array $params = []): Response
+    {
+        $this->guard();
+        if (!SiteHiring::isVisible()) {
+            throw new HttpException(404);
+        }
+        $h = SiteSections::get('hiring', 'header');
+        $open = SiteHiring::isOpen();
+        $r = $this->render('site/hiring', SiteText::tokens($h['title']), ['open' => $open, 'roles' => SiteHiring::roles(), 'preselect' => (string) ($request->query['role'] ?? ''),
+            'experience' => CareerService::EXPERIENCE, 'availability' => CareerService::AVAILABILITY,
+            'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/hiring');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function hiringReceived(Request $request, array $params = []): Response
+    {
+        $this->guard();
+        $ref = Session::pull('career_ref');
+
+        return $this->render('site/career-received', 'Application received', ['ref' => is_string($ref) ? $ref : null, 'back' => '/hiring'], '', '', '', true);
     }
 
     /** @param array<string,string> $params */
@@ -262,6 +303,9 @@ final class SitePageController extends Controller
         $this->guard();
         $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Clients', '/our-clients'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio'], ['Careers', '/careers']],
             'Get in touch' => [['Contact Us', '/contact'], ['Project Requirements', '/request-quote'], ['FAQ', '/faq'], ['Become a referral partner', '/partners/apply'], ['Client login', '/login']]];
+        if (SiteHiring::isVisible()) {
+            $groups['Company'][] = ['Hiring', '/hiring'];
+        }
         foreach (SiteContent::published('services') as $s) {
             $groups['Services'][] = [(string) $s['name'], '/services/' . $s['slug']];
         }

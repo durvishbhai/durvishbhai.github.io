@@ -769,3 +769,39 @@ html { accent-color: var(--violet); }
     .site-nav .btn { margin-top: 14px; }
     .site-header .site-nav { margin-left: 0; }
 }
+
+/* Hiring page */
+.hire-pill { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 6px 14px; border-radius: 999px; border: 1px solid rgba(25, 211, 255, 0.4); background: rgba(25, 211, 255, 0.08); color: var(--text); font-size: 0.85rem; font-weight: 600; }
+.hire-pill.is-closed { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.04); color: var(--text-dim); }
+.pulse-dot { width: 9px; height: 9px; border-radius: 50%; background: #2be3a0; box-shadow: 0 0 0 0 rgba(43, 227, 160, 0.6); animation: hire-pulse 1.8s infinite; }
+@keyframes hire-pulse { 70% { box-shadow: 0 0 0 10px rgba(43, 227, 160, 0); } 100% { box-shadow: 0 0 0 0 rgba(43, 227, 160, 0); } }
+.role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-top: 18px; }
+.role-card { display: flex; flex-direction: column; gap: 8px; text-align: left; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-card); color: var(--text); font: inherit; cursor: pointer; transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease; }
+.role-card:hover, .role-card:focus-visible { transform: translateY(-3px); border-color: rgba(25, 211, 255, 0.55); box-shadow: 0 14px 34px rgba(25, 211, 255, 0.12); }
+.role-card.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 14px 34px rgba(124, 92, 255, 0.25); }
+.role-ico { display: inline-flex; width: 46px; height: 46px; align-items: center; justify-content: center; border-radius: 12px; background: linear-gradient(135deg, rgba(25, 211, 255, 0.9), rgba(124, 92, 255, 0.9) 60%, rgba(255, 79, 168, 0.9)); color: #04101f; }
+.role-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+.role-sum { color: var(--text-dim); font-size: 0.93rem; line-height: 1.5; }
+.role-cta { margin-top: auto; color: var(--accent); font-weight: 600; font-size: 0.9rem; }
+.role-card .when-on { display: none; } .role-card.is-selected .when-on { display: inline; } .role-card.is-selected .when-off { display: none; }
+.hire-terms { padding: 26px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: linear-gradient(135deg, rgba(25, 211, 255, 0.07), rgba(124, 92, 255, 0.07)); }
+.hire-terms h2 { margin-top: 0; }
+.hire-steps { grid-template-columns: 1fr; }
+.hire-steps li { display: flex; gap: 16px; padding: 18px 20px; }
+.hire-steps li::before { display: none; }
+.hire-steps .step-n { flex: 0 0 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: #04101f; background: linear-gradient(135deg, #19d3ff, #7c5cff); }
+.hire-steps h3 { margin: 0 0 4px; font-size: 1.02rem; } .hire-steps p { margin: 0; color: var(--text-dim); }
+.hire-progress { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.hire-progress span { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #19d3ff, #7c5cff, #ff4fa8); transition: width 0.3s ease; }
+.field.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 560px) { .field.two { grid-template-columns: 1fr; } }
+.drop { display: block; padding: 18px; border: 2px dashed var(--line-strong); border-radius: 12px; text-align: center; color: var(--text-dim); cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease; }
+.drop:hover, .drop.is-over { border-color: var(--accent); background: rgba(25, 211, 255, 0.06); color: var(--text); }
+.hire-closed { text-align: center; }
+.announce { background: linear-gradient(90deg, rgba(25, 211, 255, 0.16), rgba(124, 92, 255, 0.2), rgba(255, 79, 168, 0.16)); border-bottom: 1px solid var(--line); text-align: center; padding: 8px 16px; font-size: 0.92rem; }
+.announce a { color: var(--text); font-weight: 600; text-decoration: none; }
+.announce a:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } .role-card { transition: none; } }
+.hire-form-panel { position: relative; overflow: hidden; }
+.hire-form-panel .field { position: relative; }
+.drop:focus-within, .field:focus-within .drop { border-color: var(--accent); }
