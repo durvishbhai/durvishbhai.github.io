@@ -864,9 +864,9 @@ html { accent-color: var(--violet); }
 /* Theme switch (header of the website and top bar of the dashboard) */
 .theme-toggle { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: transparent; color: var(--text); cursor: pointer; transition: transform 0.25s ease, background 0.2s ease, border-color 0.2s ease; }
 .theme-toggle:hover { background: rgba(var(--ov), 0.08); border-color: var(--accent); transform: rotate(18deg); }
-.theme-toggle svg { width: 20px; height: 20px; }
+.theme-toggle span { font-size: 1.25rem; line-height: 1; }
 .theme-toggle .i-sun { display: none; }
-:root[data-theme="light"] .theme-toggle .i-sun { display: block; }
+:root[data-theme="light"] .theme-toggle .i-sun { display: inline; }
 :root[data-theme="light"] .theme-toggle .i-moon { display: none; }
 
 /* The website header is a little wider than the page body so the theme switch fits beside the menu */
