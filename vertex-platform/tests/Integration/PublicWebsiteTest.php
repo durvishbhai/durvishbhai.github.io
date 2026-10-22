@@ -501,6 +501,23 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertStringContainsString('Hiring is currently closed', $this->client()->get('/hiring')['body'], 'resetting the wording keeps the status');
     }
 
+    public function testTheLoginLinkIsInTheHeaderOnlyAndBecomesDashboardWhenSignedIn(): void
+    {
+        $c = $this->client();
+        foreach (['/', '/about', '/contact', '/sitemap'] as $path) {
+            $html = $c->get($path)['body'];
+            $this->assertStringContainsString('href="/login"', $html, "{$path} has a Login link");
+            $footer = (string) substr($html, (int) strpos($html, '<footer'));
+            $this->assertStringNotContainsString('/login', $footer, "{$path}: no second login link in the footer");
+            $this->assertStringNotContainsString('Client login', $html, $path);
+            $main = (string) substr($html, (int) strpos($html, '<main'), (int) strpos($html, '<footer') - (int) strpos($html, '<main'));
+            $this->assertStringNotContainsString('href="/login"', $main, "{$path}: no login link in the page body");
+        }
+        $in = $this->loggedIn('admin@x.test')->get('/about')['body'];
+        $this->assertStringContainsString('href="/dashboard"', $in);
+        $this->assertStringNotContainsString('href="/login"', $in, 'a signed-in visitor sees Dashboard instead of Login');
+    }
+
     // ------------------------------------------------------------------------------------------------ misc
 
     public function testFaqPageIsSearchableAndRobotsAndSitemapAreSane(): void

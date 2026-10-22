@@ -17,6 +17,7 @@ $active = static fn (string $u): bool => $u === '/' ? $path === '/' : ($path ===
             <img src="<?= e(asset('img/krazy-mark.png')) ?>" alt="" width="86" height="35">
             <span class="brand-word">Krazy <small>Integrated Solutions</small></span>
         </a>
+        <?php if ($signedIn) : ?><a class="btn btn-ghost btn-sm header-login" href="/dashboard">Dashboard</a><?php else : ?><a class="btn btn-ghost btn-sm header-login" href="/login">Login</a><?php endif; ?>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
             <span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span>
         </button>
@@ -35,7 +36,7 @@ $active = static fn (string $u): bool => $u === '/' ? $path === '/' : ($path ===
                 <?php endforeach; ?>
             </ul>
             <div class="nav-actions">
-                <?php if ($signedIn) : ?><a class="btn btn-ghost btn-sm" href="/dashboard">Dashboard</a><?php else : ?><a class="btn btn-ghost btn-sm" href="/login">Login</a><?php endif; ?>
+                <span class="nav-login"><?php if ($signedIn) : ?><a class="btn btn-ghost btn-sm" href="/dashboard">Dashboard</a><?php else : ?><a class="btn btn-ghost btn-sm" href="/login">Login</a><?php endif; ?></span>
                 <a class="btn btn-primary btn-sm" href="/request-quote">Start Your Project</a>
             </div>
         </nav>

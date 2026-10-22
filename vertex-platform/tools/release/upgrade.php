@@ -31,6 +31,52 @@ function is_https(): bool
         || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
 }
 
+/**
+ * Puts back the small server files a site needs, when they are missing: the routing file in the web folder (without it every page except the home page
+ * shows the host's own "This Page Does Not Exist"), and the "never serve this" files for the private folders. Existing good files are left alone.
+ *
+ * @return list<string> what was checked or written
+ */
+function repair_server_files(string $appRoot): array
+{
+    $log = [];
+    $deny = "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Deny from all\n</IfModule>\n";
+    $env = (string) @file_get_contents($appRoot . '/.env');
+    $https = preg_match('/^APP_URL=(\S+)/m', $env, $m) && str_starts_with(trim($m[1], "\"'"), 'https://');
+    $htaccess = __DIR__ . '/.htaccess';
+    $current = is_file($htaccess) ? (string) @file_get_contents($htaccess) : '';
+    if (!str_contains($current, 'RewriteRule ^ index.php')) {
+        $rules = "# Front controller routing (Apache / LiteSpeed on Hostinger). Written by upgrade.php.\nOptions -Indexes -MultiViews\nDirectoryIndex index.php\n\n<IfModule mod_rewrite.c>\n    RewriteEngine On\n"
+            . ($https ? "    # Send everything to HTTPS (the AutoSSL validation path stays reachable)\n    RewriteCond %{HTTPS} off\n    RewriteCond %{HTTP:X-Forwarded-Proto} !https\n    RewriteCond %{REQUEST_URI} !^/\\.well-known/\n    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]\n\n" : '')
+            . "    # Pass the Authorization header to PHP (PhonePe webhook signature)\n    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n\n"
+            . "    # Real files (css, js, images) are served directly; everything else goes through index.php\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^ index.php [L]\n</IfModule>\n\n"
+            . "# Never expose dotfiles or leftovers\n<FilesMatch \"(^\\.|~\$|\\.(bak|old|orig|sql|log|env|ini|sh|md|lock|json)\$)\">\n    <IfModule mod_authz_core.c>\n        Require all denied\n    </IfModule>\n    <IfModule !mod_authz_core.c>\n        Order allow,deny\n        Deny from all\n    </IfModule>\n</FilesMatch>\n";
+        if ($current !== '') {
+            @copy($htaccess, $htaccess . '.before-upgrade.bak');
+        }
+        $log[] = @file_put_contents($htaccess, $rules) === false
+            ? 'WARNING: could not write public_html/.htaccess. Pages other than the home page will show "This Page Does Not Exist" until you create it (see the notes on this page).'
+            : 'Restored public_html/.htaccess (page routing' . ($https ? ' and the HTTPS redirect' : '') . ').';
+    } else {
+        $log[] = 'Routing file public_html/.htaccess is present.';
+    }
+    $files = [
+        $appRoot . '/.htaccess' => "# Private application folder: nothing here may be served.\n" . $deny,
+        $appRoot . '/storage/.htaccess' => "# Private storage (uploads, logs, sessions, backups). Never serve anything from here.\n" . $deny . "Options -Indexes -ExecCGI\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar\n",
+        __DIR__ . '/uploads/cms/.htaccess' => "# Website pictures only: nothing in here may ever run as a script.\nOptions -Indexes -ExecCGI\nRemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phar\n<FilesMatch \"\\.(php|phtml|phar|pl|py|cgi|sh)\$\">\n    Require all denied\n</FilesMatch>\n",
+    ];
+    foreach ($files as $path => $body) {
+        if (!is_dir(dirname($path))) {
+            @mkdir(dirname($path), 0755, true);
+        }
+        if (!is_file($path) && is_dir(dirname($path))) {
+            $log[] = @file_put_contents($path, $body) === false ? 'WARNING: could not write ' . basename(dirname($path)) . '/.htaccess.' : 'Restored ' . basename(dirname($path)) . '/.htaccess (protects a private folder).';
+        }
+    }
+
+    return $log;
+}
+
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
 header('X-Frame-Options: DENY');
@@ -70,9 +116,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $installed) {
             require_once $appRoot . '/bootstrap.php';
             $ran = (new \Vertex\Services\Migrator(VERTEX_ROOT . '/database/migrations'))->migrate();
             $sync = \Vertex\Services\PermissionSync::run(false);
-            $result = ['ran' => $ran, 'permissions' => $sync['permissions'] ?? 0, 'new' => $sync['new_permissions'] ?? 0];
+            $result = ['ran' => $ran, 'permissions' => $sync['permissions'] ?? 0, 'new' => $sync['new_permissions'] ?? 0, 'files' => repair_server_files($appRoot)];
             $_SESSION = [];
             session_destroy();
+            if (is_file(__DIR__ . '/install.php')) { // the site is installed: the installer is no longer needed
+                $result['files'][] = @unlink(__DIR__ . '/install.php') ? 'Removed install.php (this site is already installed).' : 'Please delete install.php by hand.';
+            }
             $self = @unlink(__FILE__);
             $result['deleted'] = $self;
         } catch (\Throwable $e) {
@@ -105,6 +154,7 @@ if ($installed && $unlocked && $result === null) {
     <div class="ok"><strong>Done.</strong>
         <?= $result['ran'] === [] ? 'The database was already up to date.' : 'Applied: ' . h(implode(', ', $result['ran'])) . '.' ?>
         <?= (int) $result['new'] > 0 ? ' ' . (int) $result['new'] . ' new permission(s) were added; the roles you edited were not changed.' : '' ?></div>
+    <ul><?php foreach ($result['files'] as $l) : ?><li><?= h($l) ?></li><?php endforeach; ?></ul>
     <p><?= $result['deleted'] ? 'This upgrader deleted itself.' : 'Please delete <code>upgrade.php</code> from your web folder now (it could not delete itself).' ?></p>
     <p><a href="/login" style="color:#19d3ff">Go to the sign-in page</a>. Then open <strong>Administration &rarr; Website</strong> once to load the starting website content.</p>
 <?php elseif (!$unlocked) : ?>
@@ -118,6 +168,8 @@ if ($installed && $unlocked && $result === null) {
         <p>These database updates will be applied:</p><ul><?php foreach ($pending as $p) : ?><li><code><?= h($p['migration']) ?></code> (<?= h($p['status']) ?>)</li><?php endforeach; ?></ul>
         <p>Take a backup first if you can (hPanel &rarr; Databases &rarr; phpMyAdmin &rarr; Export). Existing data is not removed.</p>
     <?php endif; ?>
+    <?php $ht = is_file(__DIR__ . '/.htaccess') && str_contains((string) @file_get_contents(__DIR__ . '/.htaccess'), 'RewriteRule ^ index.php'); ?>
+    <p><?= $ht ? 'Page routing file (<code>.htaccess</code>): present.' : '<strong>Page routing file (<code>.htaccess</code>) is missing or incomplete.</strong> Without it every page except the home page shows the host\'s "This Page Does Not Exist". It will be restored when you press the button.' ?></p>
     <form method="post"><input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>"><input type="hidden" name="action" value="upgrade"><button type="submit">Apply updates</button></form>
 <?php endif; ?>
 </main></body></html>

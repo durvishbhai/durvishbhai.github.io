@@ -302,7 +302,7 @@ final class SitePageController extends Controller
     {
         $this->guard();
         $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Clients', '/our-clients'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio'], ['Careers', '/careers']],
-            'Get in touch' => [['Contact Us', '/contact'], ['Project Requirements', '/request-quote'], ['FAQ', '/faq'], ['Become a referral partner', '/partners/apply'], ['Client login', '/login']]];
+            'Get in touch' => [['Contact Us', '/contact'], ['Project Requirements', '/request-quote'], ['FAQ', '/faq'], ['Become a referral partner', '/partners/apply']]];
         if (SiteHiring::isVisible()) {
             $groups['Company'][] = ['Hiring', '/hiring'];
         }
