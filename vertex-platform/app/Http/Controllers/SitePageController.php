@@ -182,7 +182,7 @@ final class SitePageController extends Controller
     {
         $this->guard();
         $h = SiteSections::get('careers', 'header');
-        $r = $this->render('site/careers', SiteText::tokens($h['title']), ['jobs' => SiteContent::published('jobs'), 'roles' => CareerService::roleChoices(), 'preselect' => (string) ($request->query['role'] ?? ''),
+        $r = $this->render('site/careers', SiteText::tokens($h['title']), ['errorsInline' => true, 'jobs' => SiteContent::published('jobs'), 'roles' => CareerService::roleChoices(), 'preselect' => (string) ($request->query['role'] ?? ''),
             'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/careers');
 
         return $r;
@@ -227,7 +227,7 @@ final class SitePageController extends Controller
             throw new HttpException(429);
         }
         $in = [];
-        foreach (['full_name', 'email', 'phone', 'role', 'skills_experience', 'portfolio_url', 'intro', 'experience', 'availability'] as $f) {
+        foreach (['full_name', 'email', 'phone', 'role', 'skills_experience', 'portfolio_url', 'linkedin_url', 'intro', 'experience', 'availability'] as $f) {
             $in[$f] = $request->string($f);
         }
         $file = self::uploadedFiles($request->files['resume'] ?? null)[0] ?? null;
@@ -250,8 +250,7 @@ final class SitePageController extends Controller
         }
         $h = SiteSections::get('hiring', 'header');
         $open = SiteHiring::isOpen();
-        $r = $this->render('site/hiring', SiteText::tokens($h['title']), ['open' => $open, 'roles' => SiteHiring::roles(), 'preselect' => (string) ($request->query['role'] ?? ''),
-            'experience' => CareerService::EXPERIENCE, 'availability' => CareerService::AVAILABILITY,
+        $r = $this->render('site/hiring', SiteText::tokens($h['title']), ['errorsInline' => true, 'open' => $open, 'roles' => SiteHiring::roles(), 'preselect' => (string) ($request->query['role'] ?? ''),
             'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/hiring');
 
         return $r;

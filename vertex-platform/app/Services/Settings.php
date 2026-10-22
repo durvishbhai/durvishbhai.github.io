@@ -66,6 +66,7 @@ final class Settings
             'phonepe.environment' => ['group' => 'phonepe', 'label' => 'Environment', 'type' => 'select', 'options' => ['sandbox' => 'Sandbox (test money)', 'production' => 'Production (real money)']],
             'phonepe.client_id' => ['group' => 'phonepe', 'label' => 'Client ID', 'type' => 'text'],
             'phonepe.client_secret' => ['group' => 'phonepe', 'label' => 'Client secret', 'type' => 'secret'],
+            'phonepe.qr_mode' => ['group' => 'phonepe', 'label' => 'How the payment QR is made', 'type' => 'select', 'options' => ['auto' => 'Automatic (UPI QR, else PhonePe checkout link)', 'direct' => 'UPI QR only', 'checkout' => 'PhonePe checkout link only'], 'help' => 'The QR always carries exactly the amount the team entered.'],
             'phonepe.client_version' => ['group' => 'phonepe', 'label' => 'Client version', 'type' => 'text'],
             'phonepe.webhook_username' => ['group' => 'phonepe', 'label' => 'Webhook username', 'type' => 'text'],
             'phonepe.webhook_password' => ['group' => 'phonepe', 'label' => 'Webhook password', 'type' => 'secret'],

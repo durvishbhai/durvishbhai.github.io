@@ -86,44 +86,166 @@ final class PhonePeGateway
         return ['status' => $res['status'], 'data' => is_array($d) ? $d : []];
     }
 
-    /** Starts a payment for what is still due on the client's own invoice. @return string the address to send the customer to */
-    public static function start(int $userId, array $invoice): string
+    // ------------------------------------------------------------------------------------------------ payment requests (staff)
+
+    /** Smallest payable request: Rs 1.00 (PhonePe's own minimum for an order). */
+    public const MIN_MINOR = 100;
+
+    /** What can still be requested on an invoice: the balance minus payments the client has reported and staff have not verified yet. */
+    public static function requestable(array $invoice): int
     {
-        Gate::authorize('payments.pay', $userId);
-        if ($invoice['client_user_id'] === null || (int) $invoice['client_user_id'] !== $userId || !in_array($invoice['status'], ['issued', 'partially_paid'], true)) {
-            throw new HttpException(404);
-        }
-        if (!self::enabled()) {
-            throw new ValidationException(['Online payment through PhonePe is not available right now.']);
-        }
-        if (!RateLimiter::hit('phonepe_start_user', (string) $userId)) {
-            throw new HttpException(429);
+        if (!in_array($invoice['status'], ['issued', 'partially_paid'], true)) {
+            return 0;
         }
         $bal = InvoiceService::balance($invoice);
-        $due = max(0, $bal['outstanding'] - $bal['pending']);
-        if ($due < 100) {
-            throw new ValidationException(['Nothing is due on this invoice, or a payment is already waiting to be checked.']);
+
+        return max(0, $bal['outstanding'] - $bal['pending']);
+    }
+
+    /**
+     * A member of the team asks the client to pay an amount THEY typed: PhonePe is asked for an order of exactly that amount and the QR shown is built only
+     * from PhonePe's answer for that order. Nothing is generated before an amount is entered, and nothing the browser sends can change it afterwards.
+     *
+     * @return array<string,mixed> the stored order row
+     */
+    public static function createRequest(int $actorId, array $invoice, int $amountMinor, string $note = ''): array
+    {
+        Gate::authorize('payments.request', $actorId);
+        if (!in_array($invoice['status'], ['issued', 'partially_paid'], true)) {
+            throw new ValidationException(['Only an issued invoice with a balance can be paid.']);
+        }
+        if (!self::enabled()) {
+            throw new ValidationException(['PhonePe payments are not switched on (Administration -> Integrations & settings -> PhonePe).']);
+        }
+        $due = self::requestable($invoice);
+        if ($amountMinor < self::MIN_MINOR) {
+            throw new ValidationException(['The smallest amount PhonePe accepts is ₹1.00.']);
+        }
+        if ($amountMinor > $due) {
+            throw new ValidationException(['The amount is more than what is still due on this invoice (₹' . FieldRules::formatMinor($due) . ').']);
+        }
+        $note = trim((string) preg_replace('/\s+/', ' ', $note));
+        if (mb_strlen($note) > 200 || preg_match('/[<>]/', $note)) {
+            throw new ValidationException(['The note must be at most 200 characters, without < or >.']);
+        }
+        if (!RateLimiter::hit('phonepe_request_user', (string) $actorId)) {
+            throw new HttpException(429);
         }
         $mid = 'KIS' . $invoice['id'] . 'X' . strtoupper(bin2hex(random_bytes(6)));
         $ttl = max(5, (int) Config::get('phonepe.order_ttl_minutes', 30));
-        $return = rtrim((string) Config::get('app.url'), '/') . '/my/invoices/' . $invoice['public_id'] . '/phonepe-return?o=' . $mid;
-        try {
-            $r = self::api('POST', '/checkout/v2/pay', ['merchantOrderId' => $mid, 'amount' => $due, 'expireAfter' => $ttl * 60, 'metaInfo' => ['udf1' => (string) $invoice['reference']],
-                'paymentFlow' => ['type' => 'PG_CHECKOUT', 'message' => 'Payment for invoice ' . $invoice['reference'], 'merchantUrls' => ['redirectUrl' => $return]]]);
-        } catch (\Throwable $e) {
-            Logger::error('PhonePe start failed', ['invoice' => (int) $invoice['id'], 'error' => $e->getMessage()]);
-            throw new ValidationException(['We could not reach PhonePe. Nothing was charged. Please try again, or pay using the instructions on the invoice.']);
+        $return = rtrim((string) Config::get('app.url'), '/') . '/my/invoices/' . $invoice['public_id'];
+        $message = 'Payment for invoice ' . $invoice['reference'];
+        $mode = (string) Config::get('phonepe.qr_mode', 'auto');
+        $flow = '';
+        $payload = '';
+        $providerOrder = '';
+        if (in_array($mode, ['auto', 'direct'], true)) {
+            try {
+                $r = self::api('POST', '/payments/v2/pay', ['merchantOrderId' => $mid, 'amount' => $amountMinor, 'expireAfter' => $ttl * 60, 'metaInfo' => ['udf1' => (string) $invoice['reference'], 'udf2' => 'staff-request'],
+                    'paymentFlow' => ['type' => 'PG', 'message' => $message, 'merchantUrls' => ['redirectUrl' => $return], 'paymentMode' => ['type' => 'UPI_QR']]]);
+                $qr = trim((string) ($r['data']['qrData'] ?? ''));
+                $intent = trim((string) ($r['data']['intentUrl'] ?? ''));
+                if ($r['status'] === 200 && $qr !== '' && self::scannable($qr)) {
+                    [$flow, $payload, $providerOrder] = ['upi_qr', $qr, (string) ($r['data']['orderId'] ?? '')];
+                } elseif ($r['status'] === 200 && $intent !== '' && self::scannable($intent)) {
+                    [$flow, $payload, $providerOrder] = ['upi_intent', $intent, (string) ($r['data']['orderId'] ?? '')];
+                } else {
+                    Logger::error('PhonePe UPI QR not available', ['http' => $r['status'], 'code' => $r['data']['code'] ?? null]);
+                }
+            } catch (\Throwable $e) {
+                Logger::error('PhonePe UPI QR request failed', ['invoice' => (int) $invoice['id'], 'error' => $e->getMessage()]);
+            }
+            if ($flow === '' && $mode === 'direct') {
+                throw new ValidationException(['PhonePe did not return a UPI QR for this order (the UPI QR option may not be enabled for your merchant account). Nothing was charged.']);
+            }
+            if ($flow !== '') {
+                self::assertAmountInPayload($payload, $amountMinor);
+            }
         }
-        $url = (string) ($r['data']['redirectUrl'] ?? '');
-        if ($r['status'] !== 200 || $url === '' || !str_starts_with($url, 'https://')) {
-            Logger::error('PhonePe start refused', ['invoice' => (int) $invoice['id'], 'http' => $r['status'], 'code' => $r['data']['code'] ?? null]);
-            throw new ValidationException(['PhonePe did not accept the payment request. Nothing was charged. Please try again later.']);
+        if ($flow === '') { // PhonePe's hosted checkout page, which itself shows the UPI QR for the order; we draw a QR that opens it
+            $mid = 'KIS' . $invoice['id'] . 'X' . strtoupper(bin2hex(random_bytes(6))); // a fresh id: the first attempt may already exist at PhonePe
+            try {
+                $r = self::api('POST', '/checkout/v2/pay', ['merchantOrderId' => $mid, 'amount' => $amountMinor, 'expireAfter' => $ttl * 60, 'metaInfo' => ['udf1' => (string) $invoice['reference'], 'udf2' => 'staff-request'],
+                    'paymentFlow' => ['type' => 'PG_CHECKOUT', 'message' => $message, 'merchantUrls' => ['redirectUrl' => $return]]]);
+            } catch (\Throwable $e) {
+                Logger::error('PhonePe request failed', ['invoice' => (int) $invoice['id'], 'error' => $e->getMessage()]);
+                throw new ValidationException(['We could not reach PhonePe. Nothing was requested. Please try again.']);
+            }
+            $url = (string) ($r['data']['redirectUrl'] ?? '');
+            if ($r['status'] !== 200 || $url === '' || !str_starts_with($url, 'https://') || mb_strlen($url) > 1900) {
+                Logger::error('PhonePe request refused', ['invoice' => (int) $invoice['id'], 'http' => $r['status'], 'code' => $r['data']['code'] ?? null]);
+                throw new ValidationException(['PhonePe did not accept the payment request. Nothing was requested. Please try again later.']);
+            }
+            [$flow, $payload, $providerOrder] = ['checkout_link', $url, (string) ($r['data']['orderId'] ?? '')];
         }
-        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, invoice_id, client_id, amount_minor, status, provider_order_id, created_by, created_at, updated_at) VALUES (?, ?, 'phonepe', ?, ?, ?, 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [uuid_hex(), $mid, $invoice['id'], $invoice['client_id'], $due, (string) ($r['data']['orderId'] ?? ''), $userId]);
-        Audit::record('gateway.order_created', 'invoice', (int) $invoice['id'], [], ['amount_minor' => $due, 'merchant_order_id' => $mid], ['provider' => 'phonepe'], $userId);
+        $pub = uuid_hex();
+        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, client_id, amount_minor, qr_payload, note, expires_at, status, provider_order_id, created_by, created_at, updated_at)
+            VALUES (?, ?, 'phonepe', ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? MINUTE), 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $mid, $flow, $invoice['id'], $invoice['client_id'], $amountMinor, $payload, $note === '' ? null : $note, $ttl, $providerOrder === '' ? null : $providerOrder, $actorId]);
+        $id = Database::insertId();
+        Audit::record('gateway.request_created', 'invoice', (int) $invoice['id'], [], ['amount_minor' => $amountMinor, 'merchant_order_id' => $mid], ['provider' => 'phonepe', 'flow' => $flow], $actorId);
+        $clientUser = Database::one('SELECT user_id FROM clients WHERE id = ?', [$invoice['client_id']]);
+        if ($clientUser !== null && $clientUser['user_id'] !== null) {
+            Notifier::send([(int) $clientUser['user_id']], 'payment.requested', 'Payment request: ₹' . FieldRules::formatMinor($amountMinor), 'A PhonePe payment request for invoice ' . $invoice['reference'] . ' is waiting for you.', '/my/pay/' . $pub, null, 'gateway_order', $id, "pay-request:{$id}");
+        }
 
-        return $url;
+        return Database::one('SELECT * FROM gateway_orders WHERE id = ?', [$id]);
+    }
+
+    /** True for a text a QR scanner can use: a UPI link or an https address, of a sensible size. */
+    private static function scannable(string $s): bool
+    {
+        return mb_strlen($s) <= 1900 && (bool) preg_match('#^(upi://|https://)\S+$#i', $s);
+    }
+
+    /**
+     * A UPI link carries its amount in "am=". When it is there it must be exactly what the team entered, or the QR is refused: this is what makes sure the
+     * QR on screen asks for that amount and no other.
+     */
+    private static function assertAmountInPayload(string $payload, int $amountMinor): void
+    {
+        if (!str_starts_with(strtolower($payload), 'upi://')) {
+            return;
+        }
+        parse_str((string) parse_url($payload, PHP_URL_QUERY), $q);
+        if (isset($q['am']) && !self::sameAmount((string) $q['am'], $amountMinor)) {
+            Logger::security('PhonePe QR amount differs from the request', ['requested' => $amountMinor, 'in_qr' => (string) $q['am']]);
+            throw new ValidationException(['PhonePe returned a QR for a different amount than the one entered. It was discarded and nothing was requested.']);
+        }
+    }
+
+    private static function sameAmount(string $am, int $minor): bool
+    {
+        return preg_match('/^\d{1,9}(\.\d{1,2})?$/', $am) === 1 && (int) round(((float) $am) * 100) === $minor;
+    }
+
+    /** @return array<string,mixed>|null */
+    public static function findRequest(string $publicId): ?array
+    {
+        return preg_match('/^[a-f0-9]{32}$/', $publicId) ? Database::one("SELECT * FROM gateway_orders WHERE public_id = ? AND provider = 'phonepe'", [$publicId]) : null;
+    }
+
+    /** @param array<string,mixed> $o an order row @return bool the QR may still be shown and paid */
+    public static function isLive(array $o): bool
+    {
+        return $o['status'] === 'pending' && $o['expires_at'] !== null && strtotime((string) $o['expires_at'] . ' UTC') > time();
+    }
+
+    /** @return list<array<string,mixed>> requests that can still be paid for one invoice, newest first */
+    public static function liveRequests(int $invoiceId): array
+    {
+        return Database::all("SELECT * FROM gateway_orders WHERE invoice_id = ? AND provider = 'phonepe' AND status = 'pending' AND expires_at > UTC_TIMESTAMP() ORDER BY id DESC", [$invoiceId]);
+    }
+
+    /** The team withdraws a request: the QR disappears. A payment that was already made is still recorded when PhonePe confirms it. @param array<string,mixed> $order */
+    public static function cancelRequest(int $actorId, array $order): void
+    {
+        Gate::authorize('payments.request', $actorId);
+        if (!in_array($order['status'], ['pending', 'created'], true)) {
+            throw new ValidationException(['This request is no longer open.']);
+        }
+        Database::run("UPDATE gateway_orders SET status = 'cancelled', cancelled_by = ?, cancelled_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP() WHERE id = ? AND status IN ('pending','created')", [$actorId, $order['id']]);
+        Audit::record('gateway.request_cancelled', 'gateway_order', (int) $order['id'], ['status' => $order['status']], ['status' => 'cancelled'], ['merchant_order_id' => $order['merchant_order_id']], $actorId);
     }
 
     /**
@@ -152,7 +274,7 @@ final class PhonePeGateway
             return ['state' => 'FAILED', 'recorded' => false];
         }
         if ($state !== 'COMPLETED') {
-            if ($order['status'] === 'pending' && strtotime($order['created_at'] . ' UTC') < time() - 3600 * 6) {
+            if ($order['status'] === 'pending' && strtotime(($order['expires_at'] ?? $order['created_at']) . ' UTC') < time() - 60) {
                 Database::run("UPDATE gateway_orders SET status = 'expired', updated_at = UTC_TIMESTAMP() WHERE id = ? AND status = 'pending'", [$order['id']]);
             }
 

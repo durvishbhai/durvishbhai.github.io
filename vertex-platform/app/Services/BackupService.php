@@ -84,6 +84,31 @@ final class BackupService
         return ['path' => $final, 'bytes' => (int) filesize($final), 'tables' => count($info['tables']), 'rows' => array_sum($info['tables']), 'uploads' => $uploads, 'sha256' => hash_file('sha256', $final)];
     }
 
+    /**
+     * A complete, restore-ready SQL file of the database (structure and data, one consistent snapshot) written to a private temporary file. The caller sends it to an
+     * authorised person and then deletes it with unlink().
+     *
+     * @return array{path:string,tables:int,rows:int,bytes:int}
+     */
+    public static function sqlDump(): array
+    {
+        $dir = rtrim((string) Config::get('uploads.root', VERTEX_ROOT . '/storage/uploads'), '/');
+        $dir = dirname($dir) . '/cache';
+        if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
+            throw new \RuntimeException('The temporary folder is not writable.');
+        }
+        $path = $dir . '/sqldump-' . bin2hex(random_bytes(12)) . '.sql';
+        try {
+            $info = self::dumpDatabase($path);
+        } catch (\Throwable $e) {
+            @unlink($path);
+            throw $e;
+        }
+        @chmod($path, 0600);
+
+        return ['path' => $path, 'tables' => count($info['tables']), 'rows' => array_sum($info['tables']), 'bytes' => (int) filesize($path)];
+    }
+
     /** @return array{tables:array<string,int>,migrations:list<string>} */
     private static function dumpDatabase(string $file): array
     {

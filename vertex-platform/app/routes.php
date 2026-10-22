@@ -43,6 +43,7 @@ use Vertex\Http\Controllers\Referrals\ReferralAdminController;
 use Vertex\Http\Controllers\TicketController;
 use Vertex\Http\Controllers\WarrantyController;
 use Vertex\Http\Controllers\RegistrationController;
+use Vertex\Http\Controllers\Admin\BackupController;
 use Vertex\Http\Controllers\Admin\BillingSettingsController;
 use Vertex\Http\Controllers\Admin\SystemController;
 use Vertex\Http\Controllers\Admin\CmsController;
@@ -54,6 +55,7 @@ use Vertex\Http\Controllers\EnquiryFileController;
 use Vertex\Http\Controllers\Admin\SiteAdminController;
 use Vertex\Http\Controllers\Admin\CareerAdminController;
 use Vertex\Http\Controllers\Billing\PhonePeController;
+use Vertex\Http\Controllers\Billing\PhonePeRequestController;
 use Vertex\Http\Controllers\Billing\CouponController;
 use Vertex\Http\Controllers\Billing\DocumentController;
 use Vertex\Http\Controllers\Billing\InvoiceController;
@@ -356,7 +358,16 @@ return static function (Router $router): void {
     $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
-    $router->post('/my/invoices/{invoice}/phonepe', [PhonePeController::class, 'start'], ['auth', 'can:payments.pay']);
+    // PhonePe payments are asked for by the KIS team only (amount typed by them); the client just sees and pays the request.
+    $pr = ['auth', 'can:payments.request'];
+    $router->get('/phonepe-requests', [PhonePeRequestController::class, 'index'], $pr);
+    $router->get('/invoices/{invoice}/phonepe', [PhonePeRequestController::class, 'create'], $pr);
+    $router->post('/invoices/{invoice}/phonepe', [PhonePeRequestController::class, 'store'], $pr);
+    $router->get('/phonepe-requests/{order}', [PhonePeRequestController::class, 'show'], $pr);
+    $router->get('/phonepe-requests/{order}/status', [PhonePeRequestController::class, 'status'], $pr);
+    $router->post('/phonepe-requests/{order}/cancel', [PhonePeRequestController::class, 'cancel'], $pr);
+    $router->get('/my/pay/{order}', [PhonePeRequestController::class, 'mine'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/pay/{order}/status', [PhonePeRequestController::class, 'mineStatus'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/phonepe-return', [PhonePeController::class, 'returned'], ['auth', 'can:invoices.view_own']);
 
     // AI assistance (drafts only)
@@ -553,6 +564,8 @@ return static function (Router $router): void {
         $r->post('/sla', [AutomationController::class, 'saveSla'], ['can:sla.manage']);
         $r->get('/recycle-bin', [RecycleBinController::class, 'index'], ['can:recycle.view']);
         $r->post('/recycle-bin/restore', [RecycleBinController::class, 'restore'], ['can:recycle.restore']);
+        $r->get('/backup', [BackupController::class, 'index'], ['can:backups.manage']);
+        $r->post('/backup/sql', [BackupController::class, 'download'], ['can:backups.manage']);
         $r->get('/data', [DataController::class, 'index'], ['can:data.export,data.import']);
         $r->get('/data/export/{type}', [DataController::class, 'export'], ['can:data.export']);
         $r->get('/data/template/{type}', [DataController::class, 'template'], ['can:data.import']);

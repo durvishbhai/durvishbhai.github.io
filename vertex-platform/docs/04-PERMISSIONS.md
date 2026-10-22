@@ -135,6 +135,7 @@ Users can hold several roles; permissions are the union.
 | `payments.pay` — Pay own invoices (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `payments.record` — Record payments | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `payments.reconcile` — Reconcile payments with the gateway | ✔ | ✔ |  |  |  |  |  |  |  |  |
+| `payments.request` — Create PhonePe payment requests (exact-amount QR) for invoices | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `billing.configure` — Edit business details and the Google Pay settings | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `transactions.approve` — Approve financial transactions | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | **Payouts** | | | | | | | | | | |

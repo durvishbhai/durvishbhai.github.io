@@ -352,9 +352,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertStringContainsString('Freelance Video Editor', $c->get('/careers')['body']);
         $this->assertSame(200, $c->get('/careers/' . $job['slug'])['status']);
 
-        $resume = $this->png('work-sample.png');
-        $r = $c->upload('/careers/apply', ['full_name' => 'Arjun Applicant', 'email' => 'arjun@web.test', 'role' => 'Freelance Video Editor', 'skills_experience' => 'Five years of editing short-form video for brands.',
-            'intro' => 'I would love to work with your team on video projects.', 'consent' => '1', 'website_url' => ''], ['resume' => [$resume['tmp_name'], 'work-sample.png', 'image/png']], '/careers');
+        $r = $c->upload('/careers/apply', $this->hiringForm(['full_name' => 'Arjun Applicant', 'email' => 'arjun@web.test', 'role' => 'Freelance Video Editor']), $this->resumeFile(), '/careers');
         $this->assertSame(303, $r['status'], $r['body']);
         $this->assertSame('/careers/received', $r['location']);
         $app = Database::one("SELECT * FROM site_job_applications WHERE email = 'arjun@web.test'");
@@ -377,11 +375,11 @@ final class PublicWebsiteTest extends HttpTestCase
 
     public function testJobApplicationNeedsConsentAndIsProtectedAgainstBots(): void
     {
-        $base = ['full_name' => 'Bot Person', 'email' => 'bot@web.test', 'role' => 'Other', 'skills_experience' => 'Plenty of relevant experience in the field.', 'intro' => 'A sufficiently long introduction text.', 'website_url' => ''];
+        $base = $this->hiringForm(['full_name' => 'Bot Person', 'email' => 'bot@web.test', 'role' => 'Other', 'consent' => '']);
         $c = $this->client();
-        $c->post('/careers/apply', $base, '/careers');
+        $c->upload('/careers/apply', $base, $this->resumeFile(), '/careers');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'no consent, nothing stored');
-        $c->post('/careers/apply', ['consent' => '1', 'website_url' => 'http://spam.example'] + $base, '/careers');
+        $c->upload('/careers/apply', ['consent' => '1', 'website_url' => 'http://spam.example'] + $base, $this->resumeFile(), '/careers');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'honeypot submissions are discarded');
         $this->assertSame(419, $c->postNoToken('/careers/apply', ['consent' => '1'] + $base)['status']);
         $bad = $this->tmp('cv.exe', 'MZ binary');
@@ -394,8 +392,17 @@ final class PublicWebsiteTest extends HttpTestCase
     /** @return array<string,string> */
     private function hiringForm(array $over = []): array
     {
-        return $over + ['role' => 'Video Editor', 'full_name' => 'Hira Hiring', 'email' => 'hira@web.test', 'experience' => '1to3', 'availability' => '2weeks',
-            'skills_experience' => 'Premiere Pro and DaVinci Resolve, short-form and YouTube edits.', 'portfolio_url' => 'https://example.com/reel', 'intro' => 'I would like to edit videos for your team.', 'consent' => '1', 'website_url' => ''];
+        return $over + ['role' => 'Video Editor', 'full_name' => 'Hira Hiring', 'email' => 'hira@web.test', 'phone' => '+91 98765 43210', 'experience' => '1 to 3 years', 'availability' => 'Within 2 weeks',
+            'skills_experience' => 'Premiere Pro and DaVinci Resolve, short-form and YouTube edits.', 'portfolio_url' => 'https://example.com/reel', 'linkedin_url' => 'https://www.linkedin.com/in/hira-hiring',
+            'intro' => 'I would like to edit videos for your team.', 'consent' => '1', 'website_url' => ''];
+    }
+
+    /** @return array<string,array{0:string,1:string,2:string}> */
+    private function resumeFile(): array
+    {
+        $f = $this->png('cv.png');
+
+        return ['resume' => [$f['tmp_name'], 'cv.png', 'image/png']];
     }
 
     public function testHiringPageListsTheFourRolesWithTheSalaryNoteAndAnInteractiveForm(): void
@@ -417,27 +424,71 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertStringContainsString('role-card is-selected', $c->get('/hiring?role=Backend+Developer')['body'], 'a role can be pre-selected from a link');
     }
 
-    public function testHiringApplicationIsStoredWithTheRoleExperienceAndAvailability(): void
+    public function testHiringApplicationIsStoredWithTheRoleExperienceAvailabilityAndLinkedIn(): void
     {
         $c = $this->client();
-        $resume = $this->png('reel.png');
-        $r = $c->upload('/hiring/apply', $this->hiringForm(), ['resume' => [$resume['tmp_name'], 'reel.png', 'image/png']], '/hiring');
+        $r = $c->upload('/hiring/apply', $this->hiringForm(), $this->resumeFile(), '/hiring');
         $this->assertSame(303, $r['status'], $r['body']);
         $this->assertSame('/hiring/received', $r['location']);
         $app = Database::one("SELECT * FROM site_job_applications WHERE email = 'hira@web.test'");
         $this->assertNotNull($app);
-        $this->assertSame('Video Editor', $app['role_applied']);
-        $this->assertStringContainsString('Experience: 1 to 3 years', $app['skills_experience']);
-        $this->assertStringContainsString('Available: Within 2 weeks', $app['skills_experience']);
+        $this->assertSame(['Video Editor', '1 to 3 years', 'Within 2 weeks', 'https://www.linkedin.com/in/hira-hiring', '+91 98765 43210'], [$app['role_applied'], $app['experience'], $app['availability'], $app['linkedin_url'], $app['phone']]);
+        $this->assertNotNull($app['file_id']);
         $this->assertStringContainsString($app['reference'], $c->get('/hiring/received')['body']);
-        $this->assertStringContainsString('Hira Hiring', $this->loggedIn('admin@x.test')->get('/admin/careers/' . $app['public_id'])['body']);
+        $page = $this->loggedIn('admin@x.test')->get('/admin/careers/' . $app['public_id'])['body'];
+        $this->assertStringContainsString('Hira Hiring', $page);
+        $this->assertStringContainsString('linkedin.com/in/hira-hiring', $page);
+        $this->assertStringContainsString('Within 2 weeks', $page);
+    }
 
+    public function testEveryFieldOfTheApplicationIsRequired(): void
+    {
+        $c = $this->client();
         $before = (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'];
-        $c->post('/hiring/apply', $this->hiringForm(['role' => 'Astronaut', 'email' => 'x@web.test']), '/hiring');
-        $c->post('/hiring/apply', $this->hiringForm(['experience' => 'forever', 'email' => 'y@web.test']), '/hiring');
-        $c->post('/hiring/apply', $this->hiringForm(['consent' => '', 'email' => 'z@web.test']), '/hiring');
-        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'unknown role, bad option and missing consent store nothing');
-        $this->assertSame(419, $c->postNoToken('/hiring/apply', $this->hiringForm(['email' => 'w@web.test']))['status']);
+        $n = 0;
+        foreach (['role', 'full_name', 'email', 'phone', 'experience', 'availability', 'skills_experience', 'portfolio_url', 'linkedin_url', 'intro', 'consent'] as $field) {
+            $n++;
+            $form = $this->hiringForm(['email' => "req{$n}@web.test"]);
+            $form[$field] = '';
+            $c->upload('/hiring/apply', $form, $this->resumeFile(), '/hiring');
+        }
+        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'nofile@web.test']), [], '/hiring');
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'a missing field (or missing résumé) stores nothing');
+        foreach (['https://example.com/in/x', 'http://www.linkedin.com/in/x', 'https://www.linkedin.com/', 'https://evil.test/linkedin.com/in/x', 'javascript:alert(1)'] as $bad) {
+            $c->upload('/hiring/apply', $this->hiringForm(['linkedin_url' => $bad, 'email' => 'badli@web.test']), $this->resumeFile(), '/hiring');
+        }
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'only a real https LinkedIn profile address is accepted');
+        $html = $c->get('/hiring')['body'];
+        $this->assertStringNotContainsString('(optional', $html, 'no field is marked optional');
+        $this->assertStringContainsString('name="linkedin_url"', $html);
+        foreach (['phone', 'experience', 'availability', 'portfolio_url', 'linkedin_url', 'resume'] as $f) {
+            $this->assertMatchesRegularExpression('#<(input|select)[^>]*name="' . $f . '"[^>]*required#', $html, "{$f} is required in the form");
+        }
+        $this->assertStringContainsString('name="linkedin_url"', $c->get('/careers')['body'], 'the Careers form has it too');
+    }
+
+    public function testTheApplicationFormIsEditableFromTheDashboard(): void
+    {
+        $admin = $this->loggedIn('admin@x.test');
+        $this->assertStringContainsString('name="s[fields][f][linkedin_label]"', $admin->get('/admin/site/sections/hiring')['body']);
+        $admin->post('/admin/site/sections/hiring', ['s' => ['fields' => ['enabled' => '1', 'f' => [
+            'role_label' => 'Which role?', 'name_label' => 'Your full name', 'email_label' => 'Email', 'phone_label' => 'Mobile', 'experience_label' => 'Experience',
+            'experience_options' => "Under 2 years\nOver 2 years", 'availability_label' => 'Start date', 'availability_options' => "Now\nLater",
+            'skills_label_dev' => 'Stack', 'skills_hint_dev' => 'Languages', 'skills_label_video' => 'Tools', 'skills_hint_video' => 'Software', 'link_label_dev' => 'Code link', 'link_label_video' => 'Reel',
+            'linkedin_label' => 'Your LinkedIn page', 'resume_label' => 'CV', 'intro_label' => 'About you', 'consent_text' => 'I agree to storage, see the', 'submit_label' => 'Send it',
+        ]]]], '/admin/site/sections/hiring');
+        $html = $this->client()->get('/hiring')['body'];
+        foreach (['Which role?', 'Your LinkedIn page', 'Under 2 years', 'Over 2 years', 'Send it', 'Mobile'] as $t) {
+            $this->assertStringContainsString($t, $html, $t);
+        }
+        $this->assertStringNotContainsString('1 to 3 years', $html);
+        // the new choices are the ones that are accepted
+        $c = $this->client();
+        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'old@web.test']), $this->resumeFile(), '/hiring');
+        $this->assertSame(0, (int) Database::one("SELECT COUNT(*) c FROM site_job_applications WHERE email = 'old@web.test'")['c'], 'a removed choice is refused');
+        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'new@web.test', 'experience' => 'Over 2 years', 'availability' => 'Now']), $this->resumeFile(), '/hiring');
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM site_job_applications WHERE email = 'new@web.test'")['c']);
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->post('/admin/site/sections/hiring', ['s' => []], '/account')['status']);
     }
 
     public function testAdminCanOpenCloseOrHideTheHiringPage(): void

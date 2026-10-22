@@ -43,7 +43,16 @@ What this phase adds, how it is protected, and exactly what has **not** been pro
 
 ## 4. PhonePe payments (module 21) — Standard Checkout
 
-Flow: client opens an invoice → *Pay online with PhonePe* → server creates a PhonePe order for what is **still due on the invoice** (the browser supplies no amount) → client pays on PhonePe → returns to `/my/invoices/{id}/phonepe-return` → PhonePe also calls `POST /webhooks/phonepe`.
+**Update (staff-initiated, exact-amount QR).** Payments are no longer started by the client. A member of the KIS team with `payments.request` (Finance Staff, Administrator, Owner) opens an invoice → *Request PhonePe payment* → **types the amount** (pre-filled with what is still due, editable down to ₹1.00, never above the balance) → the server creates a PhonePe order for exactly that amount → one QR is drawn on the server (`QrCode`, SVG, no external service) from PhonePe's answer for that order. Nothing is generated before an amount is entered; the client sees the same QR on `/my/pay/{id}` (and is notified) but cannot change or create anything. The page polls `/phonepe-requests/{id}/status` (which asks PhonePe, never trusts the browser) and flips to "Payment received" when PhonePe says COMPLETED. A request can be withdrawn (QR disappears; a payment that was already made is still recorded when PhonePe confirms it) and expires after `order_ttl_minutes` (30).
+
+How the QR is made (`PHONEPE_QR_MODE` / Integrations & settings → PhonePe → *How the payment QR is made*):
+* `auto` (default): ask PhonePe for a **UPI QR** order (`POST /payments/v2/pay`, `paymentMode.type = UPI_QR`); use its `qrData` (or `intentUrl`). If PhonePe does not return one (for example the UPI QR option is not enabled on the merchant account) fall back to **Standard Checkout** (`POST /checkout/v2/pay`) and draw a QR that opens PhonePe's hosted payment page for that order and amount.
+* `direct`: UPI QR only (refuse if PhonePe returns none). `checkout`: hosted checkout link only.
+* **Amount guard:** when the QR text is a UPI link, its `am=` must equal the typed amount or the request is discarded and nothing is stored. Independently, `reconcile()` only records a payment when PhonePe's status says COMPLETED for exactly the order's amount.
+
+**Honest limits of this update:** PhonePe's developer site could not be opened from the build environment, so the UPI QR request/response field names (`paymentFlow.paymentMode.type`, `qrData`, `intentUrl`) come from search-result summaries of the public docs and from the existing Standard Checkout code, not from reading the reference pages; the fallback exists because of that. The QR encoder itself was verified by decoding 24 generated codes with a real QR reader. Nothing has been run against PhonePe's sandbox: use the checklist below before real money.
+
+Original flow (kept for the return page and webhook): server creates a PhonePe order → customer pays on PhonePe → returns to `/my/invoices/{id}/phonepe-return` → PhonePe also calls `POST /webhooks/phonepe`.
 
 Guarantees (each is covered by tests against a simulated PhonePe):
 

@@ -24,6 +24,7 @@ $nav = [
     ['/commissions', 'Commissions', can('commissions.view_all')],
     ['/payouts', 'Payouts', can('payouts.view_all') || can('payouts.approve') || can('payouts.record')],
     ['/invoices', 'Invoices', can('invoices.view_all')],
+    ['/phonepe-requests', 'PhonePe requests', can('payments.request')],
     ['/quotations', 'Quotations', can('quotes.create') || can('quotes.send') || can('quotes.record_decision')],
     ['/my/invoices', 'My invoices', can('invoices.view_own') && $isClient],
     ['/my/quotes', 'My quotations', can('quotes.view') && can('quotes.respond') && $isClient],
@@ -59,6 +60,7 @@ $nav = [
     ['/admin/automation', 'Workflow rules', can('automation.manage')],
     ['/admin/sla', 'Support SLA', can('sla.manage')],
     ['/admin/data', 'Import & export', can('data.export') || can('data.import')],
+    ['/admin/backup', 'Backup (.sql)', can('backups.manage')],
     ['/admin/recycle-bin', 'Recycle bin', can('recycle.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
     ['/admin/payments', 'Payments (Google Pay)', can('billing.configure')],
@@ -119,6 +121,7 @@ foreach ($groups as $gname => $items) {
     <meta name="robots" content="noindex,nofollow">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
+    <script src="<?= e(asset('js/theme.js')) ?>"></script>
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 </head>
 <body class="portal">
@@ -131,6 +134,7 @@ foreach ($groups as $gname => $items) {
     </a>
     <form class="portal-search" method="get" action="/search" role="search"><label class="sr-only" for="gs">Search</label><input id="gs" name="q" type="search" placeholder="Search everything" maxlength="100" autocomplete="off"></form>
     <div class="portal-user">
+        <?= \Vertex\Core\View::partial('theme-toggle') ?>
         <a class="bell" href="/notifications" aria-label="Notifications<?= $unread > 0 ? ' (' . $unread . ' unread)' : '' ?>">&#128276;<?php if ($unread > 0) : ?><span class="bell-n"><?= $unread > 99 ? '99+' : (int) $unread ?></span><?php endif; ?></a>
         <a class="portal-name" href="/account"><?= e($user['name'] ?? '') ?></a>
         <form method="post" action="/logout">

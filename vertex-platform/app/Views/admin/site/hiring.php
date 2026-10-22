@@ -12,8 +12,9 @@ $labels = ['open' => 'Open', 'closed' => 'Hiring closed', 'hidden' => 'Hidden'];
     <li><strong>Open</strong>: the roles below, the salary note, how it works and the application form. A small "We're hiring" bar appears at the top of the other pages.</li>
     <li><strong>Hiring closed</strong>: the page stays, shows your "hiring closed" message and has no form. The top bar disappears.</li>
     <li><strong>Hidden</strong>: the page returns "not found" and is removed from the menu, footer and sitemap.</li></ul>
+    <p class="muted">Every field of the application form is required (name, email, phone, role, experience, availability, skills, portfolio link, LinkedIn link, résumé, introduction and consent). Their names and the two drop-down lists are editable; the requirement is fixed.</p>
     <p class="muted">If you saved your own header menu under Menus, add or remove the Hiring link there too.</p></div>
 <div class="panel"><h2>Roles shown on the page</h2>
     <?php if ($roles === []) : ?><p class="muted">No roles are listed, so the form cannot be used. Add roles in the wording editor.</p><?php else : ?><ul class="plain-list"><?php foreach ($roles as $r) : ?><li><strong><?= e($r['title']) ?></strong><?= $r['summary'] !== '' ? ' - ' . e($r['summary']) : '' ?></li><?php endforeach; ?></ul><?php endif; ?>
-    <p><a class="btn btn-ghost btn-sm" href="/admin/site/sections/hiring">Edit roles, salary note, steps and wording</a>
+    <p><a class="btn btn-ghost btn-sm" href="/admin/site/sections/hiring">Edit roles, salary note, steps, the application form's field names and choices</a>
     <?php if ($newApplications !== null) : ?> <a class="btn btn-ghost btn-sm" href="/admin/careers">Job applications<?= $newApplications > 0 ? ' (' . (int) $newApplications . ' new)' : '' ?></a><?php endif; ?></p></div>

@@ -547,6 +547,8 @@ final class Phase12ServiceTest extends DatabaseTestCase
 
     /** @var array<string,string> */
     private array $phonepeState = [];
+    /** @var list<array<string,mixed>> */
+    private array $lastBodies = [];
 
     private function phonepeOn(bool $webhook = true): void
     {
@@ -564,8 +566,19 @@ final class Phase12ServiceTest extends DatabaseTestCase
     private function fakePhonePe(array &$calls, array $o = []): void
     {
         $this->phonepeState = ['state' => $o['state'] ?? 'PENDING'];
+        $this->lastBodies = [];
         Http::fake(function (string $m, string $url, array $h, ?string $body) use (&$calls, &$o): array {
             $calls[] = $m . ' ' . $url;
+            if ($body !== null && is_array(json_decode($body, true))) {
+                $this->lastBodies[] = json_decode($body, true);
+            }
+            if (str_contains($url, '/payments/v2/pay')) {
+                if (empty($o['qr'])) {
+                    return ['status' => 400, 'body' => json_encode(['code' => 'FEATURE_NOT_ENABLED'])];
+                }
+
+                return ['status' => 200, 'body' => json_encode(['orderId' => 'OMOQR1', 'state' => 'PENDING', 'qrData' => $o['qr']])];
+            }
             if (str_contains($url, '/oauth/token')) {
                 return ['status' => 200, 'body' => json_encode(['access_token' => 'tok-abc', 'expires_at' => time() + 3600])];
             }
@@ -602,25 +615,84 @@ final class Phase12ServiceTest extends DatabaseTestCase
         return hash('sha256', $u . ':' . $p);
     }
 
-    public function testStartingAPaymentIsOwnerOnlyAmountComesFromTheInvoiceAndNeedsConfiguration(): void
+    /** A member of the KIS team asks for an amount (paise) on an invoice. @return array<string,mixed> */
+    private function requestPay(array $inv, int $minor = 100000, ?int $by = null): array
+    {
+        return PhonePeGateway::createRequest($by ?? $this->finance, $inv, $minor, '');
+    }
+
+    public function testOnlyTheTeamCanRequestAPaymentAndTheAmountIsExactlyWhatTheyType(): void
     {
         $calls = [];
         $this->fakePhonePe($calls);
         $inv = $this->issuedInvoice('1000');
-        $this->invalid(fn () => PhonePeGateway::start($this->client, $inv), 'not available'); // switched off
+        $this->invalid(fn () => $this->requestPay($inv), 'not switched on'); // PhonePe is off
         $this->phonepeOn();
-        $this->forbidden(fn () => PhonePeGateway::start($this->client2, $inv));   // somebody else's invoice
-        $this->forbidden(fn () => PhonePeGateway::start($this->finance, $inv));    // staff cannot "pay" as the client
+        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->client));    // a client cannot start one
+        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->client2));
+        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->dev));        // nor can staff without the permission
         $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/pay')), 'no gateway call for refused users');
-        $url = PhonePeGateway::start($this->client, $inv);
-        $this->assertStringStartsWith('https://mercury-uat.phonepe.com/', $url);
-        $o = Database::one('SELECT * FROM gateway_orders');
-        $this->assertSame(['pending', 100000, (int) $inv['id']], [$o['status'], (int) $o['amount_minor'], (int) $o['invoice_id']]);
+        // the amount typed is the amount asked: a part payment of Rs 250.50
+        $o = $this->requestPay($inv, 25050);
+        $this->assertSame(['pending', 25050, (int) $inv['id'], $this->finance], [$o['status'], (int) $o['amount_minor'], (int) $o['invoice_id'], (int) $o['created_by']]);
         $this->assertMatchesRegularExpression('/^KIS\d+X[A-F0-9]{12}$/', $o['merchant_order_id']);
-        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c'], 'starting is not paying');
-        // http (non-https) site address is refused
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c'], 'requesting is not paying');
+        $sent = array_values(array_filter($this->lastBodies, fn ($b) => isset($b['amount'])));
+        $this->assertSame([25050], array_unique(array_column($sent, 'amount')), 'every call to PhonePe carried exactly the typed amount');
+        // limits: at least Rs 1, at most what is still due, nothing on a paid/void invoice or non-https site
+        $this->invalid(fn () => $this->requestPay($inv, 99), 'smallest');
+        $this->invalid(fn () => $this->requestPay($inv, 100001), 'more than');
         Config::set('app.url', 'http://vis.test');
-        $this->invalid(fn () => PhonePeGateway::start($this->client, $inv), 'not available');
+        $this->invalid(fn () => $this->requestPay($inv, 100000), 'not switched on');
+    }
+
+    public function testADirectUpiQrIsUsedWhenPhonePeReturnsOneAndAWrongAmountInItIsRefused(): void
+    {
+        $calls = [];
+        $this->phonepeOn();
+        $this->fakePhonePe($calls, ['qr' => 'upi://pay?pa=merchant@ybl&pn=Krazy&am=250.50&cu=INR&tr=ORD1']);
+        $inv = $this->issuedInvoice('1000');
+        $o = $this->requestPay($inv, 25050);
+        $this->assertSame('upi_qr', $o['flow']);
+        $this->assertStringContainsString('am=250.50', $o['qr_payload']);
+        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_contains($c, '/payments/v2/pay')));
+        $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/checkout/v2/pay')), 'no fallback needed');
+
+        // a QR that asks for a different amount is never shown
+        $this->fakePhonePe($calls, ['qr' => 'upi://pay?pa=merchant@ybl&am=999.00&tr=ORD2']);
+        $this->invalid(fn () => $this->requestPay($inv, 25050), 'different amount');
+        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c'], 'the mismatching request was not stored');
+
+        // direct mode with no QR from PhonePe refuses instead of falling back; auto mode falls back to the hosted page
+        $this->fakePhonePe($calls);
+        Config::set('phonepe.qr_mode', 'direct');
+        $this->invalid(fn () => $this->requestPay($inv, 25050), 'UPI QR');
+        Config::set('phonepe.qr_mode', 'auto');
+        $o2 = $this->requestPay($inv, 25050);
+        $this->assertSame('checkout_link', $o2['flow']);
+        $this->assertStringStartsWith('https://mercury-uat.phonepe.com/', $o2['qr_payload']);
+        Config::set('phonepe.qr_mode', 'auto');
+    }
+
+    public function testARequestCanBeWithdrawnAndALatePaymentIsStillRecorded(): void
+    {
+        $calls = [];
+        $this->phonepeOn();
+        $this->fakePhonePe($calls);
+        $inv = $this->issuedInvoice('1000');
+        $o = $this->requestPay($inv, 100000);
+        $this->assertTrue(PhonePeGateway::isLive($o));
+        $this->forbidden(fn () => PhonePeGateway::cancelRequest($this->client, $o));
+        PhonePeGateway::cancelRequest($this->finance, $o);
+        $o = PhonePeGateway::findRequest($o['public_id']);
+        $this->assertSame('cancelled', $o['status']);
+        $this->assertFalse(PhonePeGateway::isLive($o));
+        $this->assertSame([], PhonePeGateway::liveRequests((int) $inv['id']));
+        $this->invalid(fn () => PhonePeGateway::cancelRequest($this->finance, $o), 'no longer open');
+        // the customer had already paid: PhonePe says COMPLETED, so the money is recorded
+        $this->phonepeState['state'] = 'COMPLETED';
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], PhonePeGateway::reconcile($o['merchant_order_id']));
+        $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
     }
 
     public function testAPaymentIsRecordedOnlyAfterTheStatusApiSaysCompletedForTheRightAmount(): void
@@ -629,7 +701,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         $this->assertSame(['state' => 'PENDING', 'recorded' => false], PhonePeGateway::reconcile($mid));
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
@@ -657,7 +729,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls, ['state' => 'COMPLETED', 'amount' => 100]);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         try {
             PhonePeGateway::reconcile($mid);
@@ -677,12 +749,12 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls, ['state' => 'FAILED']);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         $this->assertSame(['state' => 'FAILED', 'recorded' => false], PhonePeGateway::reconcile($mid));
         $this->assertSame('failed', Database::one('SELECT status FROM gateway_orders')['status']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        PhonePeGateway::start($this->client, InvoiceService::find($inv['public_id'])); // a failed attempt does not block a retry
+        $this->requestPay(InvoiceService::find($inv['public_id'])); // a failed attempt does not block a retry
         $this->assertSame(2, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
     }
 
@@ -692,7 +764,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls, ['state' => 'COMPLETED', 'http' => 500]);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         $this->expectException(\RuntimeException::class);
         try {
@@ -708,7 +780,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls); // PhonePe's own status API says PENDING
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         $body = json_encode(['event' => 'checkout.order.completed', 'payload' => ['merchantOrderId' => $mid, 'state' => 'COMPLETED', 'amount' => 100000]]);
         $this->assertSame(401, PhonePeGateway::webhook('', $body)['status']);
@@ -749,14 +821,14 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         // the staff verify a partial manual payment; PhonePe asks only for what is still due
         $this->phonepeState['state'] = 'COMPLETED';
         $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
         PhonePeGateway::reconcile($mid);
         $paid = InvoiceService::find($inv['public_id']);
         $this->assertSame('paid', $paid['status']);
-        $this->forbidden(fn () => PhonePeGateway::start($this->client, $paid)); // already paid: not payable
+        $this->invalid(fn () => $this->requestPay($paid), 'issued invoice'); // already paid: not payable
     }
 
     public function testReconcilePendingPicksUpOrdersTheCustomerNeverReturnedFrom(): void
@@ -765,7 +837,7 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->phonepeOn();
         $this->fakePhonePe($calls);
         $inv = $this->issuedInvoice('1000');
-        PhonePeGateway::start($this->client, $inv);
+        $this->requestPay($inv);
         $this->phonepeState['state'] = 'COMPLETED';
         $this->assertSame(0, PhonePeGateway::reconcilePending(), 'too new: the customer may still be on the PhonePe page');
         Database::run('UPDATE gateway_orders SET created_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 MINUTE)');

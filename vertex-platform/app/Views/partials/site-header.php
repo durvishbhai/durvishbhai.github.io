@@ -18,6 +18,7 @@ $active = static fn (string $u): bool => $u === '/' ? $path === '/' : ($path ===
             <span class="brand-word">Krazy <small>Integrated Solutions</small></span>
         </a>
         <?php if ($signedIn) : ?><a class="btn btn-ghost btn-sm header-login" href="/dashboard">Dashboard</a><?php else : ?><a class="btn btn-ghost btn-sm header-login" href="/login">Login</a><?php endif; ?>
+        <?= \Vertex\Core\View::partial('theme-toggle') ?>
         <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
             <span class="sr-only">Menu</span><span class="bars" aria-hidden="true"></span>
         </button>

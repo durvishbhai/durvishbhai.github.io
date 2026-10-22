@@ -39,6 +39,8 @@ return [
         'payment_claim_user' => [10, 3600],
         'ai_user' => [30, 3600],
         'phonepe_start_user' => [10, 3600],
+        'phonepe_request_user' => [30, 3600],
+        'backup_download_user' => [10, 3600],
         'cms_upload_user' => [60, 3600],
         'career_ip' => [5, 3600],
     ],

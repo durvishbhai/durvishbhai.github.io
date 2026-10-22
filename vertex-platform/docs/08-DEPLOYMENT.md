@@ -103,3 +103,9 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 ## Public website (migrations 0018 and 0019)
 
 See `docs/20-PUBLIC-WEBSITE.md`. Deployment notes: visitor uploads are private (`storage/uploads`); two optional variables `UPLOAD_ENQUIRY_MAX_MB` and `UPLOAD_CAREER_MAX_MB`; `APP_URL` must be the public https address because canonical links, Open Graph tags and `sitemap.xml` use it. After deploying, set the company name and public contact details in *Integrations & settings -> Website*, complete and publish the five policy drafts (they are hidden until then), add real team/partner/portfolio/opening entries, and submit `https://YOUR-DOMAIN/sitemap.xml` to Google Search Console.
+
+## Backup (.sql) and new migrations
+
+* **Administration → Backup (.sql)** (Owner only, password re-entry, audited) downloads one standard `.sql` file with the structure and all data. Restore it with phpMyAdmin → Import (it replaces the tables it contains). Uploaded pictures/files are not in it: copy `public_html/uploads` and `vertex/storage/uploads` from the File Manager. Keep `APP_KEY` with the backup (saved secrets are encrypted with it). Proven by importing a real dump into an empty database and comparing row counts.
+* Migrations `0020` (PhonePe payment requests: QR payload, expiry, cancelled status) and `0021` (LinkedIn, experience, availability on applications) are applied by `upgrade.php`. Until they are applied the hiring form and PhonePe requests cannot save, so run the upgrade right after uploading the files.
+* Optional variable `PHONEPE_QR_MODE=auto|direct|checkout` (see docs/18).

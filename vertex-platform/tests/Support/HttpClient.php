@@ -64,8 +64,19 @@ final class HttpClient
             }
         }
 
+        $this->lastHeaders = [];
+        foreach ($headers as $h) {
+            if (str_contains($h, ':')) {
+                [$k, $v] = explode(':', $h, 2);
+                $this->lastHeaders[strtolower(trim($k))] = trim($v);
+            }
+        }
+
         return ['status' => $status, 'body' => $body, 'location' => $location];
     }
+
+    /** @var array<string,string> response headers of the last request() (lower-case names) */
+    public array $lastHeaders = [];
 
     /** @return array{status:int,body:string,location:?string} */
     public function get(string $path): array

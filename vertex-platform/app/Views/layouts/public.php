@@ -20,6 +20,7 @@ $pageTitle = isset($title) && $title !== '' && $title !== config('app.name') ? $
     <?php if (!empty($meta['ogImage'])) : ?><meta property="og:image" content="<?= e((string) $meta['ogImage']) ?>"><?php endif; ?>
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
     <link rel="apple-touch-icon" href="<?= e(asset('img/apple-touch-icon.png')) ?>">
+    <script src="<?= e(asset('js/theme.js')) ?>"></script>
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
     <?php if (!empty($jsonld)) : ?><script type="application/ld+json"><?= $jsonld ?></script><?php endif; ?>
 </head>
@@ -28,7 +29,7 @@ $pageTitle = isset($title) && $title !== '' && $title !== config('app.name') ? $
 <?= \Vertex\Core\View::partial('site-announce') ?>
 <?= \Vertex\Core\View::partial('site-header') ?>
 <main id="main">
-    <div class="container flash-wrap"><?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?></div>
+    <div class="container flash-wrap"><?= \Vertex\Core\View::partial('flash', ['errors' => !empty($errorsInline) ? [] : ($errors ?? []), 'notice' => $notice ?? null]) ?></div>
     <?= $content ?>
 </main>
 <?= \Vertex\Core\View::partial('site-footer') ?>

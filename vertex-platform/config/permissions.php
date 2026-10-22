@@ -129,6 +129,7 @@ $p = [
         'payments.pay' => 'Pay own invoices (client)',
         'payments.record' => 'Record payments',
         'payments.reconcile' => 'Reconcile payments with the gateway',
+        'payments.request' => 'Create PhonePe payment requests (exact-amount QR) for invoices',
         'billing.configure' => 'Edit business details and the Google Pay settings',
         'transactions.approve' => 'Approve financial transactions',
     ],
@@ -259,7 +260,7 @@ $p = [
 $sensitive = [
     'users.assign_roles', 'users.reset_2fa', 'roles.manage', 'roles.manage_sensitive', 'roles.create', 'audit.view',
     'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
-    'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile',
+    'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile', 'payments.request',
     'invoices.issue', 'invoices.void', 'payouts.approve', 'payouts.record',
     'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'careers.manage', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
@@ -338,7 +339,7 @@ $roles = [
         'permissions' => [
             'finance.view',
             'invoices.view_all', 'invoices.create', 'invoices.edit',
-            'payments.view_all', 'payments.record',
+            'payments.view_all', 'payments.record', 'payments.request',
             'payouts.view_all', 'payouts.record', 'commissions.view_all', 'data.export', 'coupons.view', 'reports.financial',
         ],
     ],

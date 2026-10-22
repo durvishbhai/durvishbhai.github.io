@@ -255,21 +255,95 @@ final class Phase12HttpTest extends HttpTestCase
         return $d['public_id'];
     }
 
-    public function testPhonePeStartIsHiddenWhenOffAndNeverReachableByAnotherClient(): void
+    /** An open PhonePe request for exactly $minor paise, as PhonePe would have created it (the test server cannot call PhonePe). @return array<string,mixed> */
+    private function openRequest(string $invoicePublic, int $minor, string $payload = 'upi://pay?pa=merchant@ybl&pn=Krazy&am=250.50&cu=INR&tr=ORDX'): array
+    {
+        $inv = InvoiceService::find($invoicePublic);
+        $pub = bin2hex(random_bytes(16));
+        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, client_id, amount_minor, qr_payload, expires_at, status, created_by, last_checked_at, created_at, updated_at)
+            VALUES (?, ?, 'phonepe', 'upi_qr', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 MINUTE), 'pending', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, 'KIS' . $inv['id'] . 'X' . strtoupper(bin2hex(random_bytes(6))), $inv['id'], $inv['client_id'], $minor, $payload, $this->finance]);
+
+        return Database::one('SELECT * FROM gateway_orders WHERE public_id = ?', [$pub]);
+    }
+
+    public function testPhonePeRequestsAreCreatedByTheTeamOnlyAndClientsCannotStartOne(): void
     {
         $inv = $this->issuedInvoicePublic();
-        $c = $this->loggedIn('alpha@client.test');
-        $page = $c->get('/my/invoices/' . $inv)['body'];
-        $this->assertStringNotContainsString('PhonePe', $page, 'no PhonePe button until it is switched on');
-        $r = $c->post('/my/invoices/' . $inv . '/phonepe', [], '/my/invoices/' . $inv);
-        $this->assertSame(303, $r['status']);
-        $this->assertSame('/my/invoices/' . $inv, $r['location'], 'a friendly error, not a crash');
+        $client = $this->loggedIn('alpha@client.test');
+        // no self-service button and no route for a client to start a payment
+        $this->assertStringNotContainsString('online (UPI, cards', $client->get('/my/invoices/' . $inv)['body']);
+        $this->assertSame(403, $client->post('/invoices/' . $inv . '/phonepe', ['amount' => '10'], '/account')['status']);
+        $this->assertSame(403, $client->get('/invoices/' . $inv . '/phonepe')['status']);
+        $this->assertSame(404, $client->post('/my/invoices/' . $inv . '/phonepe', [], '/account')['status'], 'the old client route is gone');
+        $this->assertSame(403, $this->loggedIn('dev@x.test')->get('/invoices/' . $inv . '/phonepe')['status']);
+        $this->assertSame(303, $this->client()->get('/invoices/' . $inv . '/phonepe')['status']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
-        $this->assertSame(404, $this->loggedIn('bravo@client.test')->post('/my/invoices/' . $inv . '/phonepe', [], '/account')['status']);
-        $this->assertSame(403, $this->loggedIn('fin@x.test')->post('/my/invoices/' . $inv . '/phonepe', [], '/account')['status']);
-        $this->assertSame(404, $c->get('/my/invoices/' . $inv . '/phonepe-return?o=VIS1XAAAAAAAAAAAA')['status']);
-        $this->assertSame(404, $c->get('/my/invoices/' . $inv . '/phonepe-return')['status']);
-        $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/invoices/' . $inv . '/phonepe-return?o=VIS1XAAAAAAAAAAAA')['status']);
+
+        // the team sees the button and a form whose amount can be edited (pre-filled with what is due)
+        $fin = $this->loggedIn('fin@x.test');
+        $this->assertStringContainsString('Request PhonePe payment', $fin->get('/invoices/' . $inv)['body']);
+        $form = $fin->get('/invoices/' . $inv . '/phonepe');
+        $this->assertSame(200, $form['status']);
+        $this->assertStringContainsString('name="amount"', $form['body']);
+        $this->assertStringContainsString('value="1000.00"', $form['body']);
+        $this->assertStringContainsString('PhonePe is switched off', $form['body'], 'it explains why nothing can be generated yet');
+        // PhonePe is off: posting an amount creates nothing and shows a friendly error, never a QR
+        $r = $fin->post('/invoices/' . $inv . '/phonepe', ['amount' => '250.50'], '/invoices/' . $inv . '/phonepe');
+        $this->assertSame(303, $r['status']);
+        $this->assertSame('/invoices/' . $inv . '/phonepe', $r['location']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
+        $this->assertStringNotContainsString('qr-svg', $fin->get('/invoices/' . $inv . '/phonepe')['body']);
+        $this->assertSame(200, $fin->get('/phonepe-requests')['status']);
+        $this->assertSame(403, $client->get('/phonepe-requests')['status']);
+    }
+
+    public function testTheQrPageShowsOneQrForExactlyTheEnteredAmountToTheTeamAndTheOwningClientOnly(): void
+    {
+        $inv = $this->issuedInvoicePublic();
+        $o = $this->openRequest($inv, 25050);
+        $fin = $this->loggedIn('fin@x.test');
+        $page = $fin->get('/phonepe-requests/' . $o['public_id']);
+        $this->assertSame(200, $page['status']);
+        $this->assertSame(1, substr_count($page['body'], '<svg class="qr-svg"'), 'exactly one QR');
+        $this->assertStringContainsString('₹250.50', $page['body']);
+        $this->assertStringNotContainsString('₹1,000.00', $page['body']);
+        $this->assertStringContainsString('data-pay-poll="/phonepe-requests/' . $o['public_id'] . '/status"', $page['body']);
+        $this->assertStringNotContainsString($o['merchant_order_id'], $page['body'], 'internal order ids are not shown');
+        $st = $fin->get('/phonepe-requests/' . $o['public_id'] . '/status');
+        $this->assertSame(200, $st['status']);
+        $this->assertSame(['status' => 'pending', 'live' => true, 'paid' => false, 'recorded' => false], json_decode($st['body'], true));
+
+        // the client who owns the invoice sees the same QR, others do not
+        $client = $this->loggedIn('alpha@client.test');
+        $mine = $client->get('/my/pay/' . $o['public_id']);
+        $this->assertSame(200, $mine['status']);
+        $this->assertSame(1, substr_count($mine['body'], '<svg class="qr-svg"'));
+        $this->assertStringContainsString('₹250.50', $mine['body']);
+        $this->assertStringNotContainsString('Withdraw this request', $mine['body'], 'a client cannot withdraw or change it');
+        $this->assertStringContainsString('/my/pay/' . $o['public_id'], $client->get('/my/invoices/' . $inv)['body'], 'the invoice offers the pending request');
+        $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/pay/' . $o['public_id'])['status']);
+        $this->assertSame(403, $client->get('/phonepe-requests/' . $o['public_id'])['status'], 'the team page is not for clients');
+        $this->assertSame(403, $client->post('/phonepe-requests/' . $o['public_id'] . '/cancel', [], '/account')['status']);
+        $this->assertSame(404, $fin->get('/phonepe-requests/' . str_repeat('a', 32))['status']);
+
+        // withdrawing removes the QR for everyone
+        $fin->post('/phonepe-requests/' . $o['public_id'] . '/cancel', [], '/phonepe-requests/' . $o['public_id']);
+        $this->assertSame('cancelled', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$o['id']])['status']);
+        $after = $fin->get('/phonepe-requests/' . $o['public_id'])['body'];
+        $this->assertStringNotContainsString('<svg class="qr-svg"', $after);
+        $this->assertStringContainsString('withdrawn', $after);
+        $this->assertStringNotContainsString('<svg class="qr-svg"', $client->get('/my/pay/' . $o['public_id'])['body']);
+    }
+
+    public function testAnExpiredRequestShowsNoQr(): void
+    {
+        $inv = $this->issuedInvoicePublic();
+        $o = $this->openRequest($inv, 10000);
+        Database::run('UPDATE gateway_orders SET expires_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) WHERE id = ?', [$o['id']]);
+        $body = $this->loggedIn('fin@x.test')->get('/phonepe-requests/' . $o['public_id'])['body'];
+        $this->assertStringNotContainsString('<svg class="qr-svg"', $body);
+        $this->assertStringContainsString('expired', $body);
     }
 
     public function testWebhookRouteNeedsNoSessionOrCsrfButAlwaysNeedsTheSignature(): void

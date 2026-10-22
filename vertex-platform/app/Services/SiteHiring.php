@@ -85,6 +85,19 @@ final class SiteHiring
         return $out;
     }
 
+    /** @return list<string> the choices of the Experience or Availability drop-down, as the administrator wrote them */
+    public static function options(string $which): array
+    {
+        $out = [];
+        foreach (SiteText::items(SiteSections::get('hiring', 'fields')[$which . '_options'] ?? '') as $o) {
+            if (mb_strlen($o) <= 80 && !in_array($o, $out, true)) {
+                $out[] = $o;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return list<string> */
     public static function roleTitles(): array
     {

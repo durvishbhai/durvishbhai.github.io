@@ -107,6 +107,49 @@
         window.addEventListener('pageshow', function () { bar.classList.remove('is-running'); });
     }
 
+    // Public website: tag the content so it animates in as it scrolls into view (skipped for people who prefer reduced motion)
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (document.body.classList.contains('site') && !reduce) {
+        var tag = function (selector, variant, stagger) {
+            document.querySelectorAll('main ' + selector).forEach(function (el, i) {
+                if (el.classList.contains('reveal')) { return; }
+                el.classList.add('reveal');
+                if (variant) { el.classList.add(variant); }
+                if (stagger) {
+                    var idx = Array.prototype.indexOf.call(el.parentNode.children, el);
+                    el.style.transitionDelay = (Math.min(idx, 7) * 80) + 'ms';
+                }
+            });
+        };
+        tag('.pub-section h2, .pub-cta h2, .group-title', null, false);
+        tag('.pub-section .container > .prose, .pub-section .container > .muted, .pub-cta .container > .lead, .pub-cta .container > .hero-actions', null, false);
+        tag('.service-card, .team-card, .partner-card, .job-card, .work-card, .role-card', 'reveal-zoom', true);
+        tag('.steps > li, .check-list > li, .faq-item, .empty-card, .side-card, .hire-terms, .hire-form-panel, .contact-grid > .panel', 'reveal-left', true);
+        tag('.pub-chip', 'reveal-zoom', true);
+        // a soft light that follows the pointer over the cards
+        document.querySelectorAll('main .service-card, main .team-card, main .partner-card, main .job-card, main .role-card, main .work-card').forEach(function (card) {
+            card.classList.add('spot');
+            card.addEventListener('pointermove', function (e) {
+                var r = card.getBoundingClientRect();
+                card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+                card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+            });
+        });
+        // a thin progress bar showing how far down the page you are
+        var bar = document.createElement('div');
+        bar.className = 'scroll-progress';
+        bar.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(bar);
+        var ticking = false;
+        var paint = function () {
+            var h = document.documentElement.scrollHeight - window.innerHeight;
+            bar.style.transform = 'scaleX(' + (h > 0 ? Math.min(1, window.scrollY / h) : 0) + ')';
+            ticking = false;
+        };
+        window.addEventListener('scroll', function () { if (!ticking) { ticking = true; window.requestAnimationFrame(paint); } }, { passive: true });
+        paint();
+    }
+
     // Scroll reveal (content stays visible if IntersectionObserver is unavailable)
     var items = document.querySelectorAll('.reveal');
     if (!('IntersectionObserver' in window)) {
@@ -116,11 +159,13 @@
     var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
             if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
-                io.unobserve(entry.target);
+                var t = entry.target;
+                t.classList.add('is-visible');
+                io.unobserve(t);
+                if (t.style.transitionDelay) { window.setTimeout(function () { t.style.transitionDelay = ''; }, 1400); } // so later hover effects are not delayed
             }
         });
-    }, { threshold: 0.12 });
+    }, { threshold: 0.01, rootMargin: '0px 0px -6% 0px' });
     items.forEach(function (el) { io.observe(el); });
 })();
 
@@ -244,14 +289,12 @@
                 c.classList.toggle('is-selected', on);
                 c.setAttribute('aria-pressed', on ? 'true' : 'false');
             });
-            if (linkLabel) {
-                linkLabel.textContent = fam === 'video' ? 'Showreel or portfolio link (optional, https://…)' : 'GitHub or portfolio link (optional, https://…)';
-            }
-            if (skillsLabel) {
-                skillsLabel.textContent = fam === 'video' ? 'Editing tools and experience' : 'Tech stack and experience';
-            }
+            var key = fam === 'video' ? 'data-video' : 'data-dev';
+            if (linkLabel && linkLabel.getAttribute(key)) { linkLabel.textContent = linkLabel.getAttribute(key); }
+            if (skillsLabel && skillsLabel.getAttribute(key)) { skillsLabel.textContent = skillsLabel.getAttribute(key); }
             if (skills) {
-                skills.placeholder = fam === 'video' ? 'For example: editing software you use, kinds of videos you have edited, how fast you work.' : 'For example: languages, frameworks, databases and the projects you have built.';
+                var ph = skills.getAttribute(fam === 'video' ? 'data-ph-video' : 'data-ph-dev');
+                if (ph) { skills.placeholder = ph; }
             }
             update();
         };
@@ -289,10 +332,106 @@
         }
         form.addEventListener('input', update);
         form.addEventListener('change', update);
-        form.addEventListener('submit', function () {
+        var errBox = form.parentNode.querySelector('[data-form-errors]');
+        var labelOf = function (el) {
+            var l = el.id ? form.querySelector('label[for="' + el.id + '"]') : null;
+            if (el.type === 'checkbox') { return 'Agreeing to the privacy notice'; }
+            return l ? l.textContent.replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim() : (el.name || 'a field');
+        };
+        form.addEventListener('input', function (e) { var f = e.target.closest ? e.target.closest('.field') : null; if (f) { f.classList.remove('is-invalid'); } });
+        form.addEventListener('submit', function (e) {
+            // The browser's own checks are off (novalidate), so check here and say clearly what is missing, right beside the button
+            var bad = [];
+            required.forEach(function (el) {
+                var empty = el.type === 'checkbox' ? !el.checked : (el.type === 'file' ? !(el.files && el.files.length) : el.value.trim() === '');
+                var wrong = !empty && el.type !== 'checkbox' && el.type !== 'file' && !el.checkValidity();
+                var f = el.closest('.field');
+                if (f) { f.classList.toggle('is-invalid', empty || wrong); }
+                if (empty || wrong) { bad.push({ el: el, text: labelOf(el) + (empty ? ' is required' : ' is not valid') }); }
+            });
+            if (bad.length) {
+                e.preventDefault();
+                if (errBox) {
+                    errBox.innerHTML = '';
+                    var strong = document.createElement('strong'); strong.textContent = 'Please complete the form before sending:'; errBox.appendChild(strong);
+                    var ul = document.createElement('ul');
+                    bad.forEach(function (b) { var li = document.createElement('li'); li.textContent = b.text + '.'; ul.appendChild(li); });
+                    errBox.appendChild(ul);
+                    errBox.hidden = false;
+                    errBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    errBox.focus({ preventScroll: true });
+                }
+                return;
+            }
             var b = form.querySelector('[data-hire-submit]');
-            if (b) { b.disabled = true; b.textContent = 'Sending…'; }
+            if (b) { window.setTimeout(function () { b.disabled = true; b.textContent = 'Sending…'; }, 0); }
         });
         sync();
     })();
+    // PhonePe payment request page: countdown, and ask the server (which asks PhonePe) whether it has been paid
+    (function () {
+        var box = document.querySelector('[data-pay-poll]');
+        if (!box) { return; }
+        var url = box.getAttribute('data-pay-poll');
+        var expires = parseInt(box.getAttribute('data-pay-expires'), 10) * 1000;
+        var left = box.querySelector('[data-pay-left]');
+        var liveEl = box.querySelector('[data-pay-live]');
+        var paidEl = box.querySelector('[data-pay-paid]');
+        var overEl = box.querySelector('[data-pay-over]');
+        var done = box.getAttribute('data-pay-state') !== 'live';
+        var show = function (state) {
+            done = true;
+            if (liveEl) { liveEl.hidden = true; }
+            if (paidEl) { paidEl.hidden = state !== 'paid'; }
+            if (overEl) { overEl.hidden = state === 'paid'; }
+        };
+        var tick = function () {
+            if (done) { return; }
+            var ms = expires - Date.now();
+            if (ms <= 0) { show('over'); return; }
+            var s = Math.floor(ms / 1000);
+            if (left) { left.textContent = ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + (s % 60)).slice(-2); }
+        };
+        var poll = function () {
+            if (done) { return; }
+            fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+                if (!d) { return; }
+                if (d.paid) { show('paid'); } else if (!d.live) { show('over'); }
+            }).catch(function () {});
+        };
+        tick();
+        window.setInterval(tick, 1000);
+        window.setInterval(poll, 5000);
+    })();
+    // Light / dark theme switch (the saved choice itself is applied earlier by theme.js)
+    (function () {
+        var buttons = document.querySelectorAll('[data-theme-toggle]');
+        if (!buttons.length) { return; }
+        var root = document.documentElement;
+        var paint = function () {
+            var light = root.getAttribute('data-theme') === 'light';
+            buttons.forEach(function (b) { b.setAttribute('aria-label', light ? 'Switch to dark theme' : 'Switch to light theme'); b.setAttribute('title', light ? 'Switch to dark theme' : 'Switch to light theme'); });
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) { meta.setAttribute('content', light ? '#f4f6fc' : '#050818'); }
+        };
+        buttons.forEach(function (b) {
+            b.addEventListener('click', function () {
+                var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+                root.setAttribute('data-theme', next);
+                try { window.localStorage.setItem('kis-theme', next); } catch (e) { /* private mode: the choice lasts for this page only */ }
+                paint();
+            });
+        });
+        paint();
+    })();
+    // "Copy link" boxes
+    document.querySelectorAll('[data-copy-button]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var src = btn.parentNode.querySelector('[data-copy-source]');
+            if (!src) { return; }
+            src.select();
+            var done = function () { var t = btn.textContent; btn.textContent = 'Copied'; window.setTimeout(function () { btn.textContent = t; }, 1600); };
+            if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(src.value).then(done, function () { document.execCommand('copy'); done(); }); } else { document.execCommand('copy'); done(); }
+        });
+    });
 })();

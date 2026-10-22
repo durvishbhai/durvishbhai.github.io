@@ -2,6 +2,8 @@
 <div class="page-head"><div><p class="eyebrow">Application <?= e($a['reference']) ?></p><h1><?= e($a['full_name']) ?></h1></div><a class="btn btn-ghost" href="/admin/careers">All applications</a></div>
 <div class="panel"><dl class="kv">
     <dt>Role</dt><dd><?= e($a['role_applied']) ?></dd><dt>Email</dt><dd><a href="mailto:<?= e($a['email']) ?>"><?= e($a['email']) ?></a></dd><dt>Phone</dt><dd><?= e((string) ($a['phone'] ?: '—')) ?></dd>
+    <dt>LinkedIn</dt><dd><?= !empty($a['linkedin_url']) ? '<a href="' . e((string) $a['linkedin_url']) . '" rel="noopener noreferrer" target="_blank">' . e((string) $a['linkedin_url']) . '</a>' : '—' ?></dd>
+    <dt>Experience</dt><dd><?= e((string) ($a['experience'] ?: '—')) ?></dd><dt>Available to start</dt><dd><?= e((string) ($a['availability'] ?: '—')) ?></dd>
     <dt>Portfolio</dt><dd><?= $a['portfolio_url'] ? '<a href="' . e((string) $a['portfolio_url']) . '" rel="noopener noreferrer" target="_blank">' . e((string) $a['portfolio_url']) . '</a>' : '—' ?></dd>
     <dt>Received</dt><dd><?= e(local_time((string) $a['created_at'])) ?></dd><dt>Consent given</dt><dd><?= e(local_time((string) $a['consent_at'])) ?></dd>
     <dt>File</dt><dd><?= $resume ? '<a href="/admin/careers/' . e($a['public_id']) . '/file">' . e((string) $resume['original_name']) . '</a> (' . e(\Vertex\Services\FileStore::humanSize((int) $resume['size_bytes'])) . ')' : '—' ?></dd></dl>

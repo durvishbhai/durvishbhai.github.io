@@ -12,19 +12,9 @@ use Vertex\Http\Controllers\Controller;
 use Vertex\Services\InvoiceService;
 use Vertex\Services\PhonePeGateway;
 
-/** PhonePe: start (client), return page (client), webhook (PhonePe, signature-checked, no session, no CSRF). */
+/** PhonePe: return page (client) and the webhook (PhonePe, signature-checked, no session, no CSRF). Payments are requested by the team: see PhonePeRequestController. */
 final class PhonePeController extends Controller
 {
-    /** @param array<string,string> $params */
-    public function start(Request $request, array $params = []): Response
-    {
-        $uid = $this->actorId();
-        $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
-        $to = '/my/invoices/' . $i['public_id'];
-
-        return $this->guarded(fn (): Response => Response::redirect(PhonePeGateway::start($uid, $i)), $to);
-    }
-
     /** Where PhonePe sends the customer back. Nothing in the address is believed: the server asks PhonePe. @param array<string,string> $params */
     public function returned(Request $request, array $params = []): Response
     {

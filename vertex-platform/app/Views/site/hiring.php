@@ -1,4 +1,4 @@
-<?php /** @var bool $open */ /** @var list<array{title:string,summary:string,family:string}> $roles */ /** @var string $preselect */ /** @var array<string,string> $experience */ /** @var array<string,string> $availability */ /** @var string $limit */ /** @var string $extensions */
+<?php /** @var bool $open */ /** @var list<array{title:string,summary:string,family:string}> $roles */ /** @var string $preselect */ /** @var string $limit */ /** @var string $extensions */
 use Vertex\Services\SiteSections;
 use Vertex\Services\SiteText;
 $h = SiteSections::get('hiring', 'header'); $f = static fn (string $k, string $d = ''): string => old($k, $d);
@@ -41,20 +41,9 @@ $iconFor = static function (string $t): string {
 
 <?php $fm = SiteSections::get('hiring', 'form'); ?>
 <section class="pub-section pub-alt" id="apply"><div class="container narrow"><h2><?= st($fm['heading']) ?></h2>
-    <div class="panel hire-form-panel"><div class="hire-progress" aria-hidden="true"><span data-hire-bar></span></div><p class="muted small" data-hire-progress-text aria-live="polite">0% complete</p>
+    <div class="panel hire-form-panel"><?= \Vertex\Core\View::partial('form-errors', ['errors' => $errors ?? []]) ?><div class="hire-progress" aria-hidden="true"><span data-hire-bar></span></div><p class="muted small" data-hire-progress-text aria-live="polite">0% complete</p>
     <form method="post" action="/hiring/apply" enctype="multipart/form-data" class="form-grid public-form" data-hire-form novalidate><?= csrf_field() ?>
-        <div class="hp" aria-hidden="true"><label>Leave this field empty<input type="text" name="website_url" tabindex="-1" autocomplete="off"></label></div>
-        <div class="field"><label for="role">Role you are applying for</label><select id="role" name="role" required data-hire-role><option value="">Choose a role…</option><?php foreach ($roles as $r) : ?><option value="<?= e($r['title']) ?>" data-family="<?= e($r['family']) ?>"<?= $sel === $r['title'] ? ' selected' : '' ?>><?= e($r['title']) ?></option><?php endforeach; ?></select></div>
-        <div class="field"><label for="full_name">Full name</label><input id="full_name" name="full_name" required maxlength="120" autocomplete="name" value="<?= e($f('full_name')) ?>"></div>
-        <div class="field"><label for="email">Email address</label><input id="email" name="email" type="email" required maxlength="190" autocomplete="email" value="<?= e($f('email')) ?>"></div>
-        <div class="field"><label for="phone">Phone number <span class="muted">(optional)</span></label><input id="phone" name="phone" type="tel" maxlength="32" autocomplete="tel" value="<?= e($f('phone')) ?>"></div>
-        <div class="field two"><div><label for="experience">Experience <span class="muted">(optional)</span></label><select id="experience" name="experience"><option value="">Choose…</option><?php foreach ($experience as $k => $v) : ?><option value="<?= e($k) ?>"<?= $f('experience') === $k ? ' selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-            <div><label for="availability">Available to start <span class="muted">(optional)</span></label><select id="availability" name="availability"><option value="">Choose…</option><?php foreach ($availability as $k => $v) : ?><option value="<?= e($k) ?>"<?= $f('availability') === $k ? ' selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div></div>
-        <div class="field"><label for="skills_experience" data-hire-skills-label>Skills and experience</label><textarea id="skills_experience" name="skills_experience" rows="5" required minlength="20" maxlength="4000" data-hire-count="4000" placeholder="Tell us about your skills, tools and the work you have done."><?= e($f('skills_experience')) ?></textarea><p class="hint"><span data-hire-count-out>0</span> / 4000</p></div>
-        <div class="field"><label for="portfolio_url" data-hire-link-label>Portfolio or GitHub link <span class="muted">(optional, https://…)</span></label><input id="portfolio_url" name="portfolio_url" type="url" maxlength="300" placeholder="https://" value="<?= e($f('portfolio_url')) ?>"></div>
-        <div class="field"><label for="resume">Résumé or work sample <span class="muted">(optional, up to <?= e($limit) ?>)</span></label><label class="drop" for="resume" data-hire-drop><span data-hire-file-name>Choose a file or drop it here</span></label><input id="resume" name="resume" type="file" class="sr-only"><p class="hint">Allowed: <?= e($extensions) ?>. Files are stored privately and only seen by the people reviewing applications.</p></div>
-        <div class="field"><label for="intro">Short introduction</label><textarea id="intro" name="intro" rows="4" required minlength="20" maxlength="2000" data-hire-count="2000"><?= e($f('intro')) ?></textarea><p class="hint"><span data-hire-count-out>0</span> / 2000</p></div>
-        <label class="check"><input type="checkbox" name="consent" value="1" required><span>I agree that my details may be stored and used to review my application, as described in the <?= \Vertex\Services\SiteContent::publishedBySlug('policies', 'privacy-policy') ? '<a href="/privacy-policy">privacy policy</a>' : 'privacy notice' ?>.</span></label>
+        <?= \Vertex\Core\View::partial('apply-fields', ['roles' => $roles, 'sel' => $sel, 'limit' => $limit, 'extensions' => $extensions]) ?>
         <p class="muted"><?= st($fm['note']) ?></p>
-        <div class="form-actions"><button class="btn btn-primary" type="submit" data-hire-submit>Submit application</button></div></form></div></div></section>
+        <div class="form-actions"><button class="btn btn-primary" type="submit" data-hire-submit><?= st(SiteSections::get('hiring', 'fields')['submit_label']) ?></button></div></form></div></div></section>
 <?php endif; ?>

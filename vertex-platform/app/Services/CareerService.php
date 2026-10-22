@@ -17,9 +17,6 @@ final class CareerService
 {
     public const STATUSES = ['new' => 'New', 'reviewing' => 'Under review', 'shortlisted' => 'Shortlisted', 'not_selected' => 'Not selected', 'withdrawn' => 'Withdrawn', 'archived' => 'Archived'];
 
-    public const EXPERIENCE = ['fresher' => 'Fresher or student', 'lt1' => 'Less than 1 year', '1to3' => '1 to 3 years', '3to5' => '3 to 5 years', '5plus' => 'More than 5 years'];
-    public const AVAILABILITY = ['immediate' => 'Immediately', '2weeks' => 'Within 2 weeks', '1month' => 'Within a month', 'flexible' => 'Flexible / to be discussed'];
-
     /** @return array<string,string> the roles a visitor may apply for: published openings, the listed categories and "Other" */
     public static function roleChoices(): array
     {
@@ -59,26 +56,33 @@ final class CareerService
         };
         $name = $try(fn () => FieldRules::line($in['full_name'] ?? '', 'Full name', 2, 120));
         $email = $try(fn () => FieldRules::email($in['email'] ?? ''));
-        $phone = $try(fn () => FieldRules::phone($in['phone'] ?? '', false));
+        $phone = $try(fn () => FieldRules::phone($in['phone'] ?? '', true));
         $role = $try(fn () => FieldRules::choice($in['role'] ?? '', self::roleChoices(), 'role', true));
         $skills = $try(fn () => FieldRules::text($in['skills_experience'] ?? '', 'Skills and experience', 20, 4000));
         $intro = $try(fn () => FieldRules::text($in['intro'] ?? '', 'Short introduction', 20, 2000));
         $exp = (string) ($in['experience'] ?? '');
         $avail = (string) ($in['availability'] ?? '');
-        if (($exp !== '' && !isset(self::EXPERIENCE[$exp])) || ($avail !== '' && !isset(self::AVAILABILITY[$avail]))) {
-            $errors[] = 'Please choose from the listed experience and availability options.';
+        if (!in_array($exp, SiteHiring::options('experience'), true)) {
+            $errors[] = 'Please choose your experience from the list.';
         }
-        if (is_string($skills) && ($exp !== '' || $avail !== '') && !in_array('Please choose from the listed experience and availability options.', $errors, true)) {
-            $skills = trim(($exp !== '' ? 'Experience: ' . self::EXPERIENCE[$exp] . ".\n" : '') . ($avail !== '' ? 'Available: ' . self::AVAILABILITY[$avail] . ".\n" : '') . "\n" . $skills);
+        if (!in_array($avail, SiteHiring::options('availability'), true)) {
+            $errors[] = 'Please choose when you can start from the list.';
         }
         $url = trim((string) ($in['portfolio_url'] ?? ''));
-        if ($url !== '' && (!preg_match('#^https://[A-Za-z0-9][A-Za-z0-9.\-]*(:\d+)?(/\S*)?$#', $url) || mb_strlen($url) > 300 || preg_match('/[<>"\']/', $url))) {
-            $errors[] = 'The portfolio address must start with https://';
+        if (!preg_match('#^https://[A-Za-z0-9][A-Za-z0-9.\-]*(:\d+)?(/\S*)?$#', $url) || mb_strlen($url) > 300 || preg_match('/[<>"\']/', $url)) {
+            $errors[] = 'Enter your portfolio or GitHub link, starting with https://';
+        }
+        $linkedin = trim((string) ($in['linkedin_url'] ?? ''));
+        if (!preg_match('#^https://([a-z]{2,3}\.)?linkedin\.com/(in|pub|company)/[A-Za-z0-9_%\-\.]+/?([?\#]\S*)?$#i', $linkedin) || mb_strlen($linkedin) > 300) {
+            $errors[] = 'Enter your LinkedIn profile link, for example https://www.linkedin.com/in/your-name';
         }
         if (!$consent) {
             $errors[] = 'Please confirm that you agree to the privacy notice.';
         }
         $hasFile = $file !== null && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+        if (!$hasFile) {
+            $errors[] = 'Please attach your résumé or a work sample.';
+        }
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
@@ -87,14 +91,14 @@ final class CareerService
             $meta = FileStore::accept((array) $file, 'career', $requireHttpUpload);
         }
         try {
-            return Database::transaction(function () use ($name, $email, $phone, $role, $skills, $intro, $url, $meta, $ip): array {
+            return Database::transaction(function () use ($name, $email, $phone, $role, $skills, $intro, $url, $linkedin, $exp, $avail, $meta, $ip): array {
                 $fileId = $meta === null ? null : FileStore::insert($meta, null);
                 $job = Database::one("SELECT id FROM site_jobs WHERE title = ? AND status = 'published'", [$role]);
                 $ref = CrmReference::next('career');
                 $pub = uuid_hex();
-                Database::run('INSERT INTO site_job_applications (public_id, reference, job_id, role_applied, full_name, email, phone, skills_experience, portfolio_url, intro, file_id, consent_at, ip_hash, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
-                    [$pub, $ref, $job['id'] ?? null, $role, $name, $email, $phone === '' ? null : $phone, $skills, $url === '' ? null : $url, $intro, $fileId, hash_hmac('sha256', $ip, (string) Config::get('app.key', 'unset'))]);
+                Database::run('INSERT INTO site_job_applications (public_id, reference, job_id, role_applied, full_name, email, phone, skills_experience, portfolio_url, linkedin_url, experience, availability, intro, file_id, consent_at, ip_hash, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+                    [$pub, $ref, $job['id'] ?? null, $role, $name, $email, $phone, $skills, $url, $linkedin, $exp, $avail, $intro, $fileId, hash_hmac('sha256', $ip, (string) Config::get('app.key', 'unset'))]);
                 $id = Database::insertId();
                 Audit::record('career.application_received', 'career_application', $id, [], ['reference' => $ref, 'role' => (string) $role], ['has_file' => $meta !== null], null);
                 Notifier::send(Notifier::withPermission('careers.manage'), 'career.application', 'New job application', $ref . ': ' . $name . ' for ' . $role, '/admin/careers/' . $pub, null, 'career_application', $id, "career:{$id}");

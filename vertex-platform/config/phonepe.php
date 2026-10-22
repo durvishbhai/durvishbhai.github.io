@@ -17,5 +17,7 @@ return [
         'sandbox' => ['auth' => 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token', 'api' => 'https://api-preprod.phonepe.com/apis/pg-sandbox'],
         'production' => ['auth' => 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token', 'api' => 'https://api.phonepe.com/apis/pg'],
     ],
+    // How the QR is made: auto = ask PhonePe for a UPI QR and fall back to its hosted checkout link; direct = UPI QR only; checkout = hosted checkout link only
+    'qr_mode' => (string) Env::get('PHONEPE_QR_MODE', 'auto'),
     'order_ttl_minutes' => 30,
 ];
