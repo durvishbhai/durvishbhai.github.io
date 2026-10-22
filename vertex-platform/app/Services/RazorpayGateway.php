@@ -409,8 +409,10 @@ final class RazorpayGateway
         if (!preg_match('/^pay_[A-Za-z0-9]{6,40}$/', $paymentId) || !preg_match('/^order_[A-Za-z0-9]{6,40}$/', $rzpOrderId) || !preg_match('/^[a-f0-9]{64}$/i', $signature)) {
             return ['ok' => false, 'status' => 400, 'message' => 'The payment details are incomplete or malformed.', 'recorded' => false];
         }
-        $expected = hash_hmac('sha256', $rzpOrderId . '|' . $paymentId, (string) Config::get('razorpay.key_secret'));
-        if ((string) Config::get('razorpay.key_secret') === '' || !hash_equals($expected, strtolower($signature)) || $rzpOrderId !== (string) ($order['provider_order_id'] ?? '')) {
+        // as Razorpay's guide says: the order id comes from OUR records, never from what the browser sent
+        $ownOrderId = (string) ($order['provider_order_id'] ?? '');
+        $expected = hash_hmac('sha256', $ownOrderId . '|' . $paymentId, (string) Config::get('razorpay.key_secret'));
+        if ((string) Config::get('razorpay.key_secret') === '' || $ownOrderId === '' || !hash_equals($expected, strtolower($signature)) || $rzpOrderId !== $ownOrderId) {
             Logger::security('Razorpay checkout signature mismatch', ['order' => $order['merchant_order_id'] ?? null]);
 
             return ['ok' => false, 'status' => 400, 'message' => 'The payment could not be verified, so nothing was recorded. If money was taken it will be matched to the invoice after Razorpay confirms it.', 'recorded' => false];
@@ -453,8 +455,8 @@ final class RazorpayGateway
         $d = json_decode($body, true);
         $payload = is_array($d['payload'] ?? null) ? $d['payload'] : [];
         $event = mb_substr((string) ($d['event'] ?? ''), 0, 60);
-        $rid = (string) ($payload['qr_code']['entity']['id'] ?? $payload['payment_link']['entity']['id'] ?? $payload['payment']['entity']['order_id'] ?? '');
-        $mid = (string) ($payload['payment']['entity']['notes']['merchant_order_id'] ?? $payload['qr_code']['entity']['notes']['merchant_order_id'] ?? $payload['payment_link']['entity']['notes']['merchant_order_id'] ?? '');
+        $rid = (string) ($payload['qr_code']['entity']['id'] ?? $payload['payment_link']['entity']['id'] ?? $payload['order']['entity']['id'] ?? $payload['payment']['entity']['order_id'] ?? '');
+        $mid = (string) ($payload['payment']['entity']['notes']['merchant_order_id'] ?? $payload['qr_code']['entity']['notes']['merchant_order_id'] ?? $payload['payment_link']['entity']['notes']['merchant_order_id'] ?? $payload['order']['entity']['notes']['merchant_order_id'] ?? '');
         if (!preg_match('/^KIS\d+X[A-F0-9]{12}$/', $mid) && preg_match('/^(qr|plink|order)_[A-Za-z0-9]{6,40}$/', $rid)) {
             $o = Database::one("SELECT merchant_order_id FROM gateway_orders WHERE provider = 'razorpay' AND provider_order_id = ?", [$rid]);
             $mid = (string) ($o['merchant_order_id'] ?? '');

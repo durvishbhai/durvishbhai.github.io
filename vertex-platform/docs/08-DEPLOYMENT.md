@@ -90,7 +90,7 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 ## Phase 12 additions (website, AI, Razorpay)
 
 * **Website pictures** are saved in `public_html/uploads/cms/` (the installer creates it with a script-blocking `.htaccess`). They are included in `backup:create` (archive path `uploads/website-media/`); after a restore copy them back into that folder.
-* **Razorpay webhook**: `https://YOUR-SITE/webhooks/razorpay` (events `payment.captured`, `qr_code.credited`, `payment_link.paid`; the secret you set in the Razorpay Dashboard is saved in *Integrations & settings → Razorpay*).
+* **Razorpay webhook**: `https://YOUR-SITE/webhooks/razorpay` (events `order.paid`, `payment.captured`, `qr_code.credited`, `payment_link.paid`; the secret you set in the Razorpay Dashboard is saved in *Integrations & settings → Razorpay*).
 * **Settings**: after install sign in as the Owner and open *Integrations & settings* to enter SMTP, AI and Razorpay values instead of editing `.env`. `APP_KEY` must stay the same forever (sealed secrets depend on it).
 * **Scheduled task**: the daily `schedule:run` now also publishes due website pages and re-checks pending Razorpay orders; with Razorpay on, run it more often (hourly is fine, it is idempotent).
 * Test-mode checklist for Razorpay: `docs/18-PHASE12-CMS-AI-PHONEPE.md` §4.
