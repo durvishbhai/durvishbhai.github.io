@@ -12,11 +12,10 @@ use Vertex\Services\Audit;
 use Vertex\Services\BillingItems;
 use Vertex\Services\BusinessProfile;
 use Vertex\Services\ClientPaymentService;
-use Vertex\Services\GatewayConfig;
 use Vertex\Services\InvoiceService;
 use Vertex\Services\QuotationService;
 
-/** Quotations, invoices without tax, payments against invoices (staff and client-submitted), the business profile and the Google Pay settings. */
+/** Quotations, invoices without tax, payments against invoices (staff and client-submitted), the business profile. */
 final class BillingServiceTest extends DatabaseTestCase
 {
     use Phase3Fixtures;
@@ -443,115 +442,5 @@ final class BillingServiceTest extends DatabaseTestCase
         $this->assertSame('eligible_for_review', $full['status']);
         $this->assertSame(1000000, (int) $full['amount_minor'], '15% of INR 1,00,000 minus the INR 5,000 already earned');
         $this->assertTrue(Audit::verify()['ok']);
-    }
-
-    // ------------------------------------------------------------------------------------------------ Google Pay settings
-
-    public function testOnlyBillingAdministratorsConfigureGooglePay(): void
-    {
-        foreach ([$this->manager, $this->finance, $this->client, $this->partner, $this->dev] as $u) {
-            $this->expectStatus(403, fn () => GatewayConfig::saveUpi($u, ['upi_id' => 'a@b', 'payee_name' => 'X']));
-            $this->expectStatus(403, fn () => GatewayConfig::saveApi($u, []));
-        }
-    }
-
-    public function testGooglePayUpiSettingsAreValidatedAndBuildTheLink(): void
-    {
-        $this->assertFalse(GatewayConfig::upiActive());
-        $this->assertSame('not_configured', GatewayConfig::status(GatewayConfig::UPI)['state']);
-        foreach (['not a upi id', 'a@', '@bank', 'name@bank@x', "name'; DROP--@bank"] as $bad) {
-            $this->expectInvalid(fn () => GatewayConfig::saveUpi($this->admin, ['upi_id' => $bad, 'payee_name' => 'Vertex', 'enabled' => '1']), 'UPI ID');
-        }
-        $this->expectInvalid(fn () => GatewayConfig::saveUpi($this->admin, ['upi_id' => 'vertex@okhdfcbank', 'payee_name' => 'V', 'enabled' => '1']), 'payee name');
-        $this->expectInvalid(fn () => GatewayConfig::saveUpi($this->admin, ['upi_id' => 'vertex@okhdfcbank', 'payee_name' => 'Vertex', 'merchant_code' => '12', 'enabled' => '1']), 'category code');
-        GatewayConfig::saveUpi($this->admin, ['upi_id' => 'vertex.pay@okhdfcbank', 'payee_name' => 'Vertex & Sons', 'merchant_code' => '7372', 'enabled' => '0']);
-        $this->assertFalse(GatewayConfig::upiActive());
-        $this->assertNull(GatewayConfig::upiLink(['reference' => 'INV-1'], 10000), 'switched off: no link');
-        $this->assertSame('configured_inactive', GatewayConfig::status(GatewayConfig::UPI)['state']);
-        $this->assertTrue(GatewayConfig::checkUpi()['ok']);
-        GatewayConfig::saveUpi($this->admin, ['upi_id' => 'vertex.pay@okhdfcbank', 'payee_name' => 'Vertex Pay', 'merchant_code' => '7372', 'enabled' => '1']);
-        $this->assertTrue(GatewayConfig::upiActive());
-        $this->assertSame('ready', GatewayConfig::status(GatewayConfig::UPI)['state']);
-        $link = (string) GatewayConfig::upiLink(['reference' => 'INV-2026-00007'], 123456);
-        $this->assertStringStartsWith('upi://pay?', $link);
-        parse_str((string) parse_url($link, PHP_URL_QUERY), $q);
-        $this->assertSame(['pa' => 'vertex.pay@okhdfcbank', 'pn' => 'Vertex Pay', 'am' => '1234.56', 'cu' => 'INR', 'tn' => 'Invoice INV-2026-00007', 'mc' => '7372'], $q);
-        $this->assertNull(GatewayConfig::upiLink(['reference' => 'X'], 0), 'nothing to pay: no link');
-        $this->assertStringContainsString('Payments are NOT confirmed automatically', implode(' ', GatewayConfig::status(GatewayConfig::UPI)['notes']));
-    }
-
-    private function apiForm(array $over = []): array
-    {
-        return $over + ['environment' => 'TEST', 'merchant_id' => '', 'merchant_name' => 'Vertex Integrated Solutions', 'merchant_origin' => 'https://pay.vertex.test', 'processor' => 'razorpay', 'processor_merchant_id' => 'acct_Abc123',
-            'processor_key_id' => 'rzp_test_AbCd1234', 'processor_key_secret' => 'sUp3rS3cretKeyValue99', 'webhook_secret' => 'whsec_ZyXwVuTs1234', 'networks' => ['VISA', 'MASTERCARD'], 'auth_methods' => ['PAN_ONLY', 'CRYPTOGRAM_3DS']];
-    }
-
-    public function testGooglePayApiFieldsAreValidatedStoredEncryptedAndNeverShownAgain(): void
-    {
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['environment' => 'LIVE'])), 'TEST or PRODUCTION');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['environment' => 'PRODUCTION', 'merchant_id' => ''])), 'merchant ID');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['merchant_id' => 'bad id!'])), 'merchant ID');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['merchant_origin' => 'http://insecure.test'])), 'https');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['merchant_origin' => 'https://pay.test/path'])), 'no path');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['processor' => 'Razor Pay'])), 'processor identifier');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_merchant_id' => ''])), 'merchant ID at the payment processor');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_key_secret' => 'short'])), '8 to 200');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['webhook_secret' => 'has space inside it'])), 'no spaces');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['networks' => []])), 'card network');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm(['networks' => ['BITCOIN'], 'auth_methods' => ['PAN_ONLY']])), 'card network');
-        $this->assertSame([], GatewayConfig::get(GatewayConfig::API)['config'], 'nothing was saved by the failed attempts');
-        $form = $this->apiForm();
-        GatewayConfig::saveApi($this->admin, $form);
-        $g = GatewayConfig::get(GatewayConfig::API);
-        $this->assertFalse($g['enabled'], 'saving the fields never switches card payments on');
-        $this->assertSame('razorpay', $g['config']['processor']);
-        $this->assertSame(['VISA', 'MASTERCARD'], $g['config']['networks']);
-        $this->assertSame(['processor_key_secret' => '••••ue99', 'webhook_secret' => '••••1234'], $g['secrets_set']);
-        $raw = Database::one('SELECT * FROM payment_gateway_config WHERE provider = ?', [GatewayConfig::API]);
-        foreach (['sUp3rS3cretKeyValue99', 'whsec_ZyXwVuTs1234'] as $secret) {
-            $this->assertStringNotContainsString($secret, (string) $raw['secrets_enc'], 'sealed with AES-256-GCM');
-            $this->assertStringNotContainsString($secret, (string) $raw['config_json']);
-            $this->assertStringNotContainsString($secret, json_encode($g));
-        }
-        $this->assertSame('sUp3rS3cretKeyValue99', GatewayConfig::secret(GatewayConfig::API, 'processor_key_secret'));
-        $this->assertSame('whsec_ZyXwVuTs1234', GatewayConfig::secret(GatewayConfig::API, 'webhook_secret'));
-        // saving again with the secret fields empty keeps the saved secrets; a new value replaces only that one
-        GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_key_secret' => '', 'webhook_secret' => '', 'merchant_name' => 'Vertex Renamed']));
-        $this->assertSame('whsec_ZyXwVuTs1234', GatewayConfig::secret(GatewayConfig::API, 'webhook_secret'));
-        $this->assertSame('Vertex Renamed', GatewayConfig::get(GatewayConfig::API)['config']['merchant_name']);
-        GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_key_secret' => 'brandNewSecret12345', 'webhook_secret' => '']));
-        $this->assertSame('brandNewSecret12345', GatewayConfig::secret(GatewayConfig::API, 'processor_key_secret'));
-        $this->assertSame('whsec_ZyXwVuTs1234', GatewayConfig::secret(GatewayConfig::API, 'webhook_secret'));
-        // clearing deletes them
-        GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_key_secret' => '', 'webhook_secret' => '', 'clear_secrets' => '1']));
-        $this->assertNull(GatewayConfig::secret(GatewayConfig::API, 'webhook_secret'));
-        $this->assertSame([], GatewayConfig::get(GatewayConfig::API)['secrets_set']);
-        // no secret ever reaches the audit log
-        $audit = (string) Database::one("SELECT GROUP_CONCAT(COALESCE(before_json, ''), COALESCE(after_json, ''), COALESCE(meta_json, '')) AS x FROM audit_logs")['x'];
-        foreach (['sUp3rS3cretKeyValue99', 'whsec_ZyXwVuTs1234', 'brandNewSecret12345'] as $secret) {
-            $this->assertStringNotContainsString($secret, $audit);
-        }
-        $this->assertGreaterThanOrEqual(4, (int) Database::one("SELECT COUNT(*) AS c FROM audit_logs WHERE action = 'billing.gateway_changed'")['c']);
-    }
-
-    public function testTheApiModeIsReportedAsNotActiveBecauseNoProcessorIntegrationIsInstalled(): void
-    {
-        $this->assertSame('not_configured', GatewayConfig::status(GatewayConfig::API)['state']);
-        GatewayConfig::saveApi($this->admin, $this->apiForm(['processor_key_secret' => '', 'webhook_secret' => '']));
-        $s = GatewayConfig::status(GatewayConfig::API);
-        $this->assertSame('configured_inactive', $s['state']);
-        $text = implode(' ', $s['notes']);
-        $this->assertStringContainsString('not installed', $text);
-        $this->assertStringContainsString('NO payment is taken', $text);
-        $this->assertStringContainsString('API secret has not been saved', $text);
-        $this->assertStringContainsString('webhook secret has not been saved', $text);
-        $this->assertSame([], GatewayConfig::ADAPTERS);
-    }
-
-    public function testSecretsCannotBeSavedWithoutAnAppKey(): void
-    {
-        Config::set('app.key', '');
-        $this->expectInvalid(fn () => GatewayConfig::saveApi($this->admin, $this->apiForm()), 'APP_KEY');
-        $this->assertSame([], GatewayConfig::get(GatewayConfig::API)['config']);
     }
 }

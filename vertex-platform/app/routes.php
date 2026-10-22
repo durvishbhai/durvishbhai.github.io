@@ -54,8 +54,8 @@ use Vertex\Http\Controllers\SitePageController;
 use Vertex\Http\Controllers\EnquiryFileController;
 use Vertex\Http\Controllers\Admin\SiteAdminController;
 use Vertex\Http\Controllers\Admin\CareerAdminController;
-use Vertex\Http\Controllers\Billing\PhonePeController;
-use Vertex\Http\Controllers\Billing\PhonePeRequestController;
+use Vertex\Http\Controllers\Billing\PaymentRequestController;
+use Vertex\Http\Controllers\Billing\RazorpayController;
 use Vertex\Http\Controllers\Billing\CouponController;
 use Vertex\Http\Controllers\Billing\DocumentController;
 use Vertex\Http\Controllers\Billing\InvoiceController;
@@ -110,8 +110,8 @@ return static function (Router $router): void {
     }
     $router->get('/sitemap.xml', [PublicPageController::class, 'sitemap'], ['nosession']);
     $router->get('/robots.txt', [PublicPageController::class, 'robots'], ['nosession']);
-    // PhonePe calls this with its own signature header: no session, no CSRF token. The handler rejects anything without the right Authorization value.
-    $router->post('/webhooks/phonepe', [PhonePeController::class, 'webhook'], ['nosession'], false);
+    // Razorpay calls this with its own signature header: no session, no CSRF token. The handler rejects anything without a valid X-Razorpay-Signature.
+    $router->post('/webhooks/razorpay', [RazorpayController::class, 'webhook'], ['nosession'], false);
 
     // Authentication
     $router->get('/login', [AuthController::class, 'showLogin'], ['guest']);
@@ -358,17 +358,16 @@ return static function (Router $router): void {
     $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
-    // PhonePe payments are asked for by the KIS team only (amount typed by them); the client just sees and pays the request.
+    // Online payments (Razorpay) are asked for by the KIS team only (amount typed by them); the client just sees and pays the request.
     $pr = ['auth', 'can:payments.request'];
-    $router->get('/phonepe-requests', [PhonePeRequestController::class, 'index'], $pr);
-    $router->get('/invoices/{invoice}/phonepe', [PhonePeRequestController::class, 'create'], $pr);
-    $router->post('/invoices/{invoice}/phonepe', [PhonePeRequestController::class, 'store'], $pr);
-    $router->get('/phonepe-requests/{order}', [PhonePeRequestController::class, 'show'], $pr);
-    $router->get('/phonepe-requests/{order}/status', [PhonePeRequestController::class, 'status'], $pr);
-    $router->post('/phonepe-requests/{order}/cancel', [PhonePeRequestController::class, 'cancel'], $pr);
-    $router->get('/my/pay/{order}', [PhonePeRequestController::class, 'mine'], ['auth', 'can:invoices.view_own']);
-    $router->get('/my/pay/{order}/status', [PhonePeRequestController::class, 'mineStatus'], ['auth', 'can:invoices.view_own']);
-    $router->get('/my/invoices/{invoice}/phonepe-return', [PhonePeController::class, 'returned'], ['auth', 'can:invoices.view_own']);
+    $router->get('/payment-requests', [PaymentRequestController::class, 'index'], $pr);
+    $router->get('/invoices/{invoice}/pay-request', [PaymentRequestController::class, 'create'], $pr);
+    $router->post('/invoices/{invoice}/pay-request', [PaymentRequestController::class, 'store'], $pr);
+    $router->get('/payment-requests/{order}', [PaymentRequestController::class, 'show'], $pr);
+    $router->get('/payment-requests/{order}/status', [PaymentRequestController::class, 'status'], $pr);
+    $router->post('/payment-requests/{order}/cancel', [PaymentRequestController::class, 'cancel'], $pr);
+    $router->get('/my/pay/{order}', [PaymentRequestController::class, 'mine'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/pay/{order}/status', [PaymentRequestController::class, 'mineStatus'], ['auth', 'can:invoices.view_own']);
 
     // AI assistance (drafts only)
     $router->get('/ai', [AiController::class, 'index'], ['auth', 'can:ai.use']);
@@ -539,8 +538,6 @@ return static function (Router $router): void {
         $r->post('/cms/{page}/blocks/{index}', [CmsController::class, 'updateBlock'], ['can:cms.edit']);
         $r->post('/cms/{page}/blocks/{index}/action', [CmsController::class, 'blockAction'], ['can:cms.edit']);
         $r->post('/cms/{page}/status', [CmsController::class, 'status'], ['can:cms.publish']);
-        $r->get('/payments', [BillingSettingsController::class, 'payments'], ['can:billing.configure']);
-        $r->post('/payments', [BillingSettingsController::class, 'savePayments'], ['can:billing.configure']);
         $r->get('/business', [BillingSettingsController::class, 'business'], ['can:billing.configure']);
         $r->post('/business', [BillingSettingsController::class, 'saveBusiness'], ['can:billing.configure']);
         $r->get('/users', [UserController::class, 'index'], ['can:users.view']);

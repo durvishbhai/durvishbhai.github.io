@@ -26,7 +26,7 @@ Every module and role in the requirements document, where it is built, and an ho
 | 18 | Freelancer workspace | IT | Developer/editor/designer roles restricted to assigned projects and files. |
 | 19 | Delivery approval workflow | IT | Upload → QA → admin approval → client publication → revisions with versions and internal comments. |
 | 20 | Client portal & downloads | IT | Dashboards, approved deliverables only, revisions, invoices, receipts, agreements, payment history, tickets. |
-| 21 | Payment gateway & finance | **INT** | Invoices, manual and UPI-claim payments (staff-verified), outstanding balances, reconciliation report: IT. **PhonePe**: implemented with verified-status and signed-webhook handling (doc 18) but **tested only against a simulation; never run against PhonePe sandbox/production.** Advance/milestone payment requests are modelled as invoices. |
+| 21 | Payment gateway & finance | **INT** | Invoices, manual and UPI-claim payments (staff-verified), outstanding balances, reconciliation report: IT. **Razorpay**: implemented with verified-status and signed-webhook handling (doc 18) but **tested only against a simulation; never run against Razorpay sandbox/production.** Advance/milestone payment requests are modelled as invoices. |
 | 22 | Hosting & domain renewals | IT / PI | Schedules, prices, reminders, client payment activation, history: IT. Provider API integration: **not built** (manual confirmation by design, D-77). |
 | 23 | Dynamic form builder | IT | Fields, validation, conditional logic, templates, public links, access control, submissions, export (Phase 11). |
 | 24 | Referral partner & commissions | IT | Applications, approval, partner dashboard, editable rules with preserved history, splits, payouts. |

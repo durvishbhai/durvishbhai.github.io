@@ -20,13 +20,13 @@ final class RouteSweepTest extends HttpTestCase
     private const PUBLIC = [
         '/', '/health', '/login', '/login/two-factor', '/register', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
         '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received', '/f/{slug}', '/f/{slug}/thanks',
-        '/sitemap.xml', '/robots.txt', '/webhooks/phonepe', '/{slug}', '/{section}/{slug}',
+        '/sitemap.xml', '/robots.txt', '/webhooks/razorpay', '/{slug}', '/{section}/{slug}',
         '/about', '/services', '/services/{slug}', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/portfolio/{slug}', '/careers', '/careers/received', '/careers/{slug}', '/careers/apply', '/hiring', '/hiring/received', '/hiring/apply', '/faq', '/sitemap', '/project-requirements',
         '/privacy-policy', '/terms-and-conditions', '/refund-and-cancellation-policy', '/payment-policy', '/cookie-policy',
     ];
 
     /** Machine-to-machine callbacks that cannot carry a CSRF token. Each one authenticates the caller by a secret signature instead (see Phase12HttpTest). */
-    private const SIGNED_WEBHOOKS = ['/webhooks/phonepe'];
+    private const SIGNED_WEBHOOKS = ['/webhooks/razorpay'];
 
     /** @var list<array<string,mixed>> */
     private array $routes = [];

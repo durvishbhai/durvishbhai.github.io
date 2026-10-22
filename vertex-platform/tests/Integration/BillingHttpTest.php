@@ -7,11 +7,10 @@ namespace Vertex\Tests\Integration;
 use Vertex\Core\Database;
 use Vertex\Services\BusinessProfile;
 use Vertex\Services\ClientPaymentService;
-use Vertex\Services\GatewayConfig;
 use Vertex\Services\InvoiceService;
 use Vertex\Services\QuotationService;
 
-/** Quotations, invoices, client payment submission and the Google Pay settings over real HTTP: isolation, role gates, step-up password, CSRF, escaping, secrets. */
+/** Quotations, invoices, client payment submission over real HTTP: isolation, role gates, step-up password, CSRF, escaping, secrets. */
 final class BillingHttpTest extends HttpTestCase
 {
     use Phase3Fixtures;
@@ -65,7 +64,7 @@ final class BillingHttpTest extends HttpTestCase
         $this->assertStringContainsString('Keep this line', $f->get('/invoices/new')['body']);
         foreach (['dev@x.test', 'sup@x.test', 'partner@x.test', 'alpha@client.test'] as $who) {
             $c = $this->loggedIn($who);
-            foreach (['/invoices', '/invoices/new', '/quotations', '/quotations/new', '/admin/payments', '/admin/business'] as $p) {
+            foreach (['/invoices', '/invoices/new', '/quotations', '/quotations/new', '/admin/business'] as $p) {
                 $this->assertSame(403, $c->get($p)['status'], "{$who} must not open {$p}");
             }
         }
@@ -96,7 +95,6 @@ final class BillingHttpTest extends HttpTestCase
     {
         $mine = $this->issued('Mine only');
         $theirs = $this->issued('Theirs only', '700', (string) Database::one('SELECT public_id FROM clients WHERE user_id = ?', [$this->client2])['public_id']);
-        GatewayConfig::saveUpi($this->admin, ['upi_id' => 'vertex.pay@okhdfcbank', 'payee_name' => 'Vertex Pay', 'enabled' => '1']);
         $c = $this->loggedIn('alpha@client.test');
         $list = $c->get('/my/invoices');
         $this->assertStringContainsString('Mine only', $list['body']);
@@ -104,8 +102,8 @@ final class BillingHttpTest extends HttpTestCase
         $page = $c->get('/my/invoices/' . $mine['public_id']);
         $this->assertSame(200, $page['status']);
         $this->assertStringContainsString('Tax is not applicable.', $page['body']);
-        $this->assertStringContainsString('upi://pay?pa=vertex.pay%40okhdfcbank', html_entity_decode($page['body']));
-        $this->assertStringContainsString('Pay ₹1,000.00 with Google Pay', $page['body']);
+        $this->assertStringNotContainsString('Google Pay', $page['body'], 'no Google Pay option any more');
+        $this->assertStringContainsString('ask our team for a payment request', $page['body']);
         $this->assertStringNotContainsString('STAFF-ONLY-NOTE', $page['body']);
         $this->assertSame(404, $c->get('/my/invoices/' . $theirs['public_id'])['status'], 'IDOR across clients');
         $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/invoices/' . $mine['public_id'])['status']);
@@ -120,7 +118,6 @@ final class BillingHttpTest extends HttpTestCase
         $this->assertSame('issued', InvoiceService::find($mine['public_id'])['status'], 'still unpaid until staff verify');
         $after = $c->get('/my/invoices/' . $mine['public_id'])['body'];
         $this->assertStringContainsString('Your submitted payments', $after);
-        $this->assertStringNotContainsString('Pay ₹1,000.00 with Google Pay', $after, 'nothing left to pay while the full amount is awaiting confirmation');
     }
 
     public function testStaffVerifyAClientSubmittedPaymentWithTheBankAmountAndRejectNeedsAReason(): void
@@ -183,49 +180,6 @@ final class BillingHttpTest extends HttpTestCase
         $this->assertSame('accepted', QuotationService::find($q['public_id'])['status']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) AS c FROM client_payments')['c']);
         $this->assertSame(403, $this->loggedIn('partner@x.test')->post($url, ['decision' => 'accept', 'confirm' => '1'], '/account')['status']);
-    }
-
-    public function testGooglePaySettingsPageSavesWithThePasswordAndNeverShowsSecretsAgain(): void
-    {
-        $a = $this->loggedIn('admin@x.test');
-        $page = $a->get('/admin/payments');
-        $this->assertSame(200, $page['status']);
-        $this->assertStringContainsString('Google Pay is not a payment gateway on its own', $page['body']);
-        $this->assertStringContainsString('Not configured', $page['body']);
-        $upi = ['action' => 'save_upi', 'upi_id' => 'vertex.pay@okhdfcbank', 'payee_name' => 'Vertex Pay', 'merchant_code' => '', 'enabled' => '1'];
-        $a->post('/admin/payments', $upi + ['confirm_password' => 'wrong'], '/admin/payments');
-        $this->assertFalse(GatewayConfig::upiActive(), 'wrong password: nothing saved');
-        $a->post('/admin/payments', array_replace($upi, ['upi_id' => 'bad upi', 'confirm_password' => self::PASSWORD]), '/admin/payments');
-        $this->assertFalse(GatewayConfig::upiActive(), 'invalid UPI ID: nothing saved');
-        $a->post('/admin/payments', $upi + ['confirm_password' => self::PASSWORD], '/admin/payments');
-        $this->assertTrue(GatewayConfig::upiActive());
-        $this->assertStringContainsString('Payments are NOT confirmed automatically', $a->get('/admin/payments')['body']);
-        // the Google Pay API fields: secrets go in once and never come back
-        $api = ['action' => 'save_api', 'environment' => 'TEST', 'merchant_id' => '', 'merchant_name' => 'Vertex', 'merchant_origin' => 'https://pay.vertex.test', 'processor' => 'razorpay', 'processor_merchant_id' => 'acct_Abc123',
-            'processor_key_id' => 'rzp_test_AbCd1234', 'processor_key_secret' => 'sUp3rS3cretKeyValue99', 'webhook_secret' => 'whsec_ZyXwVuTs1234', 'networks' => ['VISA'], 'auth_methods' => ['PAN_ONLY']];
-        $a->post('/admin/payments', $api + ['confirm_password' => 'wrong'], '/admin/payments');
-        $this->assertSame([], GatewayConfig::get(GatewayConfig::API)['config']);
-        $a->post('/admin/payments', $api + ['confirm_password' => self::PASSWORD], '/admin/payments');
-        $this->assertSame('razorpay', GatewayConfig::get(GatewayConfig::API)['config']['processor']);
-        $body = $a->get('/admin/payments')['body'];
-        foreach (['sUp3rS3cretKeyValue99', 'whsec_ZyXwVuTs1234'] as $secret) {
-            $this->assertStringNotContainsString($secret, $body, 'a saved secret is never rendered');
-        }
-        $this->assertStringContainsString('••••ue99', $body);
-        $this->assertStringContainsString('not installed in this release', $body);
-        $this->assertStringContainsString('does <em>not</em> switch card payments on', $body);
-        $this->assertSame('sUp3rS3cretKeyValue99', GatewayConfig::secret(GatewayConfig::API, 'processor_key_secret'));
-        // the check button shows the example link without any secret
-        $a->post('/admin/payments', ['action' => 'check_upi'], '/admin/payments');
-        $this->assertStringContainsString('Example link', $a->get('/admin/payments')['body']);
-        // nobody else can open or post to it
-        foreach (['mgr@x.test', 'fin@x.test', 'alpha@client.test', 'partner@x.test'] as $who) {
-            $c = $this->loggedIn($who);
-            $this->assertSame(403, $c->post('/admin/payments', array_replace($upi, ['upi_id' => 'attacker@bank', 'confirm_password' => self::PASSWORD]), '/account')['status'], $who);
-        }
-        $this->assertSame('vertex.pay@okhdfcbank', GatewayConfig::get(GatewayConfig::UPI)['config']['upi_id']);
-        $audit = (string) Database::one("SELECT GROUP_CONCAT(COALESCE(before_json, ''), COALESCE(after_json, ''), COALESCE(meta_json, '')) AS x FROM audit_logs")['x'];
-        $this->assertStringNotContainsString('sUp3rS3cretKeyValue99', $audit);
     }
 
     public function testBusinessDetailsNeedThePasswordAndFeedTheInvoice(): void

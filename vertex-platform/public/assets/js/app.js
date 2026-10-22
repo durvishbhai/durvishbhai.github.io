@@ -368,7 +368,7 @@
         });
         sync();
     })();
-    // PhonePe payment request page: countdown, and ask the server (which asks PhonePe) whether it has been paid
+    // Payment request page: countdown, and ask the server (which asks Razorpay) whether it has been paid
     (function () {
         var box = document.querySelector('[data-pay-poll]');
         if (!box) { return; }

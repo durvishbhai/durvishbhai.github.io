@@ -1,13 +1,13 @@
-# 18 · Phase 12 — website CMS, Integration Center, AI assistance, PhonePe
+# 18 · Phase 12 — website CMS, Integration Center, AI assistance, Razorpay payments
 
 What this phase adds, how it is protected, and exactly what has **not** been proven yet.
 
 ## 1. Integration Center (module 35) — `/admin/settings`
 
-* One screen, grouped: General, Website and company facts, Email, Notifications, Storage, AI, PhonePe, Feature switches.
+* One screen, grouped: General, Website and company facts, Email, Notifications, Storage, AI, Razorpay, Feature switches.
 * A **fixed, reviewed list** of settings (`Settings::definitions()`); anything else in the table is ignored, so a database row can never override `database.*`, `app.key` and the like.
 * A saved value **replaces** the `.env` value; "Use the default again" deletes it. The screen shows where each value comes from.
-* Secrets (SMTP password, AI key, PhonePe client secret and webhook password) are **write-only**: sealed with `SecretBox` (AES-256-GCM, key derived from `APP_KEY`), never rendered back, never in the audit log (it records key names only). Leave the box empty to keep the saved secret. If `APP_KEY` changes, sealed secrets can no longer be opened and behave as unset (re-enter them).
+* Secrets (SMTP password, AI key, Razorpay key secret and webhook secret) are **write-only**: sealed with `SecretBox` (AES-256-GCM, key derived from `APP_KEY`), never rendered back, never in the audit log (it records key names only). Leave the box empty to keep the saved secret. If `APP_KEY` changes, sealed secrets can no longer be opened and behave as unset (re-enter them).
 * Viewing needs `settings.view` (Administrator + Owner); saving needs `settings.manage` (**Owner only**) and the actor's password.
 * Bootstrap applies the values once per request (one small query; swallowed if the table is missing, so a half-installed site still starts).
 
@@ -41,47 +41,44 @@ What this phase adds, how it is protected, and exactly what has **not** been pro
 * Every request is logged (user, feature, sizes, outcome — **not the text**), limited per user per hour (`ai_user`) and per month for the company (`ai.monthly_cap`). Provider errors are logged without the key and shown as a generic message.
 * **Not verified against a live provider** — the tests use a simulated provider. Try it with a real key and a harmless enquiry before relying on it. It can produce wrong text; that is why it only drafts.
 
-## 4. PhonePe payments (module 21) — Standard Checkout
+## 4. Online payments through Razorpay (module 21)
 
-**Update (staff-initiated, exact-amount QR).** Payments are no longer started by the client. A member of the KIS team with `payments.request` (Finance Staff, Administrator, Owner) opens an invoice → *Request PhonePe payment* → **types the amount** (pre-filled with what is still due, editable down to ₹1.00, never above the balance) → the server creates a PhonePe order for exactly that amount → one QR is drawn on the server (`QrCode`, SVG, no external service) from PhonePe's answer for that order. Nothing is generated before an amount is entered; the client sees the same QR on `/my/pay/{id}` (and is notified) but cannot change or create anything. The page polls `/phonepe-requests/{id}/status` (which asks PhonePe, never trusts the browser) and flips to "Payment received" when PhonePe says COMPLETED. A request can be withdrawn (QR disappears; a payment that was already made is still recorded when PhonePe confirms it) and expires after `order_ttl_minutes` (30).
+**Razorpay and Google Pay were removed** (the earlier Razorpay integration and the Google Pay settings page are gone; migrations are forward-only so old tables remain unused). Online payments now go through **Razorpay** only. Clients can still tell us they paid by bank transfer or UPI with a UTR number; staff verify those against the bank as before.
 
-How the QR is made (`PHONEPE_QR_MODE` / Integrations & settings → PhonePe → *How the payment QR is made*):
-* `auto` (default): ask PhonePe for a **UPI QR** order (`POST /payments/v2/pay`, `paymentMode.type = UPI_QR`); use its `qrData` (or `intentUrl`). If PhonePe does not return one (for example the UPI QR option is not enabled on the merchant account) fall back to **Standard Checkout** (`POST /checkout/v2/pay`) and draw a QR that opens PhonePe's hosted payment page for that order and amount.
-* `direct`: UPI QR only (refuse if PhonePe returns none). `checkout`: hosted checkout link only.
-* **Amount guard:** when the QR text is a UPI link, its `am=` must equal the typed amount or the request is discarded and nothing is stored. Independently, `reconcile()` only records a payment when PhonePe's status says COMPLETED for exactly the order's amount.
+**Staff-initiated, exact-amount QR.** A member of the KIS team with `payments.request` (Finance Staff, Administrator, Owner) opens an invoice → *Request payment* → **types the amount** (pre-filled with what is still due, editable from ₹1.00 up to the balance, never above it) → the server asks Razorpay for a collection of exactly that amount → one QR is drawn on the server (SVG, no external service) from Razorpay's answer. Nothing is generated before an amount is entered. The client sees the same QR on `/my/pay/{id}` (and is notified) but cannot create or change anything. The page counts down and polls `/payment-requests/{id}/status`, which asks Razorpay (never trusts the browser) and shows "Payment received" when Razorpay reports it. A request can be withdrawn (Razorpay is asked to close the QR / cancel the link; a payment already made is still recorded) and expires after 30 minutes.
 
-**Honest limits of this update:** PhonePe's developer site could not be opened from the build environment, so the UPI QR request/response field names (`paymentFlow.paymentMode.type`, `qrData`, `intentUrl`) come from search-result summaries of the public docs and from the existing Standard Checkout code, not from reading the reference pages; the fallback exists because of that. The QR encoder itself was verified by decoding 24 generated codes with a real QR reader. Nothing has been run against PhonePe's sandbox: use the checklist below before real money.
+How the QR is made (*Integrations & settings → Razorpay → How the payment QR is made*, or `RAZORPAY_QR_MODE`):
+* `auto` (default): `POST /v1/payments/qr_codes` with `type=upi_qr`, `usage=single_use`, `fixed_amount=true`, `payment_amount=<typed paise>`, `close_by=now+30 min`. If Razorpay returns the UPI string for that QR (`image_content`) it is drawn as our own QR (its `am=` must equal the typed amount). If Razorpay returns no UPI string, the QR is **closed** (so there is never a second way to pay) and a Razorpay **Payment Link** is used instead.
+* `link`: Payment Link only: `POST /v1/payment_links` with `amount=<typed paise>`, `accept_partial=false`, `reference_id`, `expire_by`. We draw a QR that opens Razorpay's hosted payment page for exactly that amount (UPI, cards, net banking, wallets).
+* Razorpay's answer must repeat the amount (and, for a QR, fixed amount and single use) or the request is discarded and nothing is stored.
 
-Original flow (kept for the return page and webhook): server creates a PhonePe order → customer pays on PhonePe → returns to `/my/invoices/{id}/phonepe-return` → PhonePe also calls `POST /webhooks/phonepe`.
+Guarantees (each is covered by tests against a simulated Razorpay):
+1. A payment is recorded **only** after the server asks Razorpay and finds a **captured** payment of exactly the order's amount (QR: `GET /v1/payments/qr_codes/{id}/payments`; link: `GET /v1/payment_links/{id}`). An authorized-but-not-captured payment stays pending.
+2. The webhook (`POST /webhooks/razorpay`) must carry `X-Razorpay-Signature` = HMAC-SHA256 of the raw body with the webhook secret saved in *Integrations & settings*, compared in constant time. No secret saved → every call is refused (401). The body is never believed: after the signature check it only names the order to ask Razorpay about. Events are logged once per `X-Razorpay-Event-Id`.
+3. Idempotent: webhook + page poll + scheduler can all fire for one order; one payment row exists (unique gateway reference).
+4. An amount mismatch records nothing, writes a security log line and an audit entry, and leaves the order for a person.
+5. Payments land in `client_payments` (source `gateway`, already `verified`) so invoice status, commissions, receipts and reports follow.
+6. Orders never returned from are re-checked by the scheduled task (older than 3 minutes, newer than 2 days).
+7. A client cannot start a payment; another client's request is a 404.
 
-Guarantees (each is covered by tests against a simulated PhonePe):
+**What is NOT verified:** Razorpay's documentation could not be opened from the build environment, so this was written from knowledge of the public API (Basic auth with key id/secret, QR Codes, Payment Links, HMAC-signed webhooks) and exercised only against a simulation. In particular, whether your account returns `image_content` for QR codes is unknown (hence the payment-link fallback), and QR Codes may need to be enabled on your Razorpay account. Use **test keys** first.
 
-1. A payment is recorded **only** after the server has asked PhonePe's order-status API and received `COMPLETED` for exactly the amount of our order. The browser return and the webhook body are never believed; the webhook merely triggers that check.
-2. The webhook must carry `Authorization: SHA256(username:password)` computed from the credentials saved in PhonePe's dashboard and in *Integrations & settings → PhonePe*; compared in constant time. No credentials saved → every call is refused (401).
-3. Idempotent: browser return + webhook + scheduler can all fire for one order; only one payment row exists (`external_key` unique; the order row is locked). Identical webhook bodies are stored once.
-4. An amount mismatch records nothing, writes a security log line and an audit entry, and leaves the order pending for a person.
-5. Payments land in the same `client_payments` table (source `gateway`, already `verified`), so invoice status, commissions, receipts, reports and the approval centre keep working unchanged. The client gets an in-app notification; staff with `payments.reconcile` are told.
-6. Orders that were never returned from are re-checked by the scheduled task (older than 3 minutes, newer than 2 days); orders still pending after 6 hours are marked expired.
-7. Staff cannot "pay" as the client; another client's invoice is a 404.
+### Test-mode checklist (do this before going live)
 
-**What is NOT verified:** this was written from PhonePe's published Standard Checkout documentation and exercised only against a simulation. No call has been made to PhonePe's sandbox or production. Field names, the webhook header format and the redirect behaviour must be confirmed with the **sandbox checklist** below before any real money moves.
-
-### Sandbox checklist (do this before going live)
-
-1. Get merchant credentials from the PhonePe Business dashboard (sandbox first): Client ID, Client Secret, Client Version, and set a webhook username/password there.
-2. *Integrations & settings → PhonePe*: environment **Sandbox**, paste the credentials, switch on, save. The site must be served over HTTPS (`APP_URL=https://…`); the status badge must read **Ready**.
-3. In PhonePe's dashboard set the webhook URL to `https://YOUR-SITE/webhooks/phonepe` with the same username/password.
-4. Issue a ₹10 invoice to a test client; as that client press *Pay online with PhonePe*; complete the sandbox payment.
-5. Confirm: the invoice shows **Paid**, one `Client payments` row (source *gateway*, verified), the client has a notification, `storage/logs/app-*.log` has no PhonePe errors, and *Admin → Audit* shows `client_payment.gateway_recorded`.
-6. Repeat with a failed/cancelled payment (order shows failed, nothing recorded) and by closing the PhonePe tab right after paying (the webhook or the scheduler must still record it).
-7. If the webhook never arrives: check the `Authorization` header reaches PHP (the installer adds the `.htaccess` rule `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]`), and compare the header PhonePe sends with `sha256("username:password")`.
-8. Only then switch the environment to **Production** with production credentials and make one real ₹1 payment.
+1. In the Razorpay Dashboard (Test Mode) create API keys: *Account & Settings → API Keys*. Note the **Key ID** (`rzp_test_…`) and **Key Secret**.
+2. *Integrations & settings → Razorpay*: paste the Key ID and Key Secret, switch on, save. The site must be served over HTTPS (the status badge says why it is not ready).
+3. In the Razorpay Dashboard add a webhook: URL `https://YOUR-SITE/webhooks/razorpay`, a secret you choose, events `payment.captured`, `qr_code.credited`, `payment_link.paid` (and `qr_code.closed`). Paste the same secret into *Integrations & settings → Razorpay → Webhook secret*.
+4. Issue a ₹10 invoice to a test client; as the team press *Request payment* on it, accept ₹10.00, and pay the QR with Razorpay's test method (a test payment link opens Razorpay's test checkout; use its test UPI / card details).
+5. Confirm: the page flips to **Payment received**, the invoice shows **Paid**, one `Client payments` row (source *gateway*, verified), the client has a notification and `storage/logs` shows no errors.
+6. Try a part payment (₹4 of ₹10), a withdrawn request, and an expired request (wait 30 minutes or lower `order_ttl_minutes` in `config/razorpay.php` temporarily).
+7. If the webhook never arrives, check the Dashboard's webhook delivery log; the page poll and scheduled check still record the payment.
+8. Only then switch to **live** keys (`rzp_live_…`) and make one real ₹1 payment.
 
 ## 5. New permissions and limits
 
 * `ai.use` (new). Existing `cms.view/edit/publish`, `settings.view/manage` now have working screens.
-* Rate limits (`config/auth.php`): `ai_user` 30/h, `phonepe_start_user` 10/h, `cms_upload_user` 60/h.
-* Scheduled task additions: publish due pages (`cms_published`), re-check pending PhonePe orders (`gateway_reconciled`).
+* Rate limits (`config/auth.php`): `ai_user` 30/h, `payment_request_user` 30/h, `cms_upload_user` 60/h.
+* Scheduled task additions: publish due pages (`cms_published`), re-check pending Razorpay orders (`gateway_reconciled`).
 
 ## 6. Database
 

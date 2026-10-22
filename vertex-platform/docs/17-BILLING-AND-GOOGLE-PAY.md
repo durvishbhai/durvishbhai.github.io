@@ -1,4 +1,6 @@
-# 17 · Phase 8 — Quotations, invoices (no tax), Google Pay settings
+# 17 · Phase 8 — Quotations, invoices (no tax) and payments
+
+> **Update:** the Google Pay settings page, the UPI deep link and the stand-alone Google Pay API fields described in section 0 were **removed**. Online payments are Razorpay only (docs/18 §4). Clients can still report a bank-transfer/UPI payment with a UTR number for staff to verify. Section 0 below is kept only as history.
 
 Migrations `0012_billing_gateway.sql`, `0013_payment_events.sql`. Code: `app/Services/{BillingItems,BusinessProfile,QuotationService,InvoiceService,GatewayConfig}.php`, extensions to `ClientPaymentService`, controllers `Billing/{Quotation,Invoice,MyBilling}Controller`, `Admin/BillingSettingsController`, views `quotations/`, `invoices/`, `my-billing/`, `admin/{payments,business}.php`, print layout `layouts/print.php`.
 

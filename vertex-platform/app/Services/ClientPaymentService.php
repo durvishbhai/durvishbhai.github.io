@@ -178,7 +178,7 @@ final class ClientPaymentService
     }
 
     /**
-     * A client tells us they paid an invoice (by UPI / Google Pay or bank transfer). This records a CLAIM that counts for nothing until staff verify it against
+     * A client tells us they paid an invoice (by UPI or bank transfer). This records a CLAIM that counts for nothing until staff verify it against
      * the bank statement. The same transaction reference cannot be submitted twice, and a claim can never exceed what is still due.
      *
      * @param array<string,mixed> $invoice a row the caller got from InvoiceService::requireOwn
@@ -195,7 +195,7 @@ final class ClientPaymentService
             throw new HttpException(429);
         }
         $amount = (int) FieldRules::moneyMinor($in['amount'] ?? '', 'Amount you paid', true);
-        $method = (string) FieldRules::choice($in['method'] ?? '', ['upi' => 'UPI / Google Pay', 'bank_transfer' => 'Bank transfer'], 'payment method');
+        $method = (string) FieldRules::choice($in['method'] ?? '', ['upi' => 'UPI', 'bank_transfer' => 'Bank transfer'], 'payment method');
         $ref = (string) FieldRules::line($in['reference'] ?? '', 'Transaction / UTR number', 6, 40);
         if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9._\/\- ]{4,39}$/', $ref)) {
             throw new ValidationException(['The transaction number may contain only letters, digits and . _ / - characters.']);
@@ -236,7 +236,7 @@ final class ClientPaymentService
     }
 
     /**
-     * A payment the gateway itself has confirmed (PhonePe answered COMPLETED for the right amount to a server-side status request). It is recorded already
+     * A payment the gateway itself has confirmed (Razorpay reported a captured payment of the right amount to a server-side status request). It is recorded already
      * verified: the bank-statement check that staff do for UPI claims is replaced by the gateway's own authenticated answer. Idempotent on the reference.
      *
      * @param array<string,mixed> $invoice

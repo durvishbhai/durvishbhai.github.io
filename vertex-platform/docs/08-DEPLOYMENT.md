@@ -87,13 +87,13 @@ Two cron jobs are needed (cPanel → Cron Jobs; adjust paths):
 
 `schedule:run` moves renewals along the calendar, sends reminders and releases commission hold periods; it is idempotent. **Do not tell staff or clients that reminders or backups run until you have seen both jobs run** (`schedule:status`, `backup:status`, *Admin → System status*). Until then the dashboards show a warning. Run `php bin/console.php doctor` before launch: it lists every production warning (HTTP instead of HTTPS, debug on, SMTP not configured, no scanner, seed users, never-run cron, no backup).
 
-## Phase 12 additions (website, AI, PhonePe)
+## Phase 12 additions (website, AI, Razorpay)
 
 * **Website pictures** are saved in `public_html/uploads/cms/` (the installer creates it with a script-blocking `.htaccess`). They are included in `backup:create` (archive path `uploads/website-media/`); after a restore copy them back into that folder.
-* **PhonePe webhook**: `https://YOUR-SITE/webhooks/phonepe`. The installer's `.htaccess` passes the `Authorization` header to PHP. If you replace the `.htaccess`, keep `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]`.
-* **Settings**: after install sign in as the Owner and open *Integrations & settings* to enter SMTP, AI and PhonePe values instead of editing `.env`. `APP_KEY` must stay the same forever (sealed secrets depend on it).
-* **Scheduled task**: the daily `schedule:run` now also publishes due website pages and re-checks pending PhonePe orders; with PhonePe on, run it more often (hourly is fine, it is idempotent).
-* Sandbox checklist for PhonePe: `docs/18-PHASE12-CMS-AI-PHONEPE.md` §4.
+* **Razorpay webhook**: `https://YOUR-SITE/webhooks/razorpay` (events `payment.captured`, `qr_code.credited`, `payment_link.paid`; the secret you set in the Razorpay Dashboard is saved in *Integrations & settings → Razorpay*).
+* **Settings**: after install sign in as the Owner and open *Integrations & settings* to enter SMTP, AI and Razorpay values instead of editing `.env`. `APP_KEY` must stay the same forever (sealed secrets depend on it).
+* **Scheduled task**: the daily `schedule:run` now also publishes due website pages and re-checks pending Razorpay orders; with Razorpay on, run it more often (hourly is fine, it is idempotent).
+* Test-mode checklist for Razorpay: `docs/18-PHASE12-CMS-AI-PHONEPE.md` §4.
 
 
 ## Single-folder package (upload straight into public_html)
@@ -107,5 +107,5 @@ See `docs/20-PUBLIC-WEBSITE.md`. Deployment notes: visitor uploads are private (
 ## Backup (.sql) and new migrations
 
 * **Administration → Backup (.sql)** (Owner only, password re-entry, audited) downloads one standard `.sql` file with the structure and all data. Restore it with phpMyAdmin → Import (it replaces the tables it contains). Uploaded pictures/files are not in it: copy `public_html/uploads` and `vertex/storage/uploads` from the File Manager. Keep `APP_KEY` with the backup (saved secrets are encrypted with it). Proven by importing a real dump into an empty database and comparing row counts.
-* Migrations `0020` (PhonePe payment requests: QR payload, expiry, cancelled status) and `0021` (LinkedIn, experience, availability on applications) are applied by `upgrade.php`. Until they are applied the hiring form and PhonePe requests cannot save, so run the upgrade right after uploading the files.
-* Optional variable `PHONEPE_QR_MODE=auto|direct|checkout` (see docs/18).
+* Migrations `0020` (payment requests: QR payload, expiry, cancelled status), `0021` (LinkedIn, experience, availability on applications) and `0022` (Razorpay) are applied by `upgrade.php`. Until they are applied the hiring form and PhonePe requests cannot save, so run the upgrade right after uploading the files.
+* Optional variables `RAZORPAY_ENABLED`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_QR_MODE=auto|link` (they can instead be saved in *Integrations & settings*; see docs/18 §4). PhonePe and Google Pay are no longer supported.

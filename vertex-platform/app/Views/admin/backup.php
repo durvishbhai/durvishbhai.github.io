@@ -3,7 +3,7 @@
     <p>One file with the structure and <strong>all data</strong> of the platform: users, clients, projects, invoices, payments, website content, settings and the audit log. It is a standard SQL file: to restore it, open <strong>phpMyAdmin → your database → Import</strong> and choose the file (this replaces the tables it contains).</p>
     <ul class="plain-list">
         <li>Pictures you uploaded to the website and project files are <strong>not</strong> inside the .sql file; download them from the File Manager (<code>public_html/uploads</code> and <code>vertex/storage/uploads</code>) if you need them too.</li>
-        <li>Secrets such as the PhonePe client secret are stored encrypted with your <code>APP_KEY</code>. Keep a copy of the key somewhere safe: without it those saved secrets cannot be opened after a restore.</li>
+        <li>Secrets such as the Razorpay key secret are stored encrypted with your <code>APP_KEY</code>. Keep a copy of the key somewhere safe: without it those saved secrets cannot be opened after a restore.</li>
         <li>The file contains personal and financial information. Store it somewhere private, never email it, and delete old copies.</li>
     </ul>
     <form method="post" action="/admin/backup/sql" class="form-grid"><?= csrf_field() ?>

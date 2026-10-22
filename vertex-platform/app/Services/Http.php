@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Vertex\Services;
 
 /**
- * The one place the platform makes outbound HTTPS calls (AI provider, PhonePe). Plain cURL with certificate checks always on, a short timeout, no redirects
+ * The one place the platform makes outbound HTTPS calls (AI provider, Razorpay). Plain cURL with certificate checks always on, a short timeout, no redirects
  * followed and a size cap. Tests replace it with Http::fake() so no test ever touches the network.
  */
 final class Http

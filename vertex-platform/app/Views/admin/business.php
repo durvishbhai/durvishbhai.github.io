@@ -1,5 +1,5 @@
 <?php /** @var array<string,mixed> $p */ $v = static fn (string $k): string => old($k, (string) ($p[$k] ?? '')); ?>
-<div class="page-head"><div><p class="eyebrow">Administration</p><h1>Business details</h1></div><a class="btn btn-ghost" href="/admin/payments">Payments (Google Pay)</a></div>
+<div class="page-head"><div><p class="eyebrow">Administration</p><h1>Business details</h1></div></div>
 <div class="panel"><p class="muted">Printed on every quotation and invoice. A copy is frozen into each invoice when it is issued, so later edits never change an issued invoice. Invoices cannot be issued until the business name is set.</p>
     <form method="post" action="/admin/business" class="form-grid"><?= csrf_field() ?>
     <div class="field"><label for="tn">Business name</label><input id="tn" name="trade_name" required maxlength="160" value="<?= e($v('trade_name')) ?>"></div>

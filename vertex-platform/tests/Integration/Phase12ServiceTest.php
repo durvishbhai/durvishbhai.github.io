@@ -14,10 +14,10 @@ use Vertex\Services\CmsBlocks;
 use Vertex\Services\CmsService;
 use Vertex\Services\Http;
 use Vertex\Services\InvoiceService;
-use Vertex\Services\PhonePeGateway;
+use Vertex\Services\RazorpayGateway;
 use Vertex\Services\Settings;
 
-/** Phase 12 services: settings store, CMS, AI assistance and the PhonePe gateway (against a simulated PhonePe and a simulated AI provider). */
+/** Phase 12 services: settings store, CMS, AI assistance and the Razorpay gateway (against a simulated Razorpay and a simulated AI provider). */
 final class Phase12ServiceTest extends DatabaseTestCase
 {
     use Phase3Fixtures;
@@ -39,12 +39,12 @@ final class Phase12ServiceTest extends DatabaseTestCase
             define('VERTEX_PUBLIC', self::$pub);
         }
         exec('rm -rf ' . escapeshellarg(self::$pub . '/uploads'));
-        foreach (['ai', 'phonepe', 'features', 'site', 'app.url', 'mail', 'uploads'] as $k) {
+        foreach (['ai', 'razorpay', 'features', 'site', 'app.url', 'mail', 'uploads'] as $k) {
             $this->saved[$k] = Config::get($k);
         }
         $this->clientPublic = (string) Database::one('SELECT public_id FROM clients WHERE user_id = ?', [$this->client])['public_id'];
         Config::set('mail.driver', 'none');
-        foreach (glob(dirname((string) Config::get('uploads.root', VERTEX_ROOT . '/storage/uploads')) . '/cache/phonepe-*.json') ?: [] as $f) {
+        foreach (glob(dirname((string) Config::get('uploads.root', VERTEX_ROOT . '/storage/uploads')) . '/cache/razorpay-*.json') ?: [] as $f) {
             @unlink($f);
         }
     }
@@ -543,57 +543,72 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->assertSame([null, 'urgent'], [$ok[0]['estimate_minutes'], $ok[0]['priority']]);
     }
 
-    // ------------------------------------------------------------------------------------------------ PhonePe
+    // ------------------------------------------------------------------------------------------------ Razorpay
 
-    /** @var array<string,string> */
-    private array $phonepeState = [];
-    /** @var list<array<string,mixed>> */
+    /** What the simulated Razorpay says about the order's collection. @var array<string,mixed> */
+    private array $rz = [];
+    /** @var list<array<string,mixed>> bodies sent to Razorpay */
     private array $lastBodies = [];
 
-    private function phonepeOn(bool $webhook = true): void
+    private function razorpayOn(bool $webhook = true): void
     {
         Config::set('app.url', 'https://vis.test');
-        Config::set('phonepe.enabled', true);
-        Config::set('phonepe.client_id', 'CLIENT1');
-        Config::set('phonepe.client_secret', 'SECRET1');
-        Config::set('phonepe.environment', 'sandbox');
-        Config::set('phonepe.webhook_username', $webhook ? 'hook-user' : '');
-        Config::set('phonepe.webhook_password', $webhook ? 'hook-pass-123' : '');
+        Config::set('razorpay.enabled', true);
+        Config::set('razorpay.key_id', 'rzp_test_AbCd1234');
+        Config::set('razorpay.key_secret', 'SECRETKEY1');
+        Config::set('razorpay.qr_mode', 'auto');
+        Config::set('razorpay.webhook_secret', $webhook ? 'whsec_test_123' : '');
         BusinessProfile::save($this->admin, ['trade_name' => 'Vertex Integrated Solutions', 'address' => '12 Test Street', 'tax_statement' => 'Tax is not applicable.', 'payment_instructions' => 'Bank: TEST 0000', 'invoice_footer' => 'Thanks']);
     }
 
-    /** @param array{state?:string,amount?:int,http?:int} $o @param list<string> $calls */
-    private function fakePhonePe(array &$calls, array $o = []): void
+    /**
+     * A simulated Razorpay. $o: upi (UPI string for a QR; omitted = QR without a string), qr (false = QR API refuses), paid (amount in paise paid), state (payment link status), http (status error), echo (amount the API repeats).
+     *
+     * @param list<string> $calls
+     * @param array<string,mixed> $o
+     */
+    private function fakeRazorpay(array &$calls, array $o = []): void
     {
-        $this->phonepeState = ['state' => $o['state'] ?? 'PENDING'];
+        $this->rz = $o;
         $this->lastBodies = [];
-        Http::fake(function (string $m, string $url, array $h, ?string $body) use (&$calls, &$o): array {
+        Http::fake(function (string $m, string $url, array $h, ?string $body) use (&$calls): array {
+            $o = $this->rz;
             $calls[] = $m . ' ' . $url;
-            if ($body !== null && is_array(json_decode($body, true))) {
-                $this->lastBodies[] = json_decode($body, true);
+            $b = $body !== null ? json_decode($body, true) : null;
+            if (is_array($b)) {
+                $this->lastBodies[] = $b;
             }
-            if (str_contains($url, '/payments/v2/pay')) {
-                if (empty($o['qr'])) {
-                    return ['status' => 400, 'body' => json_encode(['code' => 'FEATURE_NOT_ENABLED'])];
+            $this->assertStringStartsWith('Basic ' . base64_encode('rzp_test_AbCd1234:SECRETKEY1'), $h['Authorization'] ?? '', 'Razorpay is called with the key id and secret');
+            if ($m === 'POST' && str_ends_with($url, '/payments/qr_codes')) {
+                if (($o['qr'] ?? true) === false) {
+                    return ['status' => 400, 'body' => json_encode(['error' => ['code' => 'BAD_REQUEST_ERROR', 'description' => 'QR codes are not enabled']])];
+                }
+                $d = ['id' => 'qr_TestQr0001', 'entity' => 'qr_code', 'type' => 'upi_qr', 'usage' => 'single_use', 'fixed_amount' => true, 'payment_amount' => $o['echo'] ?? $b['payment_amount'], 'status' => 'active', 'image_url' => 'https://rzp.io/i/AbCdEf'];
+                if (isset($o['upi'])) {
+                    $d['image_content'] = $o['upi'];
                 }
 
-                return ['status' => 200, 'body' => json_encode(['orderId' => 'OMOQR1', 'state' => 'PENDING', 'qrData' => $o['qr']])];
+                return ['status' => 200, 'body' => json_encode($d)];
             }
-            if (str_contains($url, '/oauth/token')) {
-                return ['status' => 200, 'body' => json_encode(['access_token' => 'tok-abc', 'expires_at' => time() + 3600])];
+            if ($m === 'POST' && str_contains($url, '/payments/qr_codes/') && str_ends_with($url, '/close')) {
+                return ['status' => 200, 'body' => json_encode(['status' => 'closed'])];
             }
-            if (str_contains($url, '/checkout/v2/pay')) {
-                $b = json_decode((string) $body, true);
+            if ($m === 'POST' && str_ends_with($url, '/payment_links')) {
+                return ['status' => 200, 'body' => json_encode(['id' => 'plink_TestLink01', 'short_url' => 'https://rzp.io/i/LinkAbc', 'amount' => $o['echo'] ?? $b['amount'], 'accept_partial' => false, 'status' => 'created'])];
+            }
+            if ($m === 'POST' && str_contains($url, '/payment_links/') && str_ends_with($url, '/cancel')) {
+                return ['status' => 200, 'body' => json_encode(['status' => 'cancelled'])];
+            }
+            if ($m === 'GET' && str_contains($url, '/payments/qr_codes/') && str_contains($url, '/payments')) {
+                $items = isset($o['paid']) ? [['id' => 'pay_QrPaid0001', 'amount' => $o['paid'], 'status' => $o['payStatus'] ?? 'captured']] : [];
 
-                return ['status' => 200, 'body' => json_encode(['orderId' => 'OMO123', 'state' => 'PENDING', 'redirectUrl' => 'https://mercury-uat.phonepe.com/transact/pay?token=abc', 'echo' => $b['amount']])];
+                return ['status' => $o['http'] ?? 200, 'body' => json_encode(['entity' => 'collection', 'count' => count($items), 'items' => $items])];
             }
-            if (str_contains($url, '/status')) {
-                $amount = $o['amount'] ?? null;
-                preg_match('#/order/([^/]+)/status#', $url, $mm);
-                $order = Database::one('SELECT amount_minor FROM gateway_orders WHERE merchant_order_id = ?', [rawurldecode($mm[1] ?? '')]);
+            if ($m === 'GET' && str_contains($url, '/payment_links/')) {
+                $paid = $o['paid'] ?? 0;
 
-                return ['status' => $o['http'] ?? 200, 'body' => json_encode(['orderId' => 'OMO123', 'state' => $this->phonepeState['state'], 'amount' => $amount ?? (int) ($order['amount_minor'] ?? 0),
-                    'paymentDetails' => [['transactionId' => 'OMO-TXN-777', 'state' => $this->phonepeState['state'], 'paymentMode' => 'UPI_INTENT']]])];
+                return ['status' => $o['http'] ?? 200, 'body' => json_encode(['id' => 'plink_TestLink01', 'status' => $o['state'] ?? ($paid > 0 ? 'paid' : 'created'), 'amount' => 100000, 'amount_paid' => $paid,
+                    'payments' => $paid > 0 ? [['payment_id' => 'pay_LinkPaid01', 'amount' => $paid, 'status' => 'captured']] : null])];
             }
 
             return ['status' => 404, 'body' => '{}'];
@@ -610,129 +625,129 @@ final class Phase12ServiceTest extends DatabaseTestCase
         return InvoiceService::find($d['public_id']);
     }
 
-    private function auth(string $u = 'hook-user', string $p = 'hook-pass-123'): string
-    {
-        return hash('sha256', $u . ':' . $p);
-    }
-
     /** A member of the KIS team asks for an amount (paise) on an invoice. @return array<string,mixed> */
     private function requestPay(array $inv, int $minor = 100000, ?int $by = null): array
     {
-        return PhonePeGateway::createRequest($by ?? $this->finance, $inv, $minor, '');
+        return RazorpayGateway::createRequest($by ?? $this->finance, $inv, $minor, '');
+    }
+
+    private function sign(string $body, string $secret = 'whsec_test_123'): string
+    {
+        return hash_hmac('sha256', $body, $secret);
     }
 
     public function testOnlyTheTeamCanRequestAPaymentAndTheAmountIsExactlyWhatTheyType(): void
     {
         $calls = [];
-        $this->fakePhonePe($calls);
+        $this->fakeRazorpay($calls);
         $inv = $this->issuedInvoice('1000');
-        $this->invalid(fn () => $this->requestPay($inv), 'not switched on'); // PhonePe is off
-        $this->phonepeOn();
-        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->client));    // a client cannot start one
+        $this->invalid(fn () => $this->requestPay($inv), 'not switched on');
+        $this->razorpayOn();
+        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->client));
         $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->client2));
-        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->dev));        // nor can staff without the permission
-        $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/pay')), 'no gateway call for refused users');
-        // the amount typed is the amount asked: a part payment of Rs 250.50
+        $this->forbidden(fn () => $this->requestPay($inv, 100000, $this->dev));
+        $this->assertSame([], $calls, 'no call to Razorpay for refused users');
         $o = $this->requestPay($inv, 25050);
-        $this->assertSame(['pending', 25050, (int) $inv['id'], $this->finance], [$o['status'], (int) $o['amount_minor'], (int) $o['invoice_id'], (int) $o['created_by']]);
+        $this->assertSame(['pending', 25050, (int) $inv['id'], $this->finance, 'razorpay'], [$o['status'], (int) $o['amount_minor'], (int) $o['invoice_id'], (int) $o['created_by'], $o['provider']]);
         $this->assertMatchesRegularExpression('/^KIS\d+X[A-F0-9]{12}$/', $o['merchant_order_id']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c'], 'requesting is not paying');
-        $sent = array_values(array_filter($this->lastBodies, fn ($b) => isset($b['amount'])));
-        $this->assertSame([25050], array_unique(array_column($sent, 'amount')), 'every call to PhonePe carried exactly the typed amount');
-        // limits: at least Rs 1, at most what is still due, nothing on a paid/void invoice or non-https site
+        $amounts = array_values(array_filter(array_map(fn ($b) => $b['payment_amount'] ?? $b['amount'] ?? null, $this->lastBodies), fn ($a) => $a !== null));
+        $this->assertSame([25050], array_values(array_unique($amounts)), 'every call to Razorpay carried exactly the typed amount');
         $this->invalid(fn () => $this->requestPay($inv, 99), 'smallest');
         $this->invalid(fn () => $this->requestPay($inv, 100001), 'more than');
         Config::set('app.url', 'http://vis.test');
         $this->invalid(fn () => $this->requestPay($inv, 100000), 'not switched on');
     }
 
-    public function testADirectUpiQrIsUsedWhenPhonePeReturnsOneAndAWrongAmountInItIsRefused(): void
+    public function testAFixedAmountUpiQrIsUsedWhenRazorpayReturnsItsUpiStringAndAWrongAmountIsRefused(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls, ['qr' => 'upi://pay?pa=merchant@ybl&pn=Krazy&am=250.50&cu=INR&tr=ORD1']);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=rzpqr.x@icici&pn=Krazy&am=250.50&cu=INR&tr=QR1']);
         $inv = $this->issuedInvoice('1000');
         $o = $this->requestPay($inv, 25050);
-        $this->assertSame('upi_qr', $o['flow']);
+        $this->assertSame(['upi_qr', 'qr_TestQr0001', 'https://rzp.io/i/AbCdEf'], [$o['flow'], $o['provider_order_id'], $o['qr_image_url']]);
         $this->assertStringContainsString('am=250.50', $o['qr_payload']);
-        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_contains($c, '/payments/v2/pay')));
-        $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/checkout/v2/pay')), 'no fallback needed');
+        $qrBody = array_values(array_filter($this->lastBodies, fn ($b) => ($b['type'] ?? '') === 'upi_qr'))[0];
+        $this->assertSame(['single_use', true, 25050], [$qrBody['usage'], $qrBody['fixed_amount'], $qrBody['payment_amount']]);
+        $this->assertGreaterThanOrEqual(time() + 120, $qrBody['close_by'], 'Razorpay needs at least two minutes');
+        $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/payment_links')), 'no link needed');
 
-        // a QR that asks for a different amount is never shown
-        $this->fakePhonePe($calls, ['qr' => 'upi://pay?pa=merchant@ybl&am=999.00&tr=ORD2']);
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=rzpqr.x@icici&am=999.00&tr=QR2']);
         $this->invalid(fn () => $this->requestPay($inv, 25050), 'different amount');
         $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c'], 'the mismatching request was not stored');
 
-        // direct mode with no QR from PhonePe refuses instead of falling back; auto mode falls back to the hosted page
-        $this->fakePhonePe($calls);
-        Config::set('phonepe.qr_mode', 'direct');
-        $this->invalid(fn () => $this->requestPay($inv, 25050), 'UPI QR');
-        Config::set('phonepe.qr_mode', 'auto');
-        $o2 = $this->requestPay($inv, 25050);
-        $this->assertSame('checkout_link', $o2['flow']);
-        $this->assertStringStartsWith('https://mercury-uat.phonepe.com/', $o2['qr_payload']);
-        Config::set('phonepe.qr_mode', 'auto');
+        $this->fakeRazorpay($calls, ['echo' => 100]); // Razorpay answers for another amount
+        $this->invalid(fn () => $this->requestPay($inv, 25050), 'different amount');
+        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
     }
 
-    public function testARequestCanBeWithdrawnAndALatePaymentIsStillRecorded(): void
+    public function testAPaymentLinkForTheExactAmountIsUsedWhenThereIsNoUsableQr(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['qr' => false]); // the QR feature is not enabled on the account
+        $inv = $this->issuedInvoice('1000');
+        $o = $this->requestPay($inv, 25050);
+        $this->assertSame(['payment_link', 'plink_TestLink01', 'https://rzp.io/i/LinkAbc'], [$o['flow'], $o['provider_order_id'], $o['qr_payload']]);
+        $link = array_values(array_filter($this->lastBodies, fn ($b) => isset($b['reference_id'])))[0];
+        $this->assertSame([25050, 'INR', false, $o['merchant_order_id']], [$link['amount'], $link['currency'], $link['accept_partial'], $link['reference_id']]);
+        $this->assertGreaterThanOrEqual(time() + 15 * 60, $link['expire_by'], 'Razorpay payment links must live at least 15 minutes');
+
+        // a QR with no UPI string is closed so there is never a second way to pay, then the link is used
+        $this->fakeRazorpay($calls); // QR answer without image_content
+        $o2 = $this->requestPay($inv, 10000);
+        $this->assertSame('payment_link', $o2['flow']);
+        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_contains($c, '/payments/qr_codes/qr_TestQr0001/close')));
+        // link-only mode never touches the QR API
+        Config::set('razorpay.qr_mode', 'link');
+        $calls = [];
+        $this->fakeRazorpay($calls);
+        $this->requestPay($inv, 10000);
+        $this->assertSame([], array_filter($calls, fn ($c) => str_contains($c, '/qr_codes')));
+        // a link for a different amount is cancelled and refused
+        $this->fakeRazorpay($calls, ['echo' => 5]);
+        $this->invalid(fn () => $this->requestPay($inv, 10000), 'different amount');
+        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_contains($c, '/cancel')));
+    }
+
+    public function testAPaymentIsRecordedOnlyWhenRazorpayHasACapturedPaymentOfExactlyTheAmount(): void
+    {
+        $calls = [];
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q']);
         $inv = $this->issuedInvoice('1000');
         $o = $this->requestPay($inv, 100000);
-        $this->assertTrue(PhonePeGateway::isLive($o));
-        $this->forbidden(fn () => PhonePeGateway::cancelRequest($this->client, $o));
-        PhonePeGateway::cancelRequest($this->finance, $o);
-        $o = PhonePeGateway::findRequest($o['public_id']);
-        $this->assertSame('cancelled', $o['status']);
-        $this->assertFalse(PhonePeGateway::isLive($o));
-        $this->assertSame([], PhonePeGateway::liveRequests((int) $inv['id']));
-        $this->invalid(fn () => PhonePeGateway::cancelRequest($this->finance, $o), 'no longer open');
-        // the customer had already paid: PhonePe says COMPLETED, so the money is recorded
-        $this->phonepeState['state'] = 'COMPLETED';
-        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], PhonePeGateway::reconcile($o['merchant_order_id']));
-        $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
-    }
-
-    public function testAPaymentIsRecordedOnlyAfterTheStatusApiSaysCompletedForTheRightAmount(): void
-    {
-        $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls);
-        $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
-        $this->assertSame(['state' => 'PENDING', 'recorded' => false], PhonePeGateway::reconcile($mid));
+        $mid = $o['merchant_order_id'];
+        $this->assertSame(['state' => 'PENDING', 'recorded' => false], RazorpayGateway::reconcile($mid));
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        $this->phonepeState['state'] = 'COMPLETED';
-        $r = PhonePeGateway::reconcile($mid);
-        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], $r);
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q', 'paid' => 100000, 'payStatus' => 'authorized']);
+        $this->assertSame('PENDING', RazorpayGateway::reconcile($mid)['state'], 'authorized is not captured');
+        $this->fakeRazorpay($calls, ['paid' => 100000]);
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], RazorpayGateway::reconcile($mid));
         $p = Database::one('SELECT * FROM client_payments');
         $this->assertSame(['verified', 'gateway', 'gateway', 100000, (int) $inv['id']], [$p['status'], $p['source'], $p['method'], (int) $p['gross_minor'], (int) $p['invoice_id']]);
-        $this->assertSame('PhonePe OMO-TXN-777', $p['external_ref']);
+        $this->assertSame('Razorpay pay_QrPaid0001', $p['external_ref']);
         $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
-        $o = Database::one('SELECT * FROM gateway_orders');
-        $this->assertSame(['completed', 'OMO-TXN-777', (int) $p['id']], [$o['status'], $o['provider_txn_id'], (int) $o['payment_id']]);
-        // asking again (browser return + webhook + scheduler) never doubles the payment
-        $this->assertSame(['state' => 'COMPLETED', 'recorded' => false], PhonePeGateway::reconcile($mid));
+        $row = Database::one('SELECT * FROM gateway_orders');
+        $this->assertSame(['completed', 'pay_QrPaid0001', (int) $p['id']], [$row['status'], $row['provider_txn_id'], (int) $row['payment_id']]);
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => false], RazorpayGateway::reconcile($mid), 'asking again never doubles the payment');
         $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
         $this->assertNotNull(Database::one("SELECT 1 x FROM notifications WHERE user_id = ? AND event_type = 'payment.confirmed'", [$this->client]));
         $this->assertNotNull(Database::one("SELECT 1 x FROM audit_logs WHERE action = 'client_payment.gateway_recorded'"));
-        // an unknown order id is a 404, not a payment
-        $this->forbidden(fn () => PhonePeGateway::reconcile('VIS999XAAAAAAAAAAAA'));
+        $this->forbidden(fn () => RazorpayGateway::reconcile('KIS999XAAAAAAAAAAAA'));
     }
 
-    public function testAnAmountMismatchRecordsNothingAndIsLogged(): void
+    public function testAPaymentLinkThatIsPaidIsRecordedAndAnAmountMismatchRecordsNothing(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls, ['state' => 'COMPLETED', 'amount' => 100]);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['qr' => false]);
         $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
+        $o = $this->requestPay($inv, 100000);
+        $this->fakeRazorpay($calls, ['paid' => 5000, 'state' => 'partially_paid']); // somebody paid a different amount
         try {
-            PhonePeGateway::reconcile($mid);
+            RazorpayGateway::reconcile($o['merchant_order_id']);
             $this->fail('expected a refusal');
         } catch (\RuntimeException $e) {
             $this->assertStringContainsString('different amount', $e->getMessage());
@@ -740,35 +755,44 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
         $this->assertSame('pending', Database::one('SELECT status FROM gateway_orders')['status']);
         $this->assertNotNull(Database::one("SELECT 1 x FROM audit_logs WHERE action = 'gateway.amount_mismatch'"));
-        $this->assertSame('issued', InvoiceService::find($inv['public_id'])['status']);
+        $this->fakeRazorpay($calls, ['paid' => 100000]);
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], RazorpayGateway::reconcile($o['merchant_order_id']));
+        $this->assertSame('Razorpay pay_LinkPaid01', Database::one('SELECT external_ref FROM client_payments')['external_ref']);
+        $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
     }
 
-    public function testAFailedPaymentMarksTheOrderFailedAndAllowsAFreshAttempt(): void
+    public function testARequestCanBeWithdrawnAndALatePaymentIsStillRecorded(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls, ['state' => 'FAILED']);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q']);
         $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
-        $this->assertSame(['state' => 'FAILED', 'recorded' => false], PhonePeGateway::reconcile($mid));
-        $this->assertSame('failed', Database::one('SELECT status FROM gateway_orders')['status']);
-        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        $this->requestPay(InvoiceService::find($inv['public_id'])); // a failed attempt does not block a retry
-        $this->assertSame(2, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
+        $o = $this->requestPay($inv, 100000);
+        $this->assertTrue(RazorpayGateway::isLive($o));
+        $this->forbidden(fn () => RazorpayGateway::cancelRequest($this->client, $o));
+        RazorpayGateway::cancelRequest($this->finance, $o);
+        $o = RazorpayGateway::findRequest($o['public_id']);
+        $this->assertSame('cancelled', $o['status']);
+        $this->assertFalse(RazorpayGateway::isLive($o));
+        $this->assertSame([], RazorpayGateway::liveRequests((int) $inv['id']));
+        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_contains($c, '/payments/qr_codes/qr_TestQr0001/close')), 'Razorpay is asked to close the QR');
+        $this->invalid(fn () => RazorpayGateway::cancelRequest($this->finance, $o), 'no longer open');
+        $this->fakeRazorpay($calls, ['paid' => 100000]); // the customer had already paid
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], RazorpayGateway::reconcile($o['merchant_order_id']));
+        $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
     }
 
     public function testStatusApiErrorsNeverRecordAPayment(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls, ['state' => 'COMPLETED', 'http' => 500]);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q']);
         $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
+        $o = $this->requestPay($inv, 100000);
+        $this->fakeRazorpay($calls, ['paid' => 100000, 'http' => 500]);
         $this->expectException(\RuntimeException::class);
         try {
-            PhonePeGateway::reconcile($mid);
+            RazorpayGateway::reconcile($o['merchant_order_id']);
         } finally {
             $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
         }
@@ -777,86 +801,71 @@ final class Phase12ServiceTest extends DatabaseTestCase
     public function testWebhookNeedsTheRightSignatureAndTheBodyIsNeverBelieved(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls); // PhonePe's own status API says PENDING
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q']);
         $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
-        $body = json_encode(['event' => 'checkout.order.completed', 'payload' => ['merchantOrderId' => $mid, 'state' => 'COMPLETED', 'amount' => 100000]]);
-        $this->assertSame(401, PhonePeGateway::webhook('', $body)['status']);
-        $this->assertSame(401, PhonePeGateway::webhook('wrong', $body)['status']);
-        $this->assertSame(401, PhonePeGateway::webhook($this->auth('hook-user', 'other-pass'), $body)['status']);
-        $this->assertSame(401, PhonePeGateway::webhook(strtoupper($this->auth()) . 'x', $body)['status']);
-        // correct signature but a lying body: the status API says PENDING, so nothing is recorded
-        $r = PhonePeGateway::webhook($this->auth(), (string) $body);
-        $this->assertSame(['status' => 200, 'outcome' => 'pending'], $r);
+        $o = $this->requestPay($inv, 100000);
+        $mid = $o['merchant_order_id'];
+        $body = json_encode(['event' => 'qr_code.credited', 'payload' => ['qr_code' => ['entity' => ['id' => 'qr_TestQr0001']], 'payment' => ['entity' => ['id' => 'pay_Fake', 'amount' => 100000, 'status' => 'captured', 'notes' => ['merchant_order_id' => $mid]]]]]);
+        $this->assertSame(401, RazorpayGateway::webhook('', (string) $body)['status']);
+        $this->assertSame(401, RazorpayGateway::webhook($this->sign((string) $body, 'wrong-secret'), (string) $body)['status']);
+        $this->assertSame(401, RazorpayGateway::webhook($this->sign((string) $body . ' '), (string) $body)['status'], 'signature of different bytes');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        // now PhonePe really completes it; the webhook (with "SHA256(...)" style header) triggers the record
-        $this->phonepeState['state'] = 'COMPLETED';
-        $r = PhonePeGateway::webhook('SHA256(' . $this->auth() . ')' === '' ? '' : $this->auth(), (string) $body);
-        $this->assertSame(['status' => 200, 'outcome' => 'completed'], $r);
+        // a correctly signed webhook claiming a payment: the server asks Razorpay, which says nothing was paid
+        $r = RazorpayGateway::webhook($this->sign((string) $body), (string) $body, 'evt_1');
+        $this->assertSame(['status' => 200, 'outcome' => 'pending'], $r);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c'], 'the claim in the body is not believed');
+        // once Razorpay itself reports the payment, the same webhook records it exactly once, even when delivered twice
+        $this->fakeRazorpay($calls, ['paid' => 100000]);
+        $this->assertSame(['status' => 200, 'outcome' => 'completed'], RazorpayGateway::webhook($this->sign((string) $body), (string) $body, 'evt_2'));
+        RazorpayGateway::webhook($this->sign((string) $body), (string) $body, 'evt_2');
         $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        // replays and duplicates are harmless
-        PhonePeGateway::webhook($this->auth(), (string) $body);
-        PhonePeGateway::webhook($this->auth(), (string) $body);
-        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
-        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM gateway_webhook_events')['c'], 'identical deliveries are stored once');
-        // junk and unrelated orders are acknowledged and ignored
-        $this->assertSame(['status' => 200, 'outcome' => 'ignored'], PhonePeGateway::webhook($this->auth(), 'not json'));
-        $this->assertSame(['status' => 200, 'outcome' => 'ignored'], PhonePeGateway::webhook($this->auth(), json_encode(['payload' => ['merchantOrderId' => "x'; DROP TABLE users;--"]])));
-        $this->assertSame(['status' => 200, 'outcome' => 'unknown_order'], PhonePeGateway::webhook($this->auth(), json_encode(['payload' => ['merchantOrderId' => 'VIS9999XABCDEF123456']])));
-        $this->assertNotNull(Database::one("SHOW TABLES LIKE 'users'"));
+        $this->assertSame(2, (int) Database::one("SELECT COUNT(*) c FROM gateway_webhook_events WHERE provider = 'razorpay'")['c'], 'events are logged once per event id');
+        // unknown or malformed bodies are acknowledged without effect
+        $this->assertSame(['status' => 200, 'outcome' => 'ignored'], RazorpayGateway::webhook($this->sign('not json'), 'not json'));
+        $none = json_encode(['event' => 'payment.captured', 'payload' => ['payment' => ['entity' => ['id' => 'pay_X']]]]);
+        $this->assertSame(['status' => 200, 'outcome' => 'ignored'], RazorpayGateway::webhook($this->sign((string) $none), (string) $none));
+        $unk = json_encode(['payload' => ['payment_link' => ['entity' => ['id' => 'plink_Unknown0001', 'notes' => ['merchant_order_id' => 'KIS99X0123456789AB']]]]]);
+        $this->assertSame(['status' => 200, 'outcome' => 'unknown_order'], RazorpayGateway::webhook($this->sign((string) $unk), (string) $unk));
     }
 
-    public function testWebhookIsRefusedWhenNoWebhookCredentialsAreSaved(): void
+    public function testWebhookIsRefusedWhenNoWebhookSecretIsSaved(): void
     {
-        $this->phonepeOn(false);
-        $this->assertSame(401, PhonePeGateway::webhook($this->auth('', ''), '{}')['status'], 'an empty username/password can never match');
-        $this->assertSame(401, PhonePeGateway::webhook(hash('sha256', ':'), '{}')['status']);
-    }
-
-    public function testASecondStartWhileOneIsPendingAndLowBalancesAreHandled(): void
-    {
-        $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls);
-        $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        // the staff verify a partial manual payment; PhonePe asks only for what is still due
-        $this->phonepeState['state'] = 'COMPLETED';
-        $mid = (string) Database::one('SELECT merchant_order_id FROM gateway_orders')['merchant_order_id'];
-        PhonePeGateway::reconcile($mid);
-        $paid = InvoiceService::find($inv['public_id']);
-        $this->assertSame('paid', $paid['status']);
-        $this->invalid(fn () => $this->requestPay($paid), 'issued invoice'); // already paid: not payable
+        $this->razorpayOn(false);
+        $this->assertSame(401, RazorpayGateway::webhook('', '{}')['status']);
+        $this->assertSame(401, RazorpayGateway::webhook(hash_hmac('sha256', '{}', ''), '{}')['status'], 'an empty secret can never match');
     }
 
     public function testReconcilePendingPicksUpOrdersTheCustomerNeverReturnedFrom(): void
     {
         $calls = [];
-        $this->phonepeOn();
-        $this->fakePhonePe($calls);
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, ['upi' => 'upi://pay?pa=x@icici&am=1000.00&tr=Q']);
         $inv = $this->issuedInvoice('1000');
-        $this->requestPay($inv);
-        $this->phonepeState['state'] = 'COMPLETED';
-        $this->assertSame(0, PhonePeGateway::reconcilePending(), 'too new: the customer may still be on the PhonePe page');
+        $this->requestPay($inv, 100000);
+        $this->fakeRazorpay($calls, ['paid' => 100000]);
+        $this->assertSame(0, RazorpayGateway::reconcilePending(), 'too new: the customer may still be paying');
         Database::run('UPDATE gateway_orders SET created_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 10 MINUTE)');
-        $this->assertSame(1, PhonePeGateway::reconcilePending());
+        $this->assertSame(1, RazorpayGateway::reconcilePending());
         $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
-        $this->assertSame(0, PhonePeGateway::reconcilePending());
-        Config::set('phonepe.enabled', false);
-        $this->assertSame(0, PhonePeGateway::reconcilePending());
+        $this->assertSame(0, RazorpayGateway::reconcilePending());
+        Config::set('razorpay.enabled', false);
+        $this->assertSame(0, RazorpayGateway::reconcilePending());
     }
 
     public function testStatusExplainsWhatIsMissing(): void
     {
-        $this->assertFalse(PhonePeGateway::status()['ready']);
-        $this->phonepeOn(false);
-        $s = PhonePeGateway::status();
+        $this->assertFalse(RazorpayGateway::status()['ready']);
+        $this->razorpayOn(false);
+        $s = RazorpayGateway::status();
         $this->assertTrue($s['ready']);
         $this->assertStringContainsString('webhook', $s['reason']);
+        $this->assertStringContainsString('Test mode', $s['reason']);
+        $this->assertSame('test', RazorpayGateway::mode());
+        Config::set('razorpay.key_id', 'rzp_live_Abc');
+        $this->assertSame('live', RazorpayGateway::mode());
         Config::set('app.url', 'http://insecure.test');
-        $this->assertFalse(PhonePeGateway::status()['ready']);
-        $this->assertFalse(PhonePeGateway::enabled());
+        $this->assertFalse(RazorpayGateway::status()['ready']);
+        $this->assertFalse(RazorpayGateway::enabled());
     }
 }

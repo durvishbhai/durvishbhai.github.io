@@ -151,6 +151,7 @@ Nothing below has been assumed in code. Each blocks the phase shown. Items marke
 | D-108 | The database backup is a streamed `.sql` produced from one consistent snapshot, Owner only with password re-entry, deleted from the server right after sending. | Standard restore through phpMyAdmin; minimal exposure of a file that holds everything. |
 | D-109 | Every field of the job application is required and validated on the server; the form's labels and drop-down lists are editable, the requirement is not. | The business asked that nothing be optional. |
 | D-110 | Colour theme is a per-browser choice (light/dark, default from the device) applied by an external script before paint. | Works with the strict CSP; no account setting needed. |
+| D-111 | **Online payments are Razorpay only; PhonePe and Google Pay were removed** (D-95, D-106 and D-107 now apply to Razorpay: team-requested exact-amount QR, server-side verification of a captured payment of exactly that amount, HMAC-signed webhook that only triggers a check). The QR is a Razorpay UPI QR when Razorpay returns its UPI string, otherwise a Payment Link QR; a QR that cannot be used is closed first. | The business chose Razorpay as its payment provider; one gateway means one thing to configure, test and audit. |
 
 ## External integrations and credentials
 

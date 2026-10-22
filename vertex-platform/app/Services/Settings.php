@@ -9,7 +9,7 @@ use Vertex\Core\Database;
 use Vertex\Core\ValidationException;
 
 /**
- * Module 35: the Integration Center's settings store. A fixed, reviewed list of settings (company facts, email, AI, PhonePe, feature switches) can be changed in
+ * Module 35: the Integration Center's settings store. A fixed, reviewed list of settings (company facts, email, AI, Razorpay, feature switches) can be changed in
  * the admin area instead of editing .env. Values live in `app_settings`; secrets are sealed with SecretBox (key from APP_KEY, which stays in .env) and are
  * write-only: they are never shown again, never put in the audit log and never sent to the browser.
  *
@@ -62,14 +62,11 @@ final class Settings
             'ai.model' => ['group' => 'ai', 'label' => 'Model name', 'type' => 'text'],
             'ai.api_key' => ['group' => 'ai', 'label' => 'API key', 'type' => 'secret'],
             'ai.monthly_cap' => ['group' => 'ai', 'label' => 'Most AI requests per month (whole company)', 'type' => 'int'],
-            'phonepe.enabled' => ['group' => 'phonepe', 'label' => 'Accept payments through PhonePe', 'type' => 'bool'],
-            'phonepe.environment' => ['group' => 'phonepe', 'label' => 'Environment', 'type' => 'select', 'options' => ['sandbox' => 'Sandbox (test money)', 'production' => 'Production (real money)']],
-            'phonepe.client_id' => ['group' => 'phonepe', 'label' => 'Client ID', 'type' => 'text'],
-            'phonepe.client_secret' => ['group' => 'phonepe', 'label' => 'Client secret', 'type' => 'secret'],
-            'phonepe.qr_mode' => ['group' => 'phonepe', 'label' => 'How the payment QR is made', 'type' => 'select', 'options' => ['auto' => 'Automatic (UPI QR, else PhonePe checkout link)', 'direct' => 'UPI QR only', 'checkout' => 'PhonePe checkout link only'], 'help' => 'The QR always carries exactly the amount the team entered.'],
-            'phonepe.client_version' => ['group' => 'phonepe', 'label' => 'Client version', 'type' => 'text'],
-            'phonepe.webhook_username' => ['group' => 'phonepe', 'label' => 'Webhook username', 'type' => 'text'],
-            'phonepe.webhook_password' => ['group' => 'phonepe', 'label' => 'Webhook password', 'type' => 'secret'],
+            'razorpay.enabled' => ['group' => 'razorpay', 'label' => 'Accept online payments through Razorpay', 'type' => 'bool'],
+            'razorpay.key_id' => ['group' => 'razorpay', 'label' => 'Key ID', 'type' => 'text', 'help' => 'From the Razorpay Dashboard → Account & Settings → API Keys. Starts with rzp_test_ (test mode, no real money) or rzp_live_ (live).'],
+            'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
+            'razorpay.webhook_secret' => ['group' => 'razorpay', 'label' => 'Webhook secret', 'type' => 'secret', 'help' => 'The secret you type when you add the webhook in the Razorpay Dashboard.'],
+            'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How the payment QR is made', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only'], 'help' => 'Either way the QR carries exactly the amount the team entered.'],
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],
@@ -80,7 +77,7 @@ final class Settings
     /** @return array<string,string> */
     public static function groups(): array
     {
-        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'phonepe' => 'PhonePe payments', 'features' => 'Feature switches'];
+        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'features' => 'Feature switches'];
     }
 
     private static function isSecret(string $key): bool

@@ -47,11 +47,9 @@ final class SystemStatus
         $root = FileStore::root();
         $add('Files', 'Upload folder', is_dir($root) && is_writable($root) ? 'ok' : 'warn', is_dir($root) && is_writable($root) ? 'writable' : 'missing or not writable');
         $add('Billing', 'Business details on invoices', BusinessProfile::isComplete() ? 'ok' : 'warn', BusinessProfile::isComplete() ? 'set' : 'NOT SET: invoices cannot be issued (Administration → Business details)');
-        $upi = GatewayConfig::status(GatewayConfig::UPI);
-        $add('Billing', 'Google Pay by UPI', $upi['state'] === 'ready' ? 'ok' : 'warn', $upi['label'] . ($upi['state'] === 'ready' ? '. Each payment is verified by staff against the bank; nothing is confirmed automatically.' : ''));
-        $api = GatewayConfig::status(GatewayConfig::API);
-        $add('Billing', 'Google Pay API (cards through a processor)', 'warn', $api['state'] === 'not_configured' ? 'Not configured. Not available: it needs a payment processor integration that is not installed.' : 'Fields saved but NOT ACTIVE: no processor integration is installed, so no card payment is taken or confirmed.');
-        $add('Billing', 'Automatic payment confirmation (webhooks)', 'info', 'Not built. Payments are confirmed by staff.');
+        $rz = RazorpayGateway::status();
+        $add('Billing', 'Razorpay online payments', $rz['ready'] ? 'ok' : 'warn', $rz['ready'] ? 'on' . ($rz['reason'] !== '' ? '. ' . $rz['reason'] : '') : 'off: ' . $rz['reason']);
+        $add('Billing', 'Automatic payment confirmation (webhook)', (string) Config::get('razorpay.webhook_secret') !== '' ? 'ok' : 'info', (string) Config::get('razorpay.webhook_secret') !== '' ? 'Razorpay webhook secret saved' : 'No Razorpay webhook secret saved: online payments are noticed when the request page is open or the scheduled check runs.');
 
         return $rows;
     }

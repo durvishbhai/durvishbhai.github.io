@@ -69,7 +69,7 @@ final class RenewalScheduler
                 'agreements' => static fn () => AgreementService::expireDue(),
                 'automation' => static fn () => AutomationService::run($today),
                 'cms_published' => static fn () => CmsService::publishDue(),
-                'gateway_reconciled' => static fn () => PhonePeGateway::reconcilePending(),
+                'gateway_reconciled' => static fn () => RazorpayGateway::reconcilePending(),
             ] as $job => $fn) {
                 try {
                     $summary[$job] = $fn();

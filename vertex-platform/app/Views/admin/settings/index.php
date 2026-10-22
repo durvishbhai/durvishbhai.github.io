@@ -1,4 +1,4 @@
-<?php /** @var array<string,string> $groups */ /** @var array<string,list<array<string,mixed>>> $screen */ /** @var array{ready:bool,reason:string} $phonepe */ /** @var array{ready:bool,reason:string,used:int,cap:int} $ai */ /** @var string $webhookUrl */
+<?php /** @var array<string,string> $groups */ /** @var array<string,list<array<string,mixed>>> $screen */ /** @var array{ready:bool,reason:string} $razorpay */ /** @var array{ready:bool,reason:string,used:int,cap:int} $ai */ /** @var string $webhookUrl */
 $canManage = can('settings.manage'); ?>
 <div class="page-head"><div><p class="eyebrow">Administration</p><h1>Integrations &amp; settings</h1></div></div>
 <p class="muted">Company facts, email, storage, AI, payments and feature switches in one place. A value saved here replaces the one in the server's <code>.env</code> file; "Use the default again" removes it. Secrets (passwords, keys) are stored encrypted and are never shown again — leave a secret box empty to keep the saved one.</p>
@@ -6,11 +6,11 @@ $canManage = can('settings.manage'); ?>
 <nav class="tabs" aria-label="Settings sections"><?php foreach ($groups as $g => $label) : ?><a href="#<?= e($g) ?>"><?= e($label) ?></a><?php endforeach; ?></nav>
 <?php foreach ($groups as $g => $label) : ?>
 <div class="panel" id="<?= e($g) ?>"><h2><?= e($label) ?>
-    <?php if ($g === 'phonepe') : ?><span class="badge badge-sys-<?= $phonepe['ready'] ? 'ok' : 'warn' ?>"><?= $phonepe['ready'] ? 'Ready' : 'Not ready' ?></span><?php endif; ?>
+    <?php if ($g === 'razorpay') : ?><span class="badge badge-sys-<?= $razorpay['ready'] ? 'ok' : 'warn' ?>"><?= $razorpay['ready'] ? 'Ready' : 'Not ready' ?></span><?php endif; ?>
     <?php if ($g === 'ai') : ?><span class="badge badge-sys-<?= $ai['ready'] ? 'ok' : 'warn' ?>"><?= $ai['ready'] ? 'Ready' : 'Off' ?></span><?php endif; ?></h2>
-    <?php if ($g === 'phonepe') : ?>
-        <?php if ($phonepe['reason'] !== '') : ?><p class="muted"><?= e($phonepe['reason']) ?></p><?php endif; ?>
-        <p class="muted">In the PhonePe merchant dashboard set the webhook address to <code class="prewrap"><?= e($webhookUrl) ?></code> and choose the same username and password you save below. Payments are recorded only after the server has asked PhonePe's status API and received COMPLETED for the right amount. Try the sandbox first (see docs/18).</p>
+    <?php if ($g === 'razorpay') : ?>
+        <?php if ($razorpay['reason'] !== '') : ?><p class="muted"><?= e($razorpay['reason']) ?></p><?php endif; ?>
+        <p class="muted">In the Razorpay Dashboard → Account &amp; Settings → Webhooks, add the address <code class="prewrap"><?= e($webhookUrl) ?></code>, tick <em>payment.captured</em>, <em>qr_code.credited</em>, <em>payment_link.paid</em> (and <em>qr_code.closed</em>), and type the same secret you save below. Payments are recorded only after the server has asked Razorpay and found a captured payment of exactly the requested amount; the webhook only tells us when to ask. Try it with test keys (<code>rzp_test_…</code>) first.</p>
     <?php elseif ($g === 'ai') : ?>
         <?php if ($ai['reason'] !== '') : ?><p class="muted"><?= e($ai['reason']) ?></p><?php endif; ?>
         <p class="muted">Requests this month: <?= (int) $ai['used'] ?> of <?= (int) $ai['cap'] ?>. The assistant only drafts text; it never saves, sends or approves anything, and it only sees records the person asking may open.</p>

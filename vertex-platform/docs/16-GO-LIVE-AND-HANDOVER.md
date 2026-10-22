@@ -1,15 +1,15 @@
 # 16 · Go-live assessment and handover package
 
-Last updated: 2026-10-14 (after Phase 12) · Branch `ccr-13b48464-fpb2gp` · Environment tested: PHP 8.3.6, MariaDB 10.11, Chromium, development container. **Nothing has been deployed to a real host, no live payment has been taken, no live AI or PhonePe call has been made, and no secret is in this repository or in this document.**
+Last updated: 2026-10-14 (after Phase 12) · Branch `ccr-13b48464-fpb2gp` · Environment tested: PHP 8.3.6, MariaDB 10.11, Chromium, development container. **Nothing has been deployed to a real host, no live payment has been taken, no live AI or Razorpay call has been made, and no secret is in this repository or in this document.**
 
 ## 1. Verdict: is it ready for production?
 
 **Feature-complete against the 37 modules (with the stated exceptions), heavily tested in a development container — but not yet proven on a real host or against the live third-party services. Treat it as "ready for a staged go-live", not "ready to take real money tomorrow".**
 
 * **Ready in code (automated tests, 750+ passing):** everything in `19-REQUIREMENTS-TRACEABILITY.md` marked IT: accounts, 2FA, custom roles, audit chain, CRM, quotations, invoices, credit notes, PDFs, coupons, reports and charts, approval centre, clients, projects/tasks/templates/checklists, deliverables and client approval, revisions, scope requests, timestamp feedback, support with SLA, workflow rules, forms, agreements, referral commissions, payouts, renewals, global search, recycle bin, CSV import/export, website CMS with SEO, settings centre.
-* **Implemented but never exercised for real (labelled INT):** **PhonePe** (simulation only), **AI assistance** (simulation only), **SMTP delivery**, **Hostinger deployment and cron**, mobile layout of the Phase 9–12 screens.
+* **Implemented but never exercised for real (labelled INT):** **Razorpay** (simulation only), **AI assistance** (simulation only), **SMTP delivery**, **Hostinger deployment and cron**, mobile layout of the Phase 9–12 screens.
 * **Not built:** third-party e-sign, registrar/hosting provider APIs, WhatsApp/SMS, 2FA QR code, automated off-site backup and error alerting, free-form page builder (see `19` "Not built").
-* **Never exercised on the real host:** the web installer, cron, SMTP, HTTPS cookie behaviour behind the proxy, a restore on the real server, the `Authorization` header reaching PHP for the PhonePe webhook.
+* **Never exercised on the real host:** the web installer, cron, SMTP, HTTPS cookie behaviour behind the proxy, a restore on the real server, the Razorpay webhook (HMAC signature) reaching the server.
 
 ### Gate A — internal pilot (staff only, payments stay manual/UPI)
 No new development needed:
@@ -19,8 +19,8 @@ No new development needed:
 4. Backups: copy one off the server, store `APP_KEY` separately, do one real **restore drill** into an empty database and run `audit:verify`.
 5. Business decisions in §5 (at least D-60).
 
-### Gate B — customers paying online through PhonePe
-Needs inputs only you can supply and a test only the real service can give: PhonePe merchant credentials, then the **sandbox checklist in `18-PHASE12-CMS-AI-PHONEPE.md` §4** end to end (including a closed-tab payment and a webhook), then one real ₹1 production payment. Until that is done, keep UPI + staff verification as the payment method.
+### Gate B — customers paying online through Razorpay
+Needs inputs only you can supply and a test only the real service can give: Razorpay API keys (test first), then the **test-mode checklist in `18-PHASE12-CMS-AI-PHONEPE.md` §4** end to end (including a closed-tab payment and a webhook), then one real ₹1 production payment. Until that is done, keep UPI + staff verification as the payment method.
 
 ### Gate C — AI switched on
 Add an API key, try each helper on harmless data, confirm the monthly cap and the log (*ai_requests*). Keep it off if you do not want any record text to leave the server.
@@ -39,7 +39,7 @@ See **`19-REQUIREMENTS-TRACEABILITY.md`** for the module-by-module table (37 mod
 - [ ] One off-site backup copy exists, encrypted, and a **restore drill** passed on a clean database.
 - [ ] Terms, Privacy Policy and Referral Partner Terms reviewed by someone qualified; D-60 decided.
 - [ ] Staff briefed on what is manual: invoices, payments, provider renewals are recorded by hand.
-- [ ] PhonePe sandbox checklist completed (doc 18 §4) before telling clients they can pay online; no claim that WhatsApp or third-party e-signature exist.
+- [ ] Razorpay test-mode checklist completed (doc 18 §4) before telling clients they can pay online; no claim that WhatsApp or third-party e-signature exist.
 - [ ] Website pictures folder (`public_html/uploads/cms`) is writable and appears in a backup archive.
 
 ## 4. Handover package (what to give the operator; contains no secrets)

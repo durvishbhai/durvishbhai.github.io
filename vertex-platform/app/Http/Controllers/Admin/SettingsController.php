@@ -10,7 +10,7 @@ use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\AiService;
-use Vertex\Services\PhonePeGateway;
+use Vertex\Services\RazorpayGateway;
 use Vertex\Services\Settings;
 
 /** Module 35: Integration Center. Viewing needs `settings.view`; saving needs `settings.manage` and the actor's password. Secrets are write-only. */
@@ -20,7 +20,7 @@ final class SettingsController extends Controller
     public function index(Request $request, array $params = []): Response
     {
         $r = $this->page('admin/settings/index', ['title' => 'Integrations & settings', 'groups' => Settings::groups(), 'screen' => Settings::forScreen(),
-            'phonepe' => PhonePeGateway::status(), 'ai' => AiService::status(), 'webhookUrl' => rtrim((string) \Vertex\Core\Config::get('app.url'), '/') . '/webhooks/phonepe']);
+            'razorpay' => RazorpayGateway::status(), 'ai' => AiService::status(), 'webhookUrl' => rtrim((string) \Vertex\Core\Config::get('app.url'), '/') . '/webhooks/razorpay']);
         Session::forget('_old');
 
         return $r;

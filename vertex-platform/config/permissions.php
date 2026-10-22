@@ -129,8 +129,8 @@ $p = [
         'payments.pay' => 'Pay own invoices (client)',
         'payments.record' => 'Record payments',
         'payments.reconcile' => 'Reconcile payments with the gateway',
-        'payments.request' => 'Create PhonePe payment requests (exact-amount QR) for invoices',
-        'billing.configure' => 'Edit business details and the Google Pay settings',
+        'payments.request' => 'Create online payment requests (Razorpay, exact-amount QR) for invoices',
+        'billing.configure' => 'Edit the business details shown on invoices',
         'transactions.approve' => 'Approve financial transactions',
     ],
     'payouts' => [

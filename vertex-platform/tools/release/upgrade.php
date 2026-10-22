@@ -48,7 +48,7 @@ function repair_server_files(string $appRoot): array
     if (!str_contains($current, 'RewriteRule ^ index.php')) {
         $rules = "# Front controller routing (Apache / LiteSpeed on Hostinger). Written by upgrade.php.\nOptions -Indexes -MultiViews\nDirectoryIndex index.php\n\n<IfModule mod_rewrite.c>\n    RewriteEngine On\n"
             . ($https ? "    # Send everything to HTTPS (the AutoSSL validation path stays reachable)\n    RewriteCond %{HTTPS} off\n    RewriteCond %{HTTP:X-Forwarded-Proto} !https\n    RewriteCond %{REQUEST_URI} !^/\\.well-known/\n    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]\n\n" : '')
-            . "    # Pass the Authorization header to PHP (PhonePe webhook signature)\n    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n\n"
+            . "    # Pass the Authorization header to PHP (kept for payment webhooks)\n    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]\n\n"
             . "    # Real files (css, js, images) are served directly; everything else goes through index.php\n    RewriteCond %{REQUEST_FILENAME} !-f\n    RewriteCond %{REQUEST_FILENAME} !-d\n    RewriteRule ^ index.php [L]\n</IfModule>\n\n"
             . "# Never expose dotfiles or leftovers\n<FilesMatch \"(^\\.|~\$|\\.(bak|old|orig|sql|log|env|ini|sh|md|lock|json)\$)\">\n    <IfModule mod_authz_core.c>\n        Require all denied\n    </IfModule>\n    <IfModule !mod_authz_core.c>\n        Order allow,deny\n        Deny from all\n    </IfModule>\n</FilesMatch>\n";
         if ($current !== '') {

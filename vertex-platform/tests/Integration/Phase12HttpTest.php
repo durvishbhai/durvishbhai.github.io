@@ -10,7 +10,7 @@ use Vertex\Services\InvoiceService;
 use Vertex\Services\Settings;
 use Vertex\Tests\Support\HttpClient;
 
-/** Phase 12 over real HTTP: Integration Center, the website CMS and its public side, the AI hub and the PhonePe routes. */
+/** Phase 12 over real HTTP: Integration Center, the website CMS and its public side, the AI hub and the Razorpay payment-request routes. */
 final class Phase12HttpTest extends HttpTestCase
 {
     use Phase3Fixtures;
@@ -243,7 +243,7 @@ final class Phase12HttpTest extends HttpTestCase
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM ai_requests')['c']);
     }
 
-    // ------------------------------------------------------------------------------------------------ PhonePe routes
+    // ------------------------------------------------------------------------------------------------ Razorpay payment requests
 
     private function issuedInvoicePublic(): string
     {
@@ -255,47 +255,47 @@ final class Phase12HttpTest extends HttpTestCase
         return $d['public_id'];
     }
 
-    /** An open PhonePe request for exactly $minor paise, as PhonePe would have created it (the test server cannot call PhonePe). @return array<string,mixed> */
+    /** An open Razorpay request for exactly $minor paise, as Razorpay would have created it (the test server cannot call Razorpay). @return array<string,mixed> */
     private function openRequest(string $invoicePublic, int $minor, string $payload = 'upi://pay?pa=merchant@ybl&pn=Krazy&am=250.50&cu=INR&tr=ORDX'): array
     {
         $inv = InvoiceService::find($invoicePublic);
         $pub = bin2hex(random_bytes(16));
         Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, client_id, amount_minor, qr_payload, expires_at, status, created_by, last_checked_at, created_at, updated_at)
-            VALUES (?, ?, 'phonepe', 'upi_qr', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 MINUTE), 'pending', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            VALUES (?, ?, 'razorpay', 'upi_qr', ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 MINUTE), 'pending', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
             [$pub, 'KIS' . $inv['id'] . 'X' . strtoupper(bin2hex(random_bytes(6))), $inv['id'], $inv['client_id'], $minor, $payload, $this->finance]);
 
         return Database::one('SELECT * FROM gateway_orders WHERE public_id = ?', [$pub]);
     }
 
-    public function testPhonePeRequestsAreCreatedByTheTeamOnlyAndClientsCannotStartOne(): void
+    public function testPaymentRequestsAreCreatedByTheTeamOnlyAndClientsCannotStartOne(): void
     {
         $inv = $this->issuedInvoicePublic();
         $client = $this->loggedIn('alpha@client.test');
         // no self-service button and no route for a client to start a payment
         $this->assertStringNotContainsString('online (UPI, cards', $client->get('/my/invoices/' . $inv)['body']);
-        $this->assertSame(403, $client->post('/invoices/' . $inv . '/phonepe', ['amount' => '10'], '/account')['status']);
-        $this->assertSame(403, $client->get('/invoices/' . $inv . '/phonepe')['status']);
-        $this->assertSame(404, $client->post('/my/invoices/' . $inv . '/phonepe', [], '/account')['status'], 'the old client route is gone');
-        $this->assertSame(403, $this->loggedIn('dev@x.test')->get('/invoices/' . $inv . '/phonepe')['status']);
-        $this->assertSame(303, $this->client()->get('/invoices/' . $inv . '/phonepe')['status']);
+        $this->assertSame(403, $client->post('/invoices/' . $inv . '/pay-request', ['amount' => '10'], '/account')['status']);
+        $this->assertSame(403, $client->get('/invoices/' . $inv . '/pay-request')['status']);
+        $this->assertSame(404, $client->post('/my/invoices/' . $inv . '/pay-request', [], '/account')['status'], 'the old client route is gone');
+        $this->assertSame(403, $this->loggedIn('dev@x.test')->get('/invoices/' . $inv . '/pay-request')['status']);
+        $this->assertSame(303, $this->client()->get('/invoices/' . $inv . '/pay-request')['status']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
 
         // the team sees the button and a form whose amount can be edited (pre-filled with what is due)
         $fin = $this->loggedIn('fin@x.test');
-        $this->assertStringContainsString('Request PhonePe payment', $fin->get('/invoices/' . $inv)['body']);
-        $form = $fin->get('/invoices/' . $inv . '/phonepe');
+        $this->assertStringContainsString('Request payment', $fin->get('/invoices/' . $inv)['body']);
+        $form = $fin->get('/invoices/' . $inv . '/pay-request');
         $this->assertSame(200, $form['status']);
         $this->assertStringContainsString('name="amount"', $form['body']);
         $this->assertStringContainsString('value="1000.00"', $form['body']);
-        $this->assertStringContainsString('PhonePe is switched off', $form['body'], 'it explains why nothing can be generated yet');
-        // PhonePe is off: posting an amount creates nothing and shows a friendly error, never a QR
-        $r = $fin->post('/invoices/' . $inv . '/phonepe', ['amount' => '250.50'], '/invoices/' . $inv . '/phonepe');
+        $this->assertStringContainsString('Razorpay is switched off', $form['body'], 'it explains why nothing can be generated yet');
+        // Razorpay is off: posting an amount creates nothing and shows a friendly error, never a QR
+        $r = $fin->post('/invoices/' . $inv . '/pay-request', ['amount' => '250.50'], '/invoices/' . $inv . '/pay-request');
         $this->assertSame(303, $r['status']);
-        $this->assertSame('/invoices/' . $inv . '/phonepe', $r['location']);
+        $this->assertSame('/invoices/' . $inv . '/pay-request', $r['location']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM gateway_orders')['c']);
-        $this->assertStringNotContainsString('qr-svg', $fin->get('/invoices/' . $inv . '/phonepe')['body']);
-        $this->assertSame(200, $fin->get('/phonepe-requests')['status']);
-        $this->assertSame(403, $client->get('/phonepe-requests')['status']);
+        $this->assertStringNotContainsString('qr-svg', $fin->get('/invoices/' . $inv . '/pay-request')['body']);
+        $this->assertSame(200, $fin->get('/payment-requests')['status']);
+        $this->assertSame(403, $client->get('/payment-requests')['status']);
     }
 
     public function testTheQrPageShowsOneQrForExactlyTheEnteredAmountToTheTeamAndTheOwningClientOnly(): void
@@ -303,14 +303,14 @@ final class Phase12HttpTest extends HttpTestCase
         $inv = $this->issuedInvoicePublic();
         $o = $this->openRequest($inv, 25050);
         $fin = $this->loggedIn('fin@x.test');
-        $page = $fin->get('/phonepe-requests/' . $o['public_id']);
+        $page = $fin->get('/payment-requests/' . $o['public_id']);
         $this->assertSame(200, $page['status']);
         $this->assertSame(1, substr_count($page['body'], '<svg class="qr-svg"'), 'exactly one QR');
         $this->assertStringContainsString('₹250.50', $page['body']);
         $this->assertStringNotContainsString('₹1,000.00', $page['body']);
-        $this->assertStringContainsString('data-pay-poll="/phonepe-requests/' . $o['public_id'] . '/status"', $page['body']);
+        $this->assertStringContainsString('data-pay-poll="/payment-requests/' . $o['public_id'] . '/status"', $page['body']);
         $this->assertStringNotContainsString($o['merchant_order_id'], $page['body'], 'internal order ids are not shown');
-        $st = $fin->get('/phonepe-requests/' . $o['public_id'] . '/status');
+        $st = $fin->get('/payment-requests/' . $o['public_id'] . '/status');
         $this->assertSame(200, $st['status']);
         $this->assertSame(['status' => 'pending', 'live' => true, 'paid' => false, 'recorded' => false], json_decode($st['body'], true));
 
@@ -323,14 +323,14 @@ final class Phase12HttpTest extends HttpTestCase
         $this->assertStringNotContainsString('Withdraw this request', $mine['body'], 'a client cannot withdraw or change it');
         $this->assertStringContainsString('/my/pay/' . $o['public_id'], $client->get('/my/invoices/' . $inv)['body'], 'the invoice offers the pending request');
         $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/pay/' . $o['public_id'])['status']);
-        $this->assertSame(403, $client->get('/phonepe-requests/' . $o['public_id'])['status'], 'the team page is not for clients');
-        $this->assertSame(403, $client->post('/phonepe-requests/' . $o['public_id'] . '/cancel', [], '/account')['status']);
-        $this->assertSame(404, $fin->get('/phonepe-requests/' . str_repeat('a', 32))['status']);
+        $this->assertSame(403, $client->get('/payment-requests/' . $o['public_id'])['status'], 'the team page is not for clients');
+        $this->assertSame(403, $client->post('/payment-requests/' . $o['public_id'] . '/cancel', [], '/account')['status']);
+        $this->assertSame(404, $fin->get('/payment-requests/' . str_repeat('a', 32))['status']);
 
         // withdrawing removes the QR for everyone
-        $fin->post('/phonepe-requests/' . $o['public_id'] . '/cancel', [], '/phonepe-requests/' . $o['public_id']);
+        $fin->post('/payment-requests/' . $o['public_id'] . '/cancel', [], '/payment-requests/' . $o['public_id']);
         $this->assertSame('cancelled', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$o['id']])['status']);
-        $after = $fin->get('/phonepe-requests/' . $o['public_id'])['body'];
+        $after = $fin->get('/payment-requests/' . $o['public_id'])['body'];
         $this->assertStringNotContainsString('<svg class="qr-svg"', $after);
         $this->assertStringContainsString('withdrawn', $after);
         $this->assertStringNotContainsString('<svg class="qr-svg"', $client->get('/my/pay/' . $o['public_id'])['body']);
@@ -341,7 +341,7 @@ final class Phase12HttpTest extends HttpTestCase
         $inv = $this->issuedInvoicePublic();
         $o = $this->openRequest($inv, 10000);
         Database::run('UPDATE gateway_orders SET expires_at = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE) WHERE id = ?', [$o['id']]);
-        $body = $this->loggedIn('fin@x.test')->get('/phonepe-requests/' . $o['public_id'])['body'];
+        $body = $this->loggedIn('fin@x.test')->get('/payment-requests/' . $o['public_id'])['body'];
         $this->assertStringNotContainsString('<svg class="qr-svg"', $body);
         $this->assertStringContainsString('expired', $body);
     }
@@ -349,9 +349,9 @@ final class Phase12HttpTest extends HttpTestCase
     public function testWebhookRouteNeedsNoSessionOrCsrfButAlwaysNeedsTheSignature(): void
     {
         $raw = new HttpClient(self::$base);
-        $body = json_encode(['event' => 'checkout.order.completed', 'payload' => ['merchantOrderId' => 'VIS1XAAAAAAAAAAAA']]);
-        $post = static function (HttpClient $c, array $headers) use ($body): array {
-            $ch = curl_init(self::$base . '/webhooks/phonepe');
+        $body = json_encode(['event' => 'payment.captured', 'payload' => ['payment' => ['entity' => ['id' => 'pay_X', 'notes' => ['merchant_order_id' => 'KIS1XAAAAAAAAAAAA']]]]]);
+        $post = static function (array $headers) use ($body): array {
+            $ch = curl_init(self::$base . '/webhooks/razorpay');
             curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => array_merge(['Content-Type: application/json'], $headers), CURLOPT_TIMEOUT => 20]);
             $out = (string) curl_exec($ch);
             $st = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -359,17 +359,18 @@ final class Phase12HttpTest extends HttpTestCase
 
             return ['status' => $st, 'body' => $out];
         };
+        $sig = static fn (string $secret): string => 'X-Razorpay-Signature: ' . hash_hmac('sha256', (string) $body, $secret);
         // nothing configured, or no header: refused
-        $this->assertSame(401, $post($raw, [])['status']);
-        $this->assertSame(401, $post($raw, ['Authorization: ' . hash('sha256', 'hook-user:hook-pass-123')])['status'], 'not configured yet');
-        Settings::save($this->owner, 'phonepe', ['phonepe__webhook_username' => 'hook-user', 'phonepe__webhook_password' => 'hook-pass-123']);
-        $this->assertSame(401, $post($raw, [])['status']);
-        $this->assertSame(401, $post($raw, ['Authorization: nonsense'])['status']);
-        $this->assertSame(401, $post($raw, ['Authorization: ' . hash('sha256', 'hook-user:wrong')])['status']);
-        $ok = $post($raw, ['Authorization: ' . hash('sha256', 'hook-user:hook-pass-123')]);
-        $this->assertSame(200, $ok['status'], 'a signed call to an order we do not know is acknowledged, not an error');
+        $this->assertSame(401, $post([])['status']);
+        $this->assertSame(401, $post([$sig('whsec_http_1')])['status'], 'not configured yet');
+        Settings::save($this->owner, 'razorpay', ['razorpay__webhook_secret' => 'whsec_http_1']);
+        $this->assertSame(401, $post([])['status']);
+        $this->assertSame(401, $post(['X-Razorpay-Signature: nonsense'])['status']);
+        $this->assertSame(401, $post([$sig('wrong-secret')])['status']);
+        $ok = $post([$sig('whsec_http_1')]);
+        $this->assertSame(200, $ok['status'], 'a signed call about an order we do not know is acknowledged, not an error');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
         // GET is not a webhook
-        $this->assertSame(404, $raw->get('/webhooks/phonepe')['status'], 'GET shows nothing');
+        $this->assertSame(404, $raw->get('/webhooks/razorpay')['status'], 'GET shows nothing');
     }
 }
