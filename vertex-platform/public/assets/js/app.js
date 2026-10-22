@@ -403,6 +403,67 @@
         window.setInterval(tick, 1000);
         window.setInterval(poll, 5000);
     })();
+    // Razorpay Standard Web Checkout: create the order on our server, open Razorpay's window, send the result back to be verified (only the server decides it is paid)
+    (function () {
+        var btn = document.querySelector('[data-checkout-start]');
+        if (!btn) { return; }
+        var base = btn.getAttribute('data-checkout-start');
+        var verifyUrl = btn.getAttribute('data-checkout-verify');
+        var errEl = document.querySelector('[data-checkout-error]');
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        var csrf = meta ? meta.getAttribute('content') : '';
+        var label = btn.textContent;
+        var fail = function (msg) {
+            if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
+            btn.disabled = false;
+            btn.textContent = label;
+        };
+        var post = function (url, fields) {
+            return fetch(url, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-TOKEN': csrf },
+                body: new URLSearchParams(fields || {}).toString()
+            }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, status: r.status, data: d }; }); });
+        };
+        var loadScript = function () {
+            return new Promise(function (resolve, reject) {
+                if (window.Razorpay) { resolve(); return; }
+                var s = document.createElement('script');
+                s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+                s.onload = function () { resolve(); };
+                s.onerror = function () { reject(new Error('load')); };
+                document.head.appendChild(s);
+            });
+        };
+        btn.addEventListener('click', function () {
+            if (errEl) { errEl.hidden = true; }
+            btn.disabled = true;
+            btn.textContent = 'Opening Razorpay…';
+            Promise.all([post(base + '/checkout'), loadScript()]).then(function (res) {
+                var o = res[0];
+                if (!o.ok) { fail(o.data.error || 'Payment could not be started. Please try again.'); return; }
+                var d = o.data;
+                var settled = false;
+                var rzp = new window.Razorpay({
+                    key: d.key_id, amount: d.amount, currency: d.currency, order_id: d.order_id, name: d.name, description: d.description, prefill: d.prefill || {},
+                    theme: { color: '#4f6bff' },
+                    handler: function (resp) {
+                        settled = true;
+                        btn.textContent = 'Confirming your payment…';
+                        post(verifyUrl, { razorpay_payment_id: resp.razorpay_payment_id, razorpay_order_id: resp.razorpay_order_id, razorpay_signature: resp.razorpay_signature }).then(function (v) {
+                            if (v.ok && v.data.success) { window.location.reload(); return; }
+                            fail(v.data.error || 'We could not confirm the payment. If money was taken it will be matched to the invoice automatically.');
+                        }).catch(function () { fail('We could not confirm the payment. If money was taken it will be matched to the invoice automatically.'); });
+                    },
+                    modal: { ondismiss: function () { if (!settled) { fail('The payment window was closed before paying. Nothing was charged. You can try again.'); } } }
+                });
+                rzp.on('payment.failed', function (resp) {
+                    fail((resp && resp.error && resp.error.description) ? resp.error.description + ' You can try again.' : 'The payment failed. You can try again.');
+                });
+                rzp.open();
+            }).catch(function () { fail('Razorpay could not be loaded. Check your connection and try again.'); });
+        });
+    })();
     // Light / dark theme switch (the saved choice itself is applied earlier by theme.js)
     (function () {
         var buttons = document.querySelectorAll('[data-theme-toggle]');

@@ -367,6 +367,8 @@ return static function (Router $router): void {
     $router->get('/payment-requests/{order}/status', [PaymentRequestController::class, 'status'], $pr);
     $router->post('/payment-requests/{order}/cancel', [PaymentRequestController::class, 'cancel'], $pr);
     $router->get('/my/pay/{order}', [PaymentRequestController::class, 'mine'], ['auth', 'can:invoices.view_own']);
+    $router->post('/my/pay/{order}/checkout', [PaymentRequestController::class, 'checkout'], ['auth', 'can:invoices.view_own']);
+    $router->post('/my/pay/{order}/verify', [PaymentRequestController::class, 'verify'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/pay/{order}/status', [PaymentRequestController::class, 'mineStatus'], ['auth', 'can:invoices.view_own']);
 
     // AI assistance (drafts only)

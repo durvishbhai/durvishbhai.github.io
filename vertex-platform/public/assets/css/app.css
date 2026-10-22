@@ -930,3 +930,6 @@ html { accent-color: var(--violet); }
 
 .copy-row { display: flex; gap: 8px; align-items: center; } .copy-row input { flex: 1; min-width: 0; padding: 9px 12px; background: var(--field-bg); color: var(--text); border: 1px solid var(--line-strong); border-radius: 10px; font: inherit; font-size: 0.9rem; }
 .pay-share { max-width: 640px; }
+
+.pay-error { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); font-weight: 600; }
+.pay-error[hidden] { display: none; }

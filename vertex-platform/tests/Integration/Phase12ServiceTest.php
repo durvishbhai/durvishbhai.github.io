@@ -611,6 +611,20 @@ final class Phase12ServiceTest extends DatabaseTestCase
                     'payments' => $paid > 0 ? [['payment_id' => 'pay_LinkPaid01', 'amount' => $paid, 'status' => 'captured']] : null])];
             }
 
+            if ($m === 'POST' && str_ends_with($url, '/orders')) {
+                if (isset($o['orderHttp'])) {
+                    return ['status' => $o['orderHttp'], 'body' => json_encode(['error' => ['code' => 'BAD_REQUEST_ERROR', 'description' => 'simulated']])];
+                }
+
+                return ['status' => 200, 'body' => json_encode(['id' => 'order_TestOrder01', 'entity' => 'order', 'amount' => $o['echo'] ?? $b['amount'], 'currency' => 'INR', 'receipt' => $b['receipt'], 'status' => 'created'])];
+            }
+            if ($m === 'POST' && str_ends_with($url, '/capture')) {
+                return ['status' => 200, 'body' => json_encode(['id' => 'pay_CheckoutPay01', 'status' => 'captured'])];
+            }
+            if ($m === 'GET' && str_contains($url, '/payments/pay_CheckoutPay01')) {
+                return ['status' => $o['http'] ?? 200, 'body' => json_encode(['id' => 'pay_CheckoutPay01', 'order_id' => $o['payOrder'] ?? 'order_TestOrder01', 'amount' => $o['payAmount'] ?? 100000, 'currency' => 'INR', 'status' => $o['payStatus'] ?? 'captured'])];
+            }
+
             return ['status' => 404, 'body' => '{}'];
         });
     }
@@ -867,5 +881,123 @@ final class Phase12ServiceTest extends DatabaseTestCase
         Config::set('app.url', 'http://insecure.test');
         $this->assertFalse(RazorpayGateway::status()['ready']);
         $this->assertFalse(RazorpayGateway::enabled());
+    }
+
+    // ------------------------------------------------------------------------------------------------ Standard Web Checkout
+
+    private function checkoutSig(string $order, string $pay, string $secret = 'SECRETKEY1'): string
+    {
+        return hash_hmac('sha256', $order . '|' . $pay, $secret);
+    }
+
+    /** @return array{0:array<string,mixed>,1:array<string,mixed>} the invoice and a checkout request for it */
+    private function checkoutRequest(array &$calls, array $o = []): array
+    {
+        $this->razorpayOn();
+        $this->fakeRazorpay($calls, $o);
+        $inv = $this->issuedInvoice('1000');
+        $r = RazorpayGateway::createRequest($this->finance, $inv, 100000, '', 'checkout');
+        $this->assertSame('checkout', $r['flow']);
+        $this->assertSame([], $calls, 'nothing is sent to Razorpay until the client presses Pay');
+
+        return [$inv, $r];
+    }
+
+    public function testCheckoutCreatesOneRazorpayOrderForTheExactAmountAndNeverExposesTheSecret(): void
+    {
+        $calls = [];
+        [, $r] = $this->checkoutRequest($calls);
+        $d = RazorpayGateway::createCheckoutOrder($r);
+        $this->assertSame(['order_id' => 'order_TestOrder01', 'amount' => 100000, 'currency' => 'INR'], array_intersect_key($d, ['order_id' => 1, 'amount' => 1, 'currency' => 1]));
+        $this->assertSame('rzp_test_AbCd1234', $d['key_id']);
+        $this->assertStringNotContainsString('SECRETKEY1', json_encode($d));
+        $this->assertSame(100000, $this->lastBodies[0]['amount']);
+        $this->assertSame($r['merchant_order_id'], $this->lastBodies[0]['receipt']);
+        $r = RazorpayGateway::findRequest($r['public_id']);
+        RazorpayGateway::createCheckoutOrder($r);
+        $this->assertCount(1, array_filter($calls, fn ($c) => str_ends_with($c, '/orders')), 'pressing Pay twice reuses the same Razorpay order');
+    }
+
+    public function testCheckoutErrorsMapToTheRightCodes(): void
+    {
+        $calls = [];
+        [, $r] = $this->checkoutRequest($calls, ['orderHttp' => 401]);
+        foreach ([['orderHttp' => 401, 401], ['orderHttp' => 400, 500], ['orderHttp' => 500, 500]] as $case) {
+            $this->fakeRazorpay($calls, ['orderHttp' => $case['orderHttp']]);
+            try {
+                RazorpayGateway::createCheckoutOrder($r);
+                $this->fail('expected an error');
+            } catch (\RuntimeException $e) {
+                $this->assertSame($case[0], $e->getCode());
+            }
+        }
+        $this->fakeRazorpay($calls, ['echo' => 500]); // Razorpay answers for another amount
+        try {
+            RazorpayGateway::createCheckoutOrder($r);
+            $this->fail('expected an error');
+        } catch (\RuntimeException $e) {
+            $this->assertSame(500, $e->getCode());
+        }
+        Database::run("UPDATE gateway_orders SET amount_minor = 50 WHERE id = ?", [$r['id']]);
+        try {
+            RazorpayGateway::createCheckoutOrder(RazorpayGateway::findRequest($r['public_id']));
+            $this->fail('expected an error');
+        } catch (\RuntimeException $e) {
+            $this->assertSame(400, $e->getCode(), 'below Rs 1.00');
+        }
+        Database::run("UPDATE gateway_orders SET status = 'cancelled' WHERE id = ?", [$r['id']]);
+        $this->expectExceptionCode(400);
+        RazorpayGateway::createCheckoutOrder(RazorpayGateway::findRequest($r['public_id']));
+    }
+
+    public function testACheckoutPaymentIsRecordedOnlyWithAValidSignatureForTheExactCapturedAmount(): void
+    {
+        $calls = [];
+        [$inv, $r] = $this->checkoutRequest($calls);
+        RazorpayGateway::createCheckoutOrder($r);
+        $r = RazorpayGateway::findRequest($r['public_id']);
+        $good = $this->checkoutSig('order_TestOrder01', 'pay_CheckoutPay01');
+
+        // malformed / missing fields and wrong signatures: 400 and nothing is recorded
+        foreach ([['', 'order_TestOrder01', $good], ['pay_CheckoutPay01', '', $good], ['pay_CheckoutPay01', 'order_TestOrder01', ''],
+            ['pay_CheckoutPay01', 'order_TestOrder01', $this->checkoutSig('order_TestOrder01', 'pay_CheckoutPay01', 'WRONG')],
+            ['pay_CheckoutPay01', 'order_OtherOrder9', $this->checkoutSig('order_OtherOrder9', 'pay_CheckoutPay01')]] as [$pay, $ord, $sig]) {
+            $v = RazorpayGateway::verifyCheckout($r, $pay, $ord, $sig);
+            $this->assertFalse($v['ok']);
+            $this->assertSame(400, $v['status']);
+        }
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
+
+        // a correct signature for a payment of another amount is still refused
+        $this->fakeRazorpay($calls, ['payAmount' => 5000]);
+        $this->assertSame(400, RazorpayGateway::verifyCheckout($r, 'pay_CheckoutPay01', 'order_TestOrder01', $good)['status']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
+
+        // authorized payments are captured, then recorded
+        $this->fakeRazorpay($calls, ['payStatus' => 'authorized']);
+        $v = RazorpayGateway::verifyCheckout($r, 'pay_CheckoutPay01', 'order_TestOrder01', $good);
+        $this->assertTrue($v['ok']);
+        $this->assertTrue($v['recorded']);
+        $this->assertNotEmpty(array_filter($calls, fn ($c) => str_ends_with($c, '/capture')));
+        $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
+        $this->assertSame('Razorpay pay_CheckoutPay01', Database::one('SELECT external_ref FROM client_payments')['external_ref']);
+
+        // verifying again never doubles the payment
+        $v = RazorpayGateway::verifyCheckout(RazorpayGateway::findRequest($r['public_id']), 'pay_CheckoutPay01', 'order_TestOrder01', $good);
+        $this->assertFalse($v['recorded']);
+        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
+    }
+
+    public function testAnUncapturedCheckoutPaymentWaitsAndRecordsNothing(): void
+    {
+        $calls = [];
+        [$inv, $r] = $this->checkoutRequest($calls, ['payStatus' => 'created']);
+        RazorpayGateway::createCheckoutOrder($r);
+        $r = RazorpayGateway::findRequest($r['public_id']);
+        $v = RazorpayGateway::verifyCheckout($r, 'pay_CheckoutPay01', 'order_TestOrder01', $this->checkoutSig('order_TestOrder01', 'pay_CheckoutPay01'));
+        $this->assertFalse($v['ok']);
+        $this->assertSame(202, $v['status']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
+        $this->assertSame('issued', InvoiceService::find($inv['public_id'])['status']);
     }
 }

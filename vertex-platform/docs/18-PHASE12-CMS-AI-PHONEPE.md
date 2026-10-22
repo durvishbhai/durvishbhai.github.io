@@ -63,6 +63,20 @@ Guarantees (each is covered by tests against a simulated Razorpay):
 
 **What is NOT verified:** Razorpay's documentation could not be opened from the build environment, so this was written from knowledge of the public API (Basic auth with key id/secret, QR Codes, Payment Links, HMAC-signed webhooks) and exercised only against a simulation. In particular, whether your account returns `image_content` for QR codes is unknown (hence the payment-link fallback), and QR Codes may need to be enabled on your Razorpay account. Use **test keys** first.
 
+### Razorpay Standard Web Checkout (the client pays in Razorpay's window)
+
+Besides the QR, the team can choose **Razorpay checkout window** when requesting a payment (or set it as the default under *Integrations & settings → Razorpay → How payment requests are paid*). The client then sees a **Pay ₹X with Razorpay** button on `/my/pay/{request}`.
+
+| Step | Where | What happens |
+|------|-------|--------------|
+| 1. Create order | `POST /my/pay/{request}/checkout` (client, CSRF) | The server calls Razorpay `POST /v1/orders` with the amount **from our own request** (the browser sends none; minimum ₹1.00 = 100 paise, currency INR, receipt = our reference) once per request, and returns `{order_id, amount, currency, key_id, name, description, prefill}`. Errors are JSON `{error}`: 400 not payable, 401 Razorpay refused the keys, 429 too many tries, 500 anything else. |
+| 2. Pay | `public/assets/js/app.js` | Loads `https://checkout.razorpay.com/v1/checkout.js`, opens the modal with the `order_id`; closing the window or a `payment.failed` event shows a message and re-enables the button. |
+| 3. Verify | `POST /my/pay/{request}/verify` (client, CSRF) | Needs `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature` (missing → 400). The server checks `HMAC-SHA256(order_id|payment_id, KEY_SECRET)` with a constant-time comparison (mismatch → 400, nothing recorded), then confirms with Razorpay that the payment belongs to the order, is INR and exactly the requested amount, captures it if only authorized, and only then records the invoice payment (idempotent). The webhook and the scheduled check remain as a safety net. |
+
+The Key Secret is read from `.env` (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`) or the Integration Center and **never** reaches the browser; only the public Key ID is returned. Only the pay page of such a request gets a relaxed security policy (`SecurityHeadersPolicy::checkout()`: script from `checkout.razorpay.com`, frames/connections to Razorpay, `same-origin-allow-popups`); every other page keeps the strict policy. The official PHP SDK (`composer require razorpay/razorpay`) is deliberately not used: the platform already has a hardened HTTPS client, a release package can only hold `.php/.js/.css/.sql` files (the SDK ships a CA bundle that would be stripped), and the three REST calls needed are small.
+
+**Test it:** put the `rzp_test_` keys in `.env` (or the Integration Center), switch Razorpay on, request ₹10 on an invoice choosing *Razorpay checkout window*, sign in as that client, press Pay and use Razorpay's test card `4111 1111 1111 1111` (any future expiry, any CVV, OTP `1234` where asked) or test UPI `success@razorpay`. The page reloads showing **Payment received**.
+
 ### Test-mode checklist (do this before going live)
 
 1. In the Razorpay Dashboard (Test Mode) create API keys: *Account & Settings → API Keys*. Note the **Key ID** (`rzp_test_…`) and **Key Secret**.

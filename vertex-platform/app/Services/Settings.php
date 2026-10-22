@@ -66,7 +66,7 @@ final class Settings
             'razorpay.key_id' => ['group' => 'razorpay', 'label' => 'Key ID', 'type' => 'text', 'help' => 'From the Razorpay Dashboard → Account & Settings → API Keys. Starts with rzp_test_ (test mode, no real money) or rzp_live_ (live).'],
             'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
             'razorpay.webhook_secret' => ['group' => 'razorpay', 'label' => 'Webhook secret', 'type' => 'secret', 'help' => 'The secret you type when you add the webhook in the Razorpay Dashboard.'],
-            'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How the payment QR is made', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only'], 'help' => 'Either way the QR carries exactly the amount the team entered.'],
+            'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How payment requests are paid', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only', 'checkout' => 'Razorpay checkout window on the client\'s page (card, UPI, net banking, wallets)'], 'help' => 'Whichever you pick, the amount is exactly what the team entered. The team can also choose per request.'],
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],

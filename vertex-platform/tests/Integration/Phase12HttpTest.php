@@ -336,6 +336,52 @@ final class Phase12HttpTest extends HttpTestCase
         $this->assertStringNotContainsString('<svg class="qr-svg"', $client->get('/my/pay/' . $o['public_id'])['body']);
     }
 
+    public function testStandardCheckoutPageEndpointsAndHeaders(): void
+    {
+        $inv = $this->issuedInvoicePublic();
+        $o = $this->openRequest($inv, 25050);
+        Database::run("UPDATE gateway_orders SET flow = 'checkout', qr_payload = '', provider_order_id = 'order_TestOrder01' WHERE id = ?", [$o['id']]);
+        $client = $this->loggedIn('alpha@client.test');
+        $page = $client->get('/my/pay/' . $o['public_id']);
+        $this->assertSame(200, $page['status']);
+        $this->assertStringContainsString('data-checkout-start="/my/pay/' . $o['public_id'] . '"', $page['body']);
+        $this->assertStringContainsString('Pay ₹250.50 with Razorpay', $page['body']);
+        $this->assertStringNotContainsString('<svg class="qr-svg"', $page['body']);
+        $this->assertStringContainsString('script-src \'self\' https://checkout.razorpay.com', $client->lastHeaders['content-security-policy']);
+        $this->assertStringContainsString('same-origin-allow-popups', $client->lastHeaders['cross-origin-opener-policy']);
+        $this->assertStringNotContainsString('<script', str_replace('<script src=', '', $page['body']), 'no inline script');
+
+        // every other page keeps the strict policy
+        $client->get('/my/invoices/' . $inv);
+        $this->assertStringNotContainsString('razorpay', $client->lastHeaders['content-security-policy']);
+
+        // the team's page shows no Pay button and keeps the strict policy
+        $fin = $this->loggedIn('fin@x.test');
+        $this->assertStringNotContainsString('data-checkout-start', $fin->get('/payment-requests/' . $o['public_id'])['body']);
+        $this->assertStringNotContainsString('razorpay', $fin->lastHeaders['content-security-policy']);
+
+        // verify: missing fields -> 400, a wrong signature -> 400 and nothing is paid
+        $v = '/my/pay/' . $o['public_id'] . '/verify';
+        $r = $client->post($v, ['razorpay_payment_id' => 'pay_CheckoutPay01'], '/account');
+        $this->assertSame(400, $r['status']);
+        $this->assertFalse(json_decode($r['body'], true)['success']);
+        $r = $client->post($v, ['razorpay_payment_id' => 'pay_CheckoutPay01', 'razorpay_order_id' => 'order_TestOrder01', 'razorpay_signature' => str_repeat('a', 64)], '/account');
+        $this->assertSame(400, $r['status']);
+        $this->assertSame('pending', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$o['id']])['status']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM client_payments')['c']);
+
+        // create order: Razorpay is not configured on this server -> a clear error, never a crash
+        $r = $client->post('/my/pay/' . $o['public_id'] . '/checkout', [], '/account');
+        $this->assertSame(500, $r['status']);
+        $this->assertArrayHasKey('error', json_decode($r['body'], true));
+
+        // only the owning client; needs the token; the team and strangers cannot use these
+        $this->assertSame(404, $this->loggedIn('bravo@client.test')->post($v, [], '/account')['status']);
+        $this->assertSame(403, $fin->post($v, [], '/account')['status']);
+        $this->assertSame(403, $fin->post('/my/pay/' . $o['public_id'] . '/checkout', [], '/account')['status']);
+        $this->assertSame(419, $client->postNoToken('/my/pay/' . $o['public_id'] . '/checkout')['status']);
+    }
+
     public function testAnExpiredRequestShowsNoQr(): void
     {
         $inv = $this->issuedInvoicePublic();
