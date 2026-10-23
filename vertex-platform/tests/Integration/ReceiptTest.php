@@ -278,6 +278,7 @@ final class ReceiptTest extends HttpTestCase
         $this->assertSame(200, $form['status']);
         $this->assertStringContainsString('Verify a payment receipt', $form['body']);
         $this->assertStringContainsString('noindex', $form['body']);
+        $this->assertStringContainsString('href="/verify"', $anon->get('/contact')['body'], 'the public site footer links to it');
 
         $res = $anon->get('/verify/' . $r['verify_code']);
         $this->assertSame(200, $res['status']);

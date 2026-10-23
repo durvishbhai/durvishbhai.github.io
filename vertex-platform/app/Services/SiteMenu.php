@@ -64,7 +64,7 @@ final class SiteMenu
         $defaults = [
             'footer_explore' => ['Explore', $explore],
             'footer_opportunities' => ['Opportunities', [['label' => 'Our Clients', 'url' => '/our-clients'], ['label' => 'Our Partners', 'url' => '/our-partners'], ['label' => 'Careers', 'url' => '/careers'], ...(SiteHiring::isVisible() ? [['label' => 'Hiring', 'url' => '/hiring']] : []), ['label' => 'Project Requirements', 'url' => '/request-quote']]],
-            'footer_support' => ['Support', [['label' => 'Contact Us', 'url' => '/contact'], ['label' => 'FAQ', 'url' => '/faq']]],
+            'footer_support' => ['Support', [['label' => 'Contact Us', 'url' => '/contact'], ['label' => 'FAQ', 'url' => '/faq'], ['label' => 'Verify a Receipt', 'url' => '/verify']]],
             'footer_legal' => ['Legal', $legal],
         ];
         $cols = [];
