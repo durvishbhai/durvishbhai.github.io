@@ -12,6 +12,7 @@ use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\Gate;
+use Vertex\Services\RazorpayGateway;
 use Vertex\Services\RenewalPricing;
 use Vertex\Services\RenewalScheduler;
 use Vertex\Services\RenewalService;
@@ -108,7 +109,8 @@ final class RenewalController extends Controller
             'title' => $s['reference'], 's' => $s, 'cycle' => $cycle, 'payments' => $cycle === null ? [] : RenewalService::payments($cycle), 'history' => RenewalService::historyOf($s), 'past' => RenewalService::pastCycles($s),
             'reminders' => RenewalService::reminders($s), 'listPrice' => RenewalPricing::lookup((string) $s['service_type'], $period), 'overdue' => RenewalService::isOverdue($s),
             'next' => (array) Config::get("renewals.manual_transitions.{$s['status']}", []), 'projects' => Database::all('SELECT public_id, code, title FROM projects WHERE client_id = ? AND archived_at IS NULL ORDER BY code DESC', [$s['client_id']]),
-            'can' => ['manage' => Gate::can('renewals.manage', $uid), 'approve' => Gate::can('renewals.approve', $uid), 'confirm' => Gate::can('renewals.confirm_provider', $uid)],
+            'can' => ['manage' => Gate::can('renewals.manage', $uid), 'approve' => Gate::can('renewals.approve', $uid), 'confirm' => Gate::can('renewals.confirm_provider', $uid), 'request' => Gate::can('payments.request', $uid)],
+            'liveRequests' => $cycle === null ? [] : RazorpayGateway::liveRequests((int) $cycle['id'], true),
         ]);
         Session::forget('_old');
 
@@ -123,7 +125,7 @@ final class RenewalController extends Controller
         $to = '/renewals/' . $s['public_id'];
         $action = $request->string('action');
         $old = ['reason' => $request->string('reason'), 'invoice_ref' => $request->string('invoice_ref'), 'quotation_ref' => $request->string('quotation_ref'), 'amount' => $request->string('amount'),
-            'reference' => $request->string('reference'), 'confirmation_ref' => $request->string('confirmation_ref'), 'new_expiry' => $request->string('new_expiry'), 'net' => $request->string('net')];
+            'reference' => $request->string('reference'), 'confirmation_ref' => $request->string('confirmation_ref'), 'new_expiry' => $request->string('new_expiry'), 'net' => $request->string('net'), 'increase' => $request->string('increase')];
 
         return $this->guarded(function () use ($request, $uid, $s, $to, $action): Response {
             switch ($action) {
@@ -157,6 +159,11 @@ final class RenewalController extends Controller
                     RenewalService::markInvoiceSent($uid, $s);
 
                     return $this->ok($to, 'Marked as sent. The client was notified in the portal.');
+                case 'raise_price':
+                    $this->requireStepUp($request);
+                    RenewalService::raisePrice($uid, $s, $request->string('increase'), $request->string('reason'));
+
+                    return $this->ok($to, 'The price was raised and the client was told. Request the extra amount with Razorpay or record it when it arrives.');
                 case 'revise':
                     $this->requireStepUp($request);
                     RenewalService::reviseOrVoid($uid, $s, $request->string('reason'));

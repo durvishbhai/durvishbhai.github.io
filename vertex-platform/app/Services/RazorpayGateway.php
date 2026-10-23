@@ -106,7 +106,40 @@ final class RazorpayGateway
         if (!self::enabled()) {
             throw new ValidationException(['Razorpay payments are not switched on (Administration -> Integrations & settings -> Razorpay).']);
         }
-        $due = self::requestable($invoice);
+        $target = ['kind' => 'invoice', 'id' => (int) $invoice['id'], 'client_id' => (int) $invoice['client_id'], 'reference' => (string) $invoice['reference'], 'title' => (string) $invoice['title'],
+            'public_id' => (string) $invoice['public_id'], 'label' => 'invoice', 'callback' => '/my/invoices/' . $invoice['public_id']];
+
+        return self::issue($actorId, $target, self::requestable($invoice), $amountMinor, $note, $method);
+    }
+
+    /**
+     * The same, for what is still due on a domain/hosting renewal (for example after the provider raised its price).
+     *
+     * @param array<string,mixed> $service a renewal service row
+     * @return array<string,mixed> the stored order row
+     */
+    public static function createRenewalRequest(int $actorId, array $service, int $amountMinor, string $note = '', string $method = ''): array
+    {
+        Gate::authorize('payments.request', $actorId);
+        $cycle = RenewalService::openCycle($service);
+        if (!in_array($service['status'], ['invoice_issued', 'awaiting_payment'], true) || $cycle === null) {
+            throw new ValidationException(['A payment can be requested only while the renewal has an issued invoice that is not fully paid.']);
+        }
+        if (!self::enabled()) {
+            throw new ValidationException(['Razorpay payments are not switched on (Administration -> Integrations & settings -> Razorpay).']);
+        }
+        $target = ['kind' => 'renewal', 'id' => (int) $cycle['id'], 'client_id' => (int) $service['client_id'], 'reference' => (string) $service['identifier'], 'title' => 'Renewal ' . (string) $service['reference'] . ' (' . (string) $cycle['invoice_ref'] . ')',
+            'public_id' => (string) $service['public_id'], 'label' => 'renewal', 'callback' => '/my/services/' . $service['public_id']];
+
+        return self::issue($actorId, $target, RenewalService::dueOf($cycle), $amountMinor, $note, $method);
+    }
+
+    /**
+     * @param array<string,mixed> $t what is being paid: kind (invoice|renewal), id (invoice id or renewal cycle id), client_id, reference, title, public_id, label, callback
+     * @return array<string,mixed> the stored order row
+     */
+    private static function issue(int $actorId, array $t, int $due, int $amountMinor, string $note, string $method): array
+    {
         if ($amountMinor < self::MIN_MINOR) {
             throw new ValidationException(['The smallest amount Razorpay accepts is ₹1.00.']);
         }
@@ -120,11 +153,11 @@ final class RazorpayGateway
         if (!RateLimiter::hit('payment_request_user', (string) $actorId)) {
             throw new HttpException(429);
         }
-        $mid = 'KIS' . $invoice['id'] . 'X' . strtoupper(bin2hex(random_bytes(6)));
+        $mid = 'KIS' . $t['id'] . 'X' . strtoupper(bin2hex(random_bytes(6)));
         $ttl = max(15, (int) Config::get('razorpay.order_ttl_minutes', 30)); // Razorpay payment links must live at least 15 minutes
         $expiresAt = time() + $ttl * 60;
-        $description = mb_substr('Invoice ' . $invoice['reference'] . ' - ' . (string) $invoice['title'], 0, 250);
-        $notes = ['merchant_order_id' => $mid, 'invoice' => (string) $invoice['reference'], 'source' => 'staff-request'];
+        $description = mb_substr(ucfirst((string) $t['label']) . ' ' . $t['reference'] . ' - ' . $t['title'], 0, 250);
+        $notes = ['merchant_order_id' => $mid, 'invoice' => (string) $t['reference'], 'source' => 'staff-request'];
         $mode = (string) Config::get('razorpay.qr_mode', 'auto');
         if ($method === 'checkout' || ($method === '' && $mode === 'checkout')) {
             $mode = 'checkout'; // the client pays in Razorpay's checkout window on their own page; the Razorpay order is created when they press Pay
@@ -158,7 +191,7 @@ final class RazorpayGateway
             } catch (ValidationException $e) {
                 throw $e;
             } catch (\Throwable $e) {
-                Logger::error('Razorpay QR request failed', ['invoice' => (int) $invoice['id'], 'error' => $e->getMessage()]);
+                Logger::error('Razorpay QR request failed', ['invoice' => (int) $t['id'], 'error' => $e->getMessage()]);
             }
         }
         if ($mode === 'checkout') {
@@ -168,9 +201,9 @@ final class RazorpayGateway
             try {
                 $r = self::api('POST', '/payment_links', ['amount' => $amountMinor, 'currency' => 'INR', 'accept_partial' => false, 'reference_id' => $mid, 'description' => $description, 'expire_by' => $expiresAt,
                     'notify' => ['sms' => false, 'email' => false], 'reminder_enable' => false, 'notes' => $notes,
-                    'callback_url' => rtrim((string) Config::get('app.url'), '/') . '/my/invoices/' . $invoice['public_id'], 'callback_method' => 'get']);
+                    'callback_url' => rtrim((string) Config::get('app.url'), '/') . $t['callback'], 'callback_method' => 'get']);
             } catch (\Throwable $e) {
-                Logger::error('Razorpay payment link request failed', ['invoice' => (int) $invoice['id'], 'error' => $e->getMessage()]);
+                Logger::error('Razorpay payment link request failed', ['invoice' => (int) $t['id'], 'error' => $e->getMessage()]);
                 throw new ValidationException(['We could not reach Razorpay. Nothing was requested. Please try again.']);
             }
             $d = $r['data'];
@@ -188,14 +221,14 @@ final class RazorpayGateway
             [$flow, $payload, $rzpId] = ['payment_link', $url, $id];
         }
         $pub = uuid_hex();
-        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, client_id, amount_minor, qr_payload, qr_image_url, note, expires_at, status, provider_order_id, created_by, created_at, updated_at)
-            VALUES (?, ?, 'razorpay', ?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$pub, $mid, $flow, $invoice['id'], $invoice['client_id'], $amountMinor, $payload, $imageUrl, $note === '' ? null : $note, $expiresAt, $rzpId === '' ? null : $rzpId, $actorId]);
+        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, renewal_cycle_id, client_id, amount_minor, qr_payload, qr_image_url, note, expires_at, status, provider_order_id, created_by, created_at, updated_at)
+            VALUES (?, ?, 'razorpay', ?, ?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $mid, $flow, $t['kind'] === 'invoice' ? $t['id'] : null, $t['kind'] === 'renewal' ? $t['id'] : null, $t['client_id'], $amountMinor, $payload, $imageUrl, $note === '' ? null : $note, $expiresAt, $rzpId === '' ? null : $rzpId, $actorId]);
         $id = Database::insertId();
-        Audit::record('gateway.request_created', 'invoice', (int) $invoice['id'], [], ['amount_minor' => $amountMinor, 'merchant_order_id' => $mid], ['provider' => 'razorpay', 'flow' => $flow], $actorId);
-        $clientUser = Database::one('SELECT user_id FROM clients WHERE id = ?', [$invoice['client_id']]);
+        Audit::record('gateway.request_created', $t['kind'] === 'invoice' ? 'invoice' : 'renewal_cycle', (int) $t['id'], [], ['amount_minor' => $amountMinor, 'merchant_order_id' => $mid], ['provider' => 'razorpay', 'flow' => $flow], $actorId);
+        $clientUser = Database::one('SELECT user_id FROM clients WHERE id = ?', [$t['client_id']]);
         if ($clientUser !== null && $clientUser['user_id'] !== null) {
-            Notifier::send([(int) $clientUser['user_id']], 'payment.requested', 'Payment request: ₹' . FieldRules::formatMinor($amountMinor), 'A payment request for invoice ' . $invoice['reference'] . ' is waiting for you.', '/my/pay/' . $pub, null, 'gateway_order', $id, "pay-request:{$id}");
+            Notifier::send([(int) $clientUser['user_id']], 'payment.requested', 'Payment request: ₹' . FieldRules::formatMinor($amountMinor), 'A payment request for ' . $t['label'] . ' ' . $t['reference'] . ' is waiting for you.', '/my/pay/' . $pub, null, 'gateway_order', $id, "pay-request:{$id}");
         }
 
         return Database::one('SELECT * FROM gateway_orders WHERE id = ?', [$id]);
@@ -229,9 +262,9 @@ final class RazorpayGateway
     }
 
     /** @return list<array<string,mixed>> requests that can still be paid for one invoice, newest first */
-    public static function liveRequests(int $invoiceId): array
+    public static function liveRequests(int $invoiceId, bool $renewalCycle = false): array
     {
-        return Database::all("SELECT * FROM gateway_orders WHERE invoice_id = ? AND provider = 'razorpay' AND status = 'pending' AND expires_at > UTC_TIMESTAMP() ORDER BY id DESC", [$invoiceId]);
+        return Database::all("SELECT * FROM gateway_orders WHERE " . ($renewalCycle ? 'renewal_cycle_id' : 'invoice_id') . " = ? AND provider = 'razorpay' AND status = 'pending' AND expires_at > UTC_TIMESTAMP() ORDER BY id DESC", [$invoiceId]);
     }
 
     /** The team withdraws a request: the QR disappears and Razorpay is asked to close it. A payment already made is still recorded when Razorpay confirms it. @param array<string,mixed> $order */
@@ -338,6 +371,13 @@ final class RazorpayGateway
             if ($locked['status'] === 'completed') {
                 return;
             }
+            if ($locked['renewal_cycle_id'] !== null) {
+                $cycle = Database::one('SELECT * FROM renewal_cycles WHERE id = ?', [$locked['renewal_cycle_id']]) ?? throw new HttpException(404);
+                $recorded = RenewalService::recordGatewayPayment($cycle, (int) $order['amount_minor'], $txn, (string) $order['merchant_order_id']);
+                Database::run("UPDATE gateway_orders SET status = 'completed', provider_txn_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [mb_substr($txn, 0, 80), $order['id']]);
+
+                return;
+            }
             $invoice = InvoiceService::find((string) Database::one('SELECT public_id FROM invoices WHERE id = ?', [$order['invoice_id']])['public_id']);
             $p = ClientPaymentService::recordGateway($invoice, (int) $order['amount_minor'], 'Razorpay ' . $txn, 'Confirmed by Razorpay (order ' . $order['merchant_order_id'] . ')');
             Database::run("UPDATE gateway_orders SET status = 'completed', provider_txn_id = ?, payment_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [mb_substr($txn, 0, 80), $p['id'], $order['id']]);
@@ -391,10 +431,12 @@ final class RazorpayGateway
             Database::run('UPDATE gateway_orders SET provider_order_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ? AND (provider_order_id IS NULL OR provider_order_id = \'\')', [$id, $order['id']]);
             $order['provider_order_id'] = (string) Database::one('SELECT provider_order_id FROM gateway_orders WHERE id = ?', [$order['id']])['provider_order_id'];
         }
-        $inv = Database::one('SELECT reference, title FROM invoices WHERE id = ?', [$order['invoice_id']]);
+        $inv = $order['renewal_cycle_id'] !== null
+            ? Database::one("SELECT s.identifier AS reference, CONCAT('Renewal ', s.reference) AS title FROM renewal_cycles cy JOIN renewal_services s ON s.id = cy.service_id WHERE cy.id = ?", [$order['renewal_cycle_id']])
+            : Database::one('SELECT reference, title FROM invoices WHERE id = ?', [$order['invoice_id']]);
 
         return ['order_id' => (string) $order['provider_order_id'], 'amount' => $amount, 'currency' => 'INR', 'key_id' => (string) Config::get('razorpay.key_id'), 'name' => SiteText::company(),
-            'description' => mb_substr('Invoice ' . (string) ($inv['reference'] ?? '') . ' - ' . (string) ($inv['title'] ?? ''), 0, 250), 'prefill' => array_intersect_key($clientHint, ['name' => 1, 'email' => 1, 'contact' => 1])];
+            'description' => mb_substr(($order['renewal_cycle_id'] !== null ? '' : 'Invoice ') . (string) ($inv['reference'] ?? '') . ' - ' . (string) ($inv['title'] ?? ''), 0, 250), 'prefill' => array_intersect_key($clientHint, ['name' => 1, 'email' => 1, 'contact' => 1])];
     }
 
     /**

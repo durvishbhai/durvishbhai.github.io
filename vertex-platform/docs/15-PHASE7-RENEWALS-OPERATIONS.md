@@ -82,3 +82,7 @@ Measured on the development container (MariaDB 10.11) with 20,000 synthetic rene
 
 ## 10. Test results (actual)
 Full suite after Phase 7: **665 tests, 19,317 assertions, all passing**. Phase 7 adds `RenewalServiceTest` (24), `RenewalHttpTest` (7), `BackupServiceTest` (6), `SystemStatusHttpTest` (2), `FullPlatformJourneyTest` (1, referral → commission → payout → renewal → backup → restore), `StaticSecurityScanTest` (5); `RouteSweepTest` covers every new route. An earlier run found 5 failures caused by my own changes (two migration-list expectations, a test file matching its own secret pattern, and a test that leaked a temporary uploads path into later tests); all were fixed and the suite re-run clean.
+
+## Addendum: provider price rises and online payment
+
+See docs/18, "Provider price rises and paying a renewal online": an approver can raise the open renewal's price (with a reason and the password), and the team can collect what is due through Razorpay; the payment is counted on the renewal and still never makes it Renewed.

@@ -77,6 +77,15 @@ The Key Secret is read from `.env` (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`) or
 
 **Test it:** put the `rzp_test_` keys in `.env` (or the Integration Center), switch Razorpay on, request ₹10 on an invoice choosing *Razorpay checkout window*, sign in as that client, press Pay and use Razorpay's domestic test card Visa `4100 2800 0000 1007` (any future expiry, any CVV) or test UPI `success@razorpay` (`failure@razorpay` fails it). In Test Mode, net banking and wallets open a mock bank page with **Success** and **Failure** buttons. The page reloads showing **Payment received**. Payment capture: the server captures an `authorized` payment itself; you can also switch on auto-capture in the Dashboard (*Account & Settings → Payment Capture*).
 
+### Provider price rises and paying a renewal online
+
+Domain and hosting renewals use the same Razorpay requests:
+
+* **The provider raised its price** (renewal page → *The provider raised its price*; needs the approver permission `renewals.approve` and the account password). The extra amount, including any tax, is added to the renewal total and the invoice amount, with a reason of at least 10 characters. It works while the invoice is issued, part paid, or fully paid but the provider has not been asked to renew yet; in that last case the renewal goes back to **Awaiting Payment** for the extra amount only. Money already received is never touched. The client is notified and sees "includes ₹X because the provider raised its price". Once the provider work has started, the price can no longer be raised here.
+* **Collect online** (renewal page → *Collect online with Razorpay*; needs `payments.request`): the same form as for invoices (editable amount up to what is still due, QR or checkout window, optional note) at `/renewals/{service}/pay-request`. The client sees the request on their service page ("Pay ₹X online") and at `/my/pay/...`.
+* A confirmed payment is counted on the renewal (method *Payment gateway*, reference `Razorpay pay_…`), once only, and moves the renewal to **Payment Received** when the invoice is covered. It never touches the billing-invoice payments. If a payment arrives that cannot be counted (the renewal was cancelled or is already covered) it is not lost: an audit entry is written and staff with renewal rights are notified to settle it by hand.
+* Migration `0023_renewal_payment_requests.sql` adds `renewal_cycles.adjustment_minor` and lets a payment request point at a renewal cycle instead of an invoice.
+
 ### Test-mode checklist (do this before going live)
 
 1. In the Razorpay Dashboard (Test Mode) create API keys: *Account & Settings → API Keys*. Note the **Key ID** (`rzp_test_…`) and **Key Secret**.

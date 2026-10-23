@@ -363,6 +363,8 @@ return static function (Router $router): void {
     $router->get('/payment-requests', [PaymentRequestController::class, 'index'], $pr);
     $router->get('/invoices/{invoice}/pay-request', [PaymentRequestController::class, 'create'], $pr);
     $router->post('/invoices/{invoice}/pay-request', [PaymentRequestController::class, 'store'], $pr);
+    $router->get('/renewals/{service}/pay-request', [PaymentRequestController::class, 'createRenewal'], $pr);
+    $router->post('/renewals/{service}/pay-request', [PaymentRequestController::class, 'storeRenewal'], $pr);
     $router->get('/payment-requests/{order}', [PaymentRequestController::class, 'show'], $pr);
     $router->get('/payment-requests/{order}/status', [PaymentRequestController::class, 'status'], $pr);
     $router->post('/payment-requests/{order}/cancel', [PaymentRequestController::class, 'cancel'], $pr);

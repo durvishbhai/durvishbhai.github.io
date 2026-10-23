@@ -25,6 +25,9 @@ final class ClientServiceController extends Controller
     {
         $s = RenewalService::requireOwn($this->actorId(), $params['service'] ?? '');
 
-        return $this->page('renewals/my-show', ['title' => $s['identifier'], 'v' => RenewalService::clientView($s)]);
+        $cycle = RenewalService::openCycle($s);
+        $live = $cycle === null || !in_array($s['status'], ['invoice_issued', 'awaiting_payment'], true) ? [] : \Vertex\Services\RazorpayGateway::liveRequests((int) $cycle['id'], true);
+
+        return $this->page('renewals/my-show', ['title' => $s['identifier'], 'v' => RenewalService::clientView($s), 'payUrl' => $live === [] ? null : '/my/pay/' . $live[0]['public_id'], 'payAmount' => $live === [] ? 0 : (int) $live[0]['amount_minor']]);
     }
 }

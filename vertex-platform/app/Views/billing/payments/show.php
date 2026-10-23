@@ -1,9 +1,9 @@
 <?php /** @var array<string,mixed> $o */ /** @var array<string,mixed> $inv */ /** @var bool $mine */ /** @var bool $live */ /** @var string $svg */ /** @var string $statusUrl */ /** @var int $expiresAt */ /** @var string $invoiceUrl */
 $st = (string) $o['status']; $amount = money((int) $o['amount_minor']); ?>
 <div class="page-head"><div><p class="eyebrow">Razorpay</p><h1><?= $mine ? 'Pay ' . e($amount) : 'Payment request' ?></h1></div>
-    <div class="actions"><a class="btn btn-ghost" href="<?= e($invoiceUrl) ?>">&larr; Invoice <?= e($inv['reference']) ?></a><?php if (!$mine) : ?><a class="btn btn-ghost" href="/payment-requests">All requests</a><?php endif; ?></div></div>
+    <div class="actions"><a class="btn btn-ghost" href="<?= e($invoiceUrl) ?>">&larr; <?= $inv['kind'] === 'renewal' ? 'Renewal' : 'Invoice' ?> <?= e($inv['reference']) ?></a><?php if (!$mine) : ?><a class="btn btn-ghost" href="/payment-requests">All requests</a><?php endif; ?></div></div>
 <div class="pay-card" data-pay-poll="<?= e($statusUrl) ?>" data-pay-expires="<?= (int) $expiresAt ?>" data-pay-state="<?= e($live ? 'live' : $st) ?>">
-    <div class="pay-amount"><span class="muted">Amount</span><strong><?= e($amount) ?></strong><span class="muted">Invoice <?= e($inv['reference']) ?> · <?= e($inv['client_name']) ?></span><?php if (!empty($o['note']) && !$mine) : ?><span class="muted">Note: <?= e($o['note']) ?></span><?php endif; ?></div>
+    <div class="pay-amount"><span class="muted">Amount</span><strong><?= e($amount) ?></strong><span class="muted"><?= $inv['kind'] === 'renewal' ? 'Renewal' : 'Invoice' ?> <?= e($inv['reference']) ?> · <?= e($inv['client_name']) ?></span><?php if (!empty($o['note']) && !$mine) : ?><span class="muted">Note: <?= e($o['note']) ?></span><?php endif; ?></div>
     <?php if ($o['flow'] === 'checkout') : ?>
     <div class="pay-qr" data-pay-live<?= $live ? '' : ' hidden' ?>>
         <?php if ($mine) : ?>
@@ -23,7 +23,7 @@ $st = (string) $o['status']; $amount = money((int) $o['amount_minor']); ?>
         <p class="muted small">Waiting for Razorpay's confirmation. This page updates by itself once the payment is received.</p>
     </div>
     <?php endif; ?>
-    <div class="pay-done" data-pay-paid<?= $st === 'completed' ? '' : ' hidden' ?>><span class="pay-tick" aria-hidden="true">✓</span><h2>Payment received</h2><p>Razorpay confirmed <?= e($amount) ?> and it has been recorded on the invoice.</p></div>
+    <div class="pay-done" data-pay-paid<?= $st === 'completed' ? '' : ' hidden' ?>><span class="pay-tick" aria-hidden="true">✓</span><h2>Payment received</h2><p>Razorpay confirmed <?= e($amount) ?> and it has been recorded<?= $inv['kind'] === 'renewal' ? ' on the renewal' : ' on the invoice' ?>.</p></div>
     <div class="pay-done is-bad" data-pay-over<?= (!$live && $st !== 'completed') ? '' : ' hidden' ?>><h2><?= $st === 'cancelled' ? 'This request was withdrawn' : ($st === 'failed' ? 'The payment did not go through' : 'This request has expired') ?></h2><p><?= $mine ? 'Please ask the team for a new payment request.' : 'Create a new request from the invoice if the client still needs to pay.' ?></p></div>
 </div>
 <?php if (!$mine && $live) : ?><div class="panel pay-share"><h2>Send it to the client</h2><p class="muted">The client sees this same QR (and is notified) after signing in to their account. You can also share this link with them:</p>

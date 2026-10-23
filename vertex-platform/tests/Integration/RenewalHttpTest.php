@@ -178,4 +178,62 @@ final class RenewalHttpTest extends HttpTestCase
         RenewalScheduler::run();
         $this->assertStringNotContainsString('Reminders are not running', $m->get('/renewals')['body']);
     }
+
+    public function testRaisingThePriceAndRequestingPaymentOverHttp(): void
+    {
+        $s = $this->svc();
+        $url = '/renewals/' . $s['public_id'];
+        $a = $this->loggedIn('admin@x.test');
+        $m = $this->loggedIn('mgr@x.test');
+        $a->post($url, ['action' => 'approve', 'price_mode' => 'list', 'period_months' => '12', 'confirm_password' => self::PASSWORD], $url);
+        $this->assertStringNotContainsString('The provider raised its price', $a->get($url)['body'], 'no invoice yet');
+        $m->post($url, ['action' => 'invoice', 'invoice_ref' => 'INV-R1', 'amount' => '1416.00'], $url);
+        $m->post($url, ['action' => 'invoice_sent'], $url);
+
+        // only the approver, with the password, can raise the price
+        $page = $a->get($url)['body'];
+        $this->assertStringContainsString('The provider raised its price', $page);
+        $this->assertStringContainsString('Collect online with Razorpay', $page);
+        $this->assertStringNotContainsString('The provider raised its price', $m->get($url)['body']);
+        $raise = ['action' => 'raise_price', 'increase' => '200.00', 'reason' => 'Registrar raised the .com renewal price'];
+        $m->post($url, $raise + ['confirm_password' => self::PASSWORD], $url);
+        $a->post($url, $raise + ['confirm_password' => 'wrong'], $url);
+        $this->assertSame(0, (int) Database::one('SELECT adjustment_minor FROM renewal_cycles')['adjustment_minor']);
+        $a->post($url, $raise + ['confirm_password' => self::PASSWORD], $url);
+        $this->assertSame(20000, (int) Database::one('SELECT adjustment_minor FROM renewal_cycles')['adjustment_minor']);
+        $this->assertStringContainsString('1,616.00', $a->get($url)['body']);
+        $client = $this->loggedIn('alpha@client.test')->get('/my/services/' . $s['public_id'])['body'];
+        $this->assertStringContainsString('1,616.00', $client);
+        $this->assertStringContainsString('provider raised its price', $client);
+
+        // the request page: an editable amount, up to what is due, and only for people who may request payments
+        $this->assertSame(403, $m->get($url . '/pay-request')['status']);
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get($url . '/pay-request')['status']);
+        $form = $a->get($url . '/pay-request');
+        $this->assertSame(200, $form['status']);
+        $this->assertStringContainsString('value="1616.00"', $form['body']);
+        $this->assertStringContainsString($s['identifier'], $form['body']);
+        $r = $a->post($url . '/pay-request', ['amount' => '500'], $url . '/pay-request');
+        $this->assertSame(303, $r['status'], 'Razorpay is off here, so a friendly error and back to the form');
+        $this->assertSame($url . '/pay-request', $r['location']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) AS c FROM gateway_orders')['c']);
+
+        // a request that exists (as Razorpay would have made it) is shown to the team and to the owning client only
+        $cycle = Database::one('SELECT * FROM renewal_cycles');
+        $pub = bin2hex(random_bytes(16));
+        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, renewal_cycle_id, client_id, amount_minor, qr_payload, expires_at, status, created_by, last_checked_at, created_at, updated_at)
+            VALUES (?, ?, 'razorpay', 'checkout', NULL, ?, ?, 20000, '', DATE_ADD(UTC_TIMESTAMP(), INTERVAL 20 MINUTE), 'pending', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, 'KIS' . $cycle['id'] . 'XABCDEF012345', $cycle['id'], $s['client_id'], $this->admin]);
+        $this->assertStringContainsString('/payment-requests/' . $pub, $a->get($url)['body']);
+        $this->assertStringContainsString('Renewal', $a->get('/payment-requests/' . $pub)['body']);
+        $this->assertStringContainsString('/payment-requests', $a->get('/payment-requests')['body']);
+        $mine = $this->loggedIn('alpha@client.test');
+        $this->assertStringContainsString('/my/pay/' . $pub, $mine->get('/my/services/' . $s['public_id'])['body']);
+        $pay = $mine->get('/my/pay/' . $pub);
+        $this->assertSame(200, $pay['status']);
+        $this->assertStringContainsString('Pay ₹200.00 with Razorpay', $pay['body']);
+        $this->assertStringContainsString('/my/services/' . $s['public_id'], $pay['body']);
+        $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/pay/' . $pub)['status']);
+        $this->assertSame(400, $mine->post('/my/pay/' . $pub . '/verify', ['razorpay_payment_id' => 'pay_X'], '/account')['status']);
+    }
 }

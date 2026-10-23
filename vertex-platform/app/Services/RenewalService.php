@@ -440,39 +440,128 @@ final class RenewalService
             throw new ValidationException(['The date received cannot be in the future.']);
         }
         Database::transaction(function () use ($actorId, $service, $amount, $method, $ref, $on): void {
+            self::applyPayment($actorId, $service, $amount, $method, $ref, $on);
+        });
+    }
+
+    /**
+     * Counts money received against the open cycle's invoice (the caller holds the transaction). Used by staff recording a payment and by the payment
+     * gateway when Razorpay confirms one. Throws ValidationException when the payment cannot be counted (wrong status, more than is due, repeated reference).
+     *
+     * @param array<string,mixed> $service
+     */
+    private static function applyPayment(?int $actorId, array $service, int $amount, string $method, string $ref, string $on): void
+    {
+        $s = self::lock((int) $service['id']);
+        if (!in_array($s['status'], ['invoice_issued', 'awaiting_payment'], true)) {
+            throw new ValidationException(['A payment can be recorded only against an issued invoice.']);
+        }
+        $cycle = self::cycleFor($s);
+        $remaining = (int) $cycle['invoice_amount_minor'] - (int) $cycle['paid_minor'];
+        if ($amount > $remaining) {
+            throw new ValidationException(['That is more than the ₹' . FieldRules::formatMinor($remaining) . ' still due on the invoice.']);
+        }
+        try {
+            Database::run('INSERT INTO renewal_payments (cycle_id, amount_minor, method, reference, payment_key, received_on, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+                [$cycle['id'], $amount, $method, $ref, hash('sha256', $method . ':' . strtolower($ref)), $on, $actorId]);
+        } catch (\PDOException $e) {
+            if (($e->errorInfo[1] ?? 0) === 1062) {
+                throw new ValidationException(['That transaction has already been recorded. It cannot be counted twice.']);
+            }
+            throw $e;
+        }
+        $paid = (int) $cycle['paid_minor'] + $amount;
+        Database::run('UPDATE renewal_cycles SET paid_minor = ?, payment_complete_at = IF(? >= invoice_amount_minor, UTC_TIMESTAMP(), NULL), updated_at = UTC_TIMESTAMP() WHERE id = ?', [$paid, $paid, $cycle['id']]);
+        Audit::record('renewal.payment_recorded', 'renewal_service', (int) $s['id'], ['paid_minor' => (int) $cycle['paid_minor']], ['paid_minor' => $paid, 'amount_minor' => $amount, 'method' => $method], [], $actorId);
+        if ($paid >= (int) $cycle['invoice_amount_minor']) {
+            $s = self::moveTo($s, 'payment_received', 'payment', 'Payment complete (the provider has NOT been asked to renew yet).', $actorId);
+            self::notifyStaff('renewal.payment_received', $s, 'Payment received: ' . $s['identifier'], 'Start the renewal with the provider and record their confirmation.', 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':paid' . ((int) $cycle['adjustment_minor'] > 0 ? ':' . (int) $cycle['invoice_amount_minor'] : ''), ['renewals.manage', 'renewals.confirm_provider']);
+            if ($s['client_user_id']) {
+                Notifier::send([(int) $s['client_user_id']], 'renewal.payment_received', 'Payment received for ' . $s['identifier'], 'Thank you. We will now renew it with the provider and confirm here once it is done.', '/my/services/' . $s['public_id'], null, 'renewal_service', (int) $s['id'], 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':client-paid' . ((int) $cycle['adjustment_minor'] > 0 ? ':' . (int) $cycle['invoice_amount_minor'] : ''));
+            }
+        } elseif ($s['status'] === 'invoice_issued') {
+            self::moveTo($s, 'awaiting_payment', 'payment', 'Part payment recorded.', $actorId);
+        } else {
+            self::history((int) $s['id'], (int) $s['cycle_no'], 'payment', null, null, 'Part payment of ₹' . FieldRules::formatMinor($amount) . ' recorded.', $actorId);
+        }
+    }
+
+    /**
+     * Counts a payment Razorpay has confirmed (a captured payment of exactly the requested amount). Idempotent: the same Razorpay payment is never counted
+     * twice. Returns false when it was already counted. A payment that cannot be matched (the renewal was cancelled or already covered) is not lost: staff
+     * are told to settle it by hand.
+     *
+     * @param array<string,mixed> $cycle
+     */
+    public static function recordGatewayPayment(array $cycle, int $amount, string $paymentId, string $orderRef): bool
+    {
+        $service = Database::one('SELECT s.*, c.user_id AS client_user_id FROM renewal_services s JOIN clients c ON c.id = s.client_id WHERE s.id = ?', [$cycle['service_id']]) ?? throw new HttpException(404);
+        if (Database::one('SELECT id FROM renewal_payments WHERE payment_key = ?', [hash('sha256', 'gateway:' . strtolower('Razorpay ' . $paymentId))]) !== null) {
+            return false;
+        }
+        try {
+            Database::transaction(function () use ($service, $amount, $paymentId, $orderRef): void {
+                self::applyPayment(null, $service, $amount, 'gateway', 'Razorpay ' . $paymentId, AppTime::today());
+                self::history((int) $service['id'], (int) $service['cycle_no'], 'payment', null, null, 'Razorpay payment of ₹' . FieldRules::formatMinor($amount) . ' confirmed (' . $orderRef . ').', null);
+            });
+
+            return true;
+        } catch (ValidationException $e) {
+            if (str_contains(implode(' ', $e->errors), 'already been recorded')) {
+                return false;
+            }
+            \Vertex\Core\Logger::error('Razorpay payment for a renewal could not be counted', ['service' => $service['identifier'], 'payment' => $paymentId, 'reason' => implode(' ', $e->errors)]);
+            Audit::record('renewal.gateway_payment_unmatched', 'renewal_service', (int) $service['id'], [], ['amount_minor' => $amount, 'payment' => $paymentId], [], null);
+            self::notifyStaff('renewal.payment_unmatched', $service, 'Check this payment: ' . $service['identifier'], 'Razorpay confirmed ₹' . FieldRules::formatMinor($amount) . ' (' . $paymentId . ') but it could not be counted against the renewal (it may be cancelled or already paid). Settle it by hand.', 'rnw:' . $service['id'] . ':unmatched:' . $paymentId, ['renewals.manage', 'renewals.approve']);
+
+            return false;
+        }
+    }
+
+    /**
+     * The provider raised its price: adds the increase (₹, including any tax) to the open renewal and its invoice, with a reason. Allowed while the invoice is
+     * issued, part paid, or paid but the provider has not been asked to renew yet; in that last case the renewal goes back to Awaiting Payment for the extra
+     * amount. Money already received is never touched.
+     */
+    public static function raisePrice(int $actorId, array $service, string $increase, string $reason): void
+    {
+        Gate::authorize('renewals.approve', $actorId);
+        $inc = (int) FieldRules::moneyMinor($increase, 'Price increase', true);
+        $reason = (string) FieldRules::line($reason, 'Reason for the price increase', 10, 255);
+        if ($inc < 100 || $inc > 100000000) {
+            throw new ValidationException(['The increase must be between ₹1.00 and ₹10,00,000.00.']);
+        }
+        Database::transaction(function () use ($actorId, $service, $inc, $reason): void {
             $s = self::lock((int) $service['id']);
-            if (!in_array($s['status'], ['invoice_issued', 'awaiting_payment'], true)) {
-                throw new ValidationException(['A payment can be recorded only against an issued invoice.']);
+            if (!in_array($s['status'], ['invoice_issued', 'awaiting_payment', 'payment_received'], true)) {
+                throw new ValidationException(['The price can be raised only after the invoice is recorded and before the provider renewal has started.']);
             }
             $cycle = self::cycleFor($s);
-            $remaining = (int) $cycle['invoice_amount_minor'] - (int) $cycle['paid_minor'];
-            if ($amount > $remaining) {
-                throw new ValidationException(['That is more than the ₹' . FieldRules::formatMinor($remaining) . ' still due on the invoice.']);
+            if ($cycle['invoice_ref'] === null || $cycle['invoice_amount_minor'] === null) {
+                throw new ValidationException(['There is no invoice on this renewal to raise (a waived renewal must be sent back for a new price instead).']);
             }
-            try {
-                Database::run('INSERT INTO renewal_payments (cycle_id, amount_minor, method, reference, payment_key, received_on, recorded_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
-                    [$cycle['id'], $amount, $method, $ref, hash('sha256', $method . ':' . strtolower($ref)), $on, $actorId]);
-            } catch (\PDOException $e) {
-                if (($e->errorInfo[1] ?? 0) === 1062) {
-                    throw new ValidationException(['That transaction has already been recorded. It cannot be counted twice.']);
-                }
-                throw $e;
-            }
-            $paid = (int) $cycle['paid_minor'] + $amount;
-            Database::run('UPDATE renewal_cycles SET paid_minor = ?, payment_complete_at = IF(? >= invoice_amount_minor, UTC_TIMESTAMP(), NULL), updated_at = UTC_TIMESTAMP() WHERE id = ?', [$paid, $paid, $cycle['id']]);
-            Audit::record('renewal.payment_recorded', 'renewal_service', (int) $s['id'], ['paid_minor' => (int) $cycle['paid_minor']], ['paid_minor' => $paid, 'amount_minor' => $amount, 'method' => $method], [], $actorId);
-            if ($paid >= (int) $cycle['invoice_amount_minor']) {
-                $s = self::moveTo($s, 'payment_received', 'payment', 'Payment complete (the provider has NOT been asked to renew yet).', $actorId);
-                self::notifyStaff('renewal.payment_received', $s, 'Payment received: ' . $s['identifier'], 'Start the renewal with the provider and record their confirmation.', 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':paid', ['renewals.manage', 'renewals.confirm_provider']);
-                if ($s['client_user_id']) {
-                    Notifier::send([(int) $s['client_user_id']], 'renewal.payment_received', 'Payment received for ' . $s['identifier'], 'Thank you. We will now renew it with the provider and confirm here once it is done.', '/my/services/' . $s['public_id'], null, 'renewal_service', (int) $s['id'], 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':client-paid');
-                }
-            } elseif ($s['status'] === 'invoice_issued') {
-                self::moveTo($s, 'awaiting_payment', 'payment', 'Part payment recorded.', $actorId);
+            $total = (int) $cycle['total_minor'] + $inc;
+            $invoice = (int) $cycle['invoice_amount_minor'] + $inc;
+            Database::run('UPDATE renewal_cycles SET adjustment_minor = adjustment_minor + ?, total_minor = ?, invoice_amount_minor = ?, payment_complete_at = NULL, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$inc, $total, $invoice, $cycle['id']]);
+            Audit::record('renewal.price_raised', 'renewal_service', (int) $s['id'], ['total_minor' => (int) $cycle['total_minor']], ['total_minor' => $total, 'increase_minor' => $inc], ['reason_recorded' => true], $actorId);
+            $note = 'Provider price increase of ₹' . FieldRules::formatMinor($inc) . ' (new total ₹' . FieldRules::formatMinor($invoice) . '): ' . $reason;
+            if ($s['status'] === 'payment_received') {
+                $s = self::moveTo($s, 'awaiting_payment', 'price_increase', $note, $actorId);
             } else {
-                self::history((int) $s['id'], (int) $s['cycle_no'], 'payment', null, null, 'Part payment of ₹' . FieldRules::formatMinor($amount) . ' recorded.', $actorId);
+                self::history((int) $s['id'], (int) $s['cycle_no'], 'price_increase', null, null, $note, $actorId);
+            }
+            $due = $invoice - (int) $cycle['paid_minor'];
+            $clientUser = Database::one('SELECT user_id FROM clients WHERE id = ?', [$s['client_id']])['user_id'] ?? null;
+            if ($clientUser !== null) {
+                Notifier::send([(int) $clientUser], 'renewal.price_raised', 'Price update for ' . $s['identifier'], 'The provider has raised its price. An extra ₹' . FieldRules::formatMinor($inc) . ' is needed; ₹' . FieldRules::formatMinor($due) . ' is now due. ' . $reason, '/my/services/' . $s['public_id'], null, 'renewal_service', (int) $s['id'], 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':raise:' . $invoice);
             }
         });
+    }
+
+    /** What is still unpaid on the open cycle's invoice. @param array<string,mixed> $cycle */
+    public static function dueOf(?array $cycle): int
+    {
+        return $cycle === null || $cycle['invoice_amount_minor'] === null ? 0 : max(0, (int) $cycle['invoice_amount_minor'] - (int) $cycle['paid_minor']);
     }
 
     // ------------------------------------------------------------------------------------------------ provider work
@@ -706,7 +795,7 @@ final class RenewalService
             'period_months' => (int) $s['period_months'], 'status' => $s['status'], 'stage' => $stage, 'client_notes' => $s['client_notes'], 'last_renewed_at' => $s['last_renewed_at'],
             'price' => $approved ? ['net_minor' => (int) $cycle['net_minor'], 'tax_minor' => (int) $cycle['tax_minor'], 'total_minor' => (int) $cycle['total_minor'], 'period_months' => (int) $cycle['period_months'], 'waived' => $cycle['price_source'] === 'waived'] : null,
             'quotation_ref' => $cycle['quotation_ref'] ?? null, 'invoice_ref' => $cycle['invoice_ref'] ?? null, 'invoice_amount_minor' => $cycle !== null && $cycle['invoice_amount_minor'] !== null ? (int) $cycle['invoice_amount_minor'] : null,
-            'paid_minor' => (int) ($cycle['paid_minor'] ?? 0), 'steps' => self::steps($s['status'])];
+            'adjustment_minor' => (int) ($cycle['adjustment_minor'] ?? 0), 'paid_minor' => (int) ($cycle['paid_minor'] ?? 0), 'steps' => self::steps($s['status'])];
     }
 
     /** @return list<array{label:string,state:string}> a plain progress bar for the client */

@@ -9,7 +9,9 @@ use Vertex\Core\Database;
 use Vertex\Core\HttpException;
 use Vertex\Core\ValidationException;
 use Vertex\Services\Audit;
+use Vertex\Services\Http;
 use Vertex\Services\Mailer;
+use Vertex\Services\RazorpayGateway;
 use Vertex\Services\RenewalPricing;
 use Vertex\Services\RenewalScheduler;
 use Vertex\Services\RenewalService;
@@ -589,5 +591,138 @@ final class RenewalServiceTest extends DatabaseTestCase
         $this->assertSame($before[0], Database::all('SELECT * FROM projects ORDER BY id'));
         $this->assertSame($before[1], Database::all('SELECT * FROM clients ORDER BY id'));
         $this->assertSame($before[2], (int) Database::one('SELECT COUNT(*) AS c FROM client_payments')['c'], 'renewal payments are separate from project payments and commissions');
+    }
+
+    // ------------------------------------------------------------------------------------------------ provider price rises and online payment
+
+    /** A renewal whose invoice (INV-P1, total in $total) is recorded and sent. @return array{0:array<string,mixed>,1:int} the service and the invoice total in paise */
+    private function awaitingPayment(): array
+    {
+        $this->addPrice();
+        $s = $this->inReview();
+        $this->approveListPrice($s);
+        $s = $this->fresh($s);
+        $total = (int) RenewalService::openCycle($s)['total_minor'];
+        RenewalService::recordInvoice($this->manager, $s, ['invoice_ref' => 'INV-P1', 'amount' => number_format($total / 100, 2, '.', '')]);
+        RenewalService::markInvoiceSent($this->manager, $this->fresh($s));
+
+        return [$this->fresh($s), $total];
+    }
+
+    public function testTheApproverCanRaiseThePriceAndPaidRenewalsReopenUntilTheProviderIsStarted(): void
+    {
+        [$s, $total] = $this->awaitingPayment();
+        $this->assertSame('awaiting_payment', $s['status']);
+        try {
+            RenewalService::raisePrice($this->manager, $s, '150', 'Registrar raised the renewal price');
+            $this->fail('only the approver may raise the price');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->status);
+        }
+        $this->expectInvalid(fn () => RenewalService::raisePrice($this->admin, $s, '0.50', 'Registrar raised the renewal price'), 'between');
+        $this->expectInvalid(fn () => RenewalService::raisePrice($this->admin, $s, '150', 'short'), 'reason');
+
+        RenewalService::raisePrice($this->admin, $s, '150', 'Registrar raised the renewal price');
+        $c = RenewalService::openCycle($this->fresh($s));
+        $this->assertSame($total + 15000, (int) $c['total_minor']);
+        $this->assertSame($total + 15000, (int) $c['invoice_amount_minor']);
+        $this->assertSame(15000, (int) $c['adjustment_minor']);
+        $this->assertSame('awaiting_payment', $this->fresh($s)['status']);
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND event_type = 'renewal.price_raised'", [$this->client])['c']);
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) AS c FROM audit_logs WHERE action = 'renewal.price_raised'")['c']);
+
+        // paying everything now needs the new total; the renewal is then "paid" ...
+        RenewalService::recordPayment($this->manager, $this->fresh($s), ['amount' => number_format(($total + 15000) / 100, 2, '.', ''), 'method' => 'upi', 'reference' => 'UPI-ALL', 'received_on' => self::TODAY]);
+        $this->assertSame('payment_received', $this->fresh($s)['status']);
+        // ... and another rise before the provider is started reopens it for the extra amount only
+        RenewalService::raisePrice($this->admin, $this->fresh($s), '100', 'Registrar raised the price again');
+        $x = $this->fresh($s);
+        $this->assertSame('awaiting_payment', $x['status']);
+        $this->assertSame(10000, RenewalService::dueOf(RenewalService::openCycle($x)));
+        $this->expectInvalid(fn () => RenewalService::startProviderRenewal($this->manager, $x), '');
+        RenewalService::recordPayment($this->manager, $x, ['amount' => '100', 'method' => 'upi', 'reference' => 'UPI-EXTRA', 'received_on' => self::TODAY]);
+        $this->assertSame('payment_received', $this->fresh($s)['status']);
+
+        // once the provider work has started the price can no longer be raised here
+        RenewalService::startProviderRenewal($this->manager, $this->fresh($s));
+        $this->expectInvalid(fn () => RenewalService::raisePrice($this->admin, $this->fresh($s), '50', 'Registrar raised the price once more'), 'before the provider');
+    }
+
+    public function testThePriceCannotBeRaisedBeforeAnInvoiceExists(): void
+    {
+        $this->addPrice();
+        $s = $this->inReview();
+        $this->approveListPrice($s);
+        $this->expectInvalid(fn () => RenewalService::raisePrice($this->admin, $this->fresh($s), '50', 'Registrar raised the price'), 'invoice');
+    }
+
+    private function razorpayLinks(array &$calls, int $paid = 0): void
+    {
+        Config::set('app.url', 'https://vis.test');
+        Config::set('razorpay.enabled', true);
+        Config::set('razorpay.key_id', 'rzp_test_AbCd1234');
+        Config::set('razorpay.key_secret', 'SECRETKEY1');
+        Config::set('razorpay.qr_mode', 'link');
+        Config::set('razorpay.webhook_secret', 'whsec_test_123');
+        Http::fake(function (string $m, string $url, array $h, ?string $body) use (&$calls, &$paid): array {
+            $calls[] = $m . ' ' . $url;
+            $b = $body !== null ? json_decode($body, true) : [];
+            if ($m === 'POST' && str_ends_with($url, '/payment_links')) {
+                return ['status' => 200, 'body' => json_encode(['id' => 'plink_RenewLink01', 'short_url' => 'https://rzp.io/i/Renew', 'amount' => $b['amount'], 'accept_partial' => false])];
+            }
+            if ($m === 'GET' && str_contains($url, '/payment_links/')) {
+                return ['status' => 200, 'body' => json_encode(['id' => 'plink_RenewLink01', 'status' => $paid > 0 ? 'paid' : 'created', 'amount_paid' => $paid, 'payments' => $paid > 0 ? [['payment_id' => 'pay_RenewPaid001', 'amount' => $paid, 'status' => 'captured']] : null])];
+            }
+
+            return ['status' => 404, 'body' => '{}'];
+        });
+    }
+
+    public function testARazorpayRequestForARenewalIsExactAndItsPaymentIsCountedOnTheRenewalOnce(): void
+    {
+        [$s, $total] = $this->awaitingPayment();
+        $calls = [];
+        $this->razorpayLinks($calls);
+        try {
+            RazorpayGateway::createRenewalRequest($this->manager, $s, 10000);
+            $this->fail('only people with payments.request may ask for a payment');
+        } catch (HttpException $e) {
+            $this->assertSame(403, $e->status);
+        }
+        $o = RazorpayGateway::createRenewalRequest($this->admin, $s, 40000, 'advance');
+        $this->assertSame(40000, (int) $o['amount_minor']);
+        $this->assertNull($o['invoice_id']);
+        $this->assertNotNull($o['renewal_cycle_id']);
+        $this->assertSame('payment_link', $o['flow']);
+        $this->expectInvalid(fn () => RazorpayGateway::createRenewalRequest($this->admin, $s, $total + 100), 'more than');
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND event_type = 'payment.requested'", [$this->client])['c']);
+        $this->assertCount(1, RazorpayGateway::liveRequests((int) $o['renewal_cycle_id'], true));
+
+        // the customer pays: only a captured payment of exactly 400.00 counts, and only once
+        $this->razorpayLinks($calls, 40000);
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => true], RazorpayGateway::reconcile($o['merchant_order_id']));
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => false], RazorpayGateway::reconcile($o['merchant_order_id']));
+        $c = RenewalService::openCycle($this->fresh($s));
+        $this->assertSame(40000, (int) $c['paid_minor']);
+        $this->assertSame('awaiting_payment', $this->fresh($s)['status']);
+        $p = RenewalService::payments($c);
+        $this->assertSame('gateway', $p[0]['method']);
+        $this->assertSame('Razorpay pay_RenewPaid001', $p[0]['reference']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) AS c FROM client_payments')['c'], 'renewal money never lands in the billing-invoice payments');
+        $this->assertSame('completed', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$o['id']])['status']);
+    }
+
+    public function testAGatewayPaymentThatCannotBeCountedIsReportedToStaffNotLost(): void
+    {
+        [$s] = $this->awaitingPayment();
+        $calls = [];
+        $this->razorpayLinks($calls);
+        $o = RazorpayGateway::createRenewalRequest($this->admin, $s, 40000);
+        RenewalService::cancel($this->admin, $this->fresh($s), 'Client no longer wants it');
+        $this->razorpayLinks($calls, 40000);
+        $this->assertSame(['state' => 'COMPLETED', 'recorded' => false], RazorpayGateway::reconcile($o['merchant_order_id']));
+        $this->assertSame(0, (int) Database::one('SELECT paid_minor FROM renewal_cycles ORDER BY id DESC LIMIT 1')['paid_minor']);
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) AS c FROM audit_logs WHERE action = 'renewal.gateway_payment_unmatched'")['c']);
+        $this->assertGreaterThanOrEqual(1, (int) Database::one("SELECT COUNT(*) AS c FROM notifications WHERE event_type = 'renewal.payment_unmatched'")['c']);
     }
 }

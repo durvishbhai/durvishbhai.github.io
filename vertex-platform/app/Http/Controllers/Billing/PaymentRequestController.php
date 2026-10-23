@@ -14,6 +14,7 @@ use Vertex\Services\InvoiceService;
 use Vertex\Services\RazorpayGateway;
 use Vertex\Services\QrCode;
 use Vertex\Services\RateLimiter;
+use Vertex\Services\RenewalService;
 use Vertex\Core\SecurityHeadersPolicy;
 
 /**
@@ -25,8 +26,9 @@ final class PaymentRequestController extends Controller
     /** @param array<string,string> $params */
     public function index(Request $request, array $params = []): Response
     {
-        $rows = Database::all("SELECT o.*, i.reference AS invoice_ref, i.public_id AS invoice_pub, COALESCE(NULLIF(c.company_name, ''), c.contact_name) AS client_name, u.name AS by_name FROM gateway_orders o
-            JOIN invoices i ON i.id = o.invoice_id JOIN clients c ON c.id = o.client_id LEFT JOIN users u ON u.id = o.created_by WHERE o.provider = 'razorpay' ORDER BY o.id DESC LIMIT 100");
+        $rows = Database::all("SELECT o.*, COALESCE(i.reference, rs.identifier) AS invoice_ref, COALESCE(i.public_id, rs.public_id) AS invoice_pub, o.renewal_cycle_id IS NOT NULL AS is_renewal, COALESCE(NULLIF(c.company_name, ''), c.contact_name) AS client_name, u.name AS by_name FROM gateway_orders o
+            LEFT JOIN invoices i ON i.id = o.invoice_id LEFT JOIN renewal_cycles cy ON cy.id = o.renewal_cycle_id LEFT JOIN renewal_services rs ON rs.id = cy.service_id
+            JOIN clients c ON c.id = o.client_id LEFT JOIN users u ON u.id = o.created_by WHERE o.provider = 'razorpay' ORDER BY o.id DESC LIMIT 100");
 
         return $this->page('billing/payments/index', ['title' => 'Payment requests', 'rows' => $rows, 'ready' => RazorpayGateway::status()]);
     }
@@ -35,7 +37,8 @@ final class PaymentRequestController extends Controller
     public function create(Request $request, array $params = []): Response
     {
         $i = InvoiceService::requireStaff($this->actorId(), $params['invoice'] ?? '');
-        $r = $this->page('billing/payments/new', ['title' => 'Request a payment', 'i' => $i, 'due' => RazorpayGateway::requestable($i), 'ready' => RazorpayGateway::status(), 'live' => RazorpayGateway::liveRequests((int) $i['id'])]);
+        $r = $this->page('billing/payments/new', ['title' => 'Request a payment', 'i' => $i, 'due' => RazorpayGateway::requestable($i), 'ready' => RazorpayGateway::status(), 'live' => RazorpayGateway::liveRequests((int) $i['id']),
+            't' => ['back' => '/invoices/' . $i['public_id'], 'action' => '/invoices/' . $i['public_id'] . '/pay-request', 'backLabel' => 'Invoice ' . $i['reference'], 'what' => $i['reference'] . ' · ' . $i['title'], 'detail' => '', 'client' => $i['client_name'], 'kind' => 'invoice']]);
         \Vertex\Core\Session::forget('_old');
 
         return $r;
@@ -54,6 +57,33 @@ final class PaymentRequestController extends Controller
 
             return Response::redirect('/payment-requests/' . $o['public_id']);
         }, $back, ['amount' => $request->string('amount'), 'note' => $request->string('note'), 'method' => $request->string('method')]);
+    }
+
+    /** @param array<string,string> $params */
+    public function createRenewal(Request $request, array $params = []): Response
+    {
+        $s = RenewalService::find($params['service'] ?? '') ?? throw new HttpException(404);
+        $cycle = RenewalService::openCycle($s);
+        $r = $this->page('billing/payments/new', ['title' => 'Request a payment', 'ready' => RazorpayGateway::status(), 'due' => in_array($s['status'], ['invoice_issued', 'awaiting_payment'], true) ? RenewalService::dueOf($cycle) : 0,
+            't' => ['back' => '/renewals/' . $s['public_id'], 'action' => '/renewals/' . $s['public_id'] . '/pay-request', 'backLabel' => 'Renewal ' . $s['reference'], 'what' => 'Renewal ' . $s['reference'] . ' · ' . $s['identifier'], 'detail' => $cycle['invoice_ref'] ?? '', 'client' => $s['client_name'], 'kind' => 'renewal'],
+            'live' => $cycle === null ? [] : RazorpayGateway::liveRequests((int) $cycle['id'], true)]);
+        \Vertex\Core\Session::forget('_old');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function storeRenewal(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $s = RenewalService::find($params['service'] ?? '') ?? throw new HttpException(404);
+
+        return $this->guarded(function () use ($request, $uid, $s): Response {
+            $amount = FieldRules::moneyMinor($request->input('amount'), 'Amount', true);
+            $o = RazorpayGateway::createRenewalRequest($uid, $s, (int) $amount, $request->string('note'), $request->string('method'));
+
+            return Response::redirect('/payment-requests/' . $o['public_id']);
+        }, '/renewals/' . $s['public_id'] . '/pay-request', ['amount' => $request->string('amount'), 'note' => $request->string('note'), 'method' => $request->string('method')]);
     }
 
     /** @param array<string,string> $params */
@@ -157,6 +187,12 @@ final class PaymentRequestController extends Controller
     private function ownOrder(string $publicId): array
     {
         $o = RazorpayGateway::findRequest($publicId) ?? throw new HttpException(404);
+        if ($o['renewal_cycle_id'] !== null) {
+            $sp = (string) (Database::one('SELECT s.public_id FROM renewal_cycles cy JOIN renewal_services s ON s.id = cy.service_id WHERE cy.id = ?', [$o['renewal_cycle_id']])['public_id'] ?? '');
+            RenewalService::requireOwn($this->actorId(), $sp);
+
+            return $o;
+        }
         $i = InvoiceService::requireOwn($this->actorId(), (string) Database::one('SELECT public_id FROM invoices WHERE id = ?', [$o['invoice_id']])['public_id']);
         if ((int) $i['id'] !== (int) $o['invoice_id']) {
             throw new HttpException(404);
@@ -168,11 +204,17 @@ final class PaymentRequestController extends Controller
     /** @param array<string,mixed> $o @return array<string,mixed> */
     private static function view(array $o, bool $mine): array
     {
-        $inv = Database::one("SELECT i.public_id, i.reference, i.title, COALESCE(NULLIF(c.company_name, ''), c.contact_name) AS client_name FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?", [$o['invoice_id']]);
+        if ($o['renewal_cycle_id'] !== null) {
+            $inv = Database::one("SELECT s.public_id, s.identifier AS reference, CONCAT('Renewal ', s.reference) AS title, COALESCE(NULLIF(c.company_name, ''), c.contact_name) AS client_name FROM renewal_cycles cy JOIN renewal_services s ON s.id = cy.service_id JOIN clients c ON c.id = s.client_id WHERE cy.id = ?", [$o['renewal_cycle_id']]);
+            $inv['kind'] = 'renewal';
+        } else {
+            $inv = Database::one("SELECT i.public_id, i.reference, i.title, COALESCE(NULLIF(c.company_name, ''), c.contact_name) AS client_name FROM invoices i JOIN clients c ON c.id = i.client_id WHERE i.id = ?", [$o['invoice_id']]);
+            $inv['kind'] = 'invoice';
+        }
         $live = RazorpayGateway::isLive($o);
 
         return ['title' => 'Payment request', 'o' => $o, 'inv' => $inv, 'mine' => $mine, 'live' => $live, 'svg' => $live && $o['flow'] !== 'checkout' ? QrCode::svg((string) $o['qr_payload'], 'QR code to pay ₹' . FieldRules::formatMinor((int) $o['amount_minor'])) : '',
-            'statusUrl' => ($mine ? '/my/pay/' : '/payment-requests/') . $o['public_id'] . '/status', 'expiresAt' => (int) strtotime((string) $o['expires_at'] . ' UTC'), 'invoiceUrl' => ($mine ? '/my/invoices/' : '/invoices/') . $inv['public_id']];
+            'statusUrl' => ($mine ? '/my/pay/' : '/payment-requests/') . $o['public_id'] . '/status', 'expiresAt' => (int) strtotime((string) $o['expires_at'] . ' UTC'), 'invoiceUrl' => ($inv['kind'] === 'renewal' ? ($mine ? '/my/services/' : '/renewals/') : ($mine ? '/my/invoices/' : '/invoices/')) . $inv['public_id']];
     }
 
     /**
