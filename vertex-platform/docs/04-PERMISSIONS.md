@@ -131,6 +131,9 @@ Users can hold several roles; permissions are the union.
 | `invoices.issue` — Issue invoices as payable | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `invoices.void` — Void invoices | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `receipts.view_own` — View own receipts (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
+| `receipts.view_all` — View all payment receipts | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
+| `receipts.issue` — Issue a payment receipt by hand (for a payment made outside the system) | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
+| `receipts.void` — Void a payment receipt | ✔ | ✔ |  |  |  |  |  |  |  |  |
 | `payments.view_all` — View all client payments | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |
 | `payments.pay` — Pay own invoices (client) | ✔ | ✔ |  |  |  |  |  |  |  | ✔ |
 | `payments.record` — Record payments | ✔ | ✔ |  | ✔ |  |  |  |  |  |  |

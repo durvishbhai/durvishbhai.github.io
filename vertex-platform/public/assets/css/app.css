@@ -933,3 +933,66 @@ html { accent-color: var(--violet); }
 
 .pay-error { margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--danger-bg); color: var(--danger); font-weight: 600; }
 .pay-error[hidden] { display: none; }
+
+/* Payment receipt (the KIS template). Always a white sheet, whatever the site theme. */
+.rcpt { max-width: 794px; margin: 18px auto; background: #fff; color: #0b1220; font-family: Arial, Helvetica, sans-serif; font-size: 13px; padding: 0 0 18px; box-shadow: 0 6px 30px rgba(0, 0, 0, .25); }
+.rcpt .muted { color: #6b7587; }
+.rcpt-head { display: flex; align-items: center; gap: 28px; background: #050d1f; padding: 14px 24px; }
+.rcpt-head img { width: 120px; height: auto; display: block; }
+.rcpt-head strong { display: block; color: #fff; font-size: 20px; letter-spacing: .2px; }
+.rcpt-head span { display: block; margin-top: 6px; color: #8de0f7; font-weight: 700; font-size: 16px; }
+.rcpt-title { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 26px 24px 0; }
+.rcpt-title h1 { margin: 0; font-size: 34px; letter-spacing: .3px; color: #0b1220; }
+.rcpt-title h1 em { font-style: normal; color: #7333ed; }
+.rcpt-sub { margin: 10px 0 0; color: #6b7587; }
+.rcpt-no { display: grid; gap: 4px; min-width: 210px; font-size: 12px; color: #6b7587; }
+.rcpt-no strong { color: #0b1220; font-size: 14px; }
+.rcpt-no b { color: #0b1220; font-weight: 600; }
+.rcpt-badge { display: inline-block; justify-self: start; margin-top: 4px; padding: 3px 10px; border-radius: 6px; background: #cc2633; color: #fff; font-weight: 700; }
+.rcpt-boxes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 22px 24px 0; }
+.rcpt-box { border: 1px solid #dde2ec; }
+.rcpt-box h2 { margin: 0; padding: 9px 12px; background: #f1f5fb; color: #0b1220; font-size: 12px; letter-spacing: .3px; }
+.rcpt-box dl { margin: 0; }
+.rcpt-box dl div { display: flex; gap: 8px; padding: 9px 12px; border-top: 1px solid #e4e8f0; }
+.rcpt-box dt { color: #6b7587; white-space: nowrap; }
+.rcpt-box dd { margin: 0; font-weight: 700; color: #0b1220; overflow-wrap: anywhere; }
+.rcpt-items, .rcpt-totals { border-collapse: collapse; }
+.rcpt-items { width: calc(100% - 48px); margin: 22px 24px 0; }
+.rcpt-items th { background: #050d1f; color: #fff; text-align: left; padding: 10px 12px; font-size: 12px; }
+.rcpt-items td { padding: 11px 12px; border: 1px solid #dde2ec; color: #0b1220; }
+.rcpt-items .n { width: 44px; }
+.rcpt-items .a { text-align: right; width: 150px; white-space: nowrap; }
+.rcpt-totals { width: 260px; margin: 12px 24px 0 auto; }
+.rcpt-totals td { padding: 8px 12px; border: 1px solid #dde2ec; color: #0b1220; }
+.rcpt-totals td:last-child { text-align: right; white-space: nowrap; }
+.rcpt-totals .total td { background: #2f7bff; color: #fff; font-weight: 700; border-color: #2f7bff; padding: 10px 12px; }
+.rcpt-totals .refund td { color: #cc2633; font-weight: 700; border: 0; }
+.rcpt-words { padding: 18px 28px 0; }
+.rcpt-words p { margin: 6px 0 0; color: #0b1220; }
+.rcpt-words p.muted { color: #6b7587; font-size: 12px; margin-top: 4px; }
+.rcpt-ack { margin: 16px 24px 0; padding: 12px 16px; background: #edf7ff; border-left: 3px solid #19c7e6; color: #0b1220; }
+.rcpt-ack p { margin: 5px 0 0; }
+.rcpt-ack p.muted { color: #6b7587; }
+.rcpt-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; flex-wrap: wrap; padding: 24px 24px 0; }
+.rcpt-thanks strong { display: block; color: #2f7bff; font-size: 26px; }
+.rcpt-thanks span { display: block; margin-top: 8px; font-weight: 700; color: #0b1220; }
+.rcpt-verify { display: flex; align-items: center; gap: 12px; font-size: 11px; color: #0b1220; }
+.rcpt-verify strong { display: block; font-size: 11px; margin-bottom: 4px; }
+.rcpt-verify span { display: block; color: #1a59d9; overflow-wrap: anywhere; max-width: 230px; }
+.rcpt-verify span:last-child { color: #0b1220; margin-top: 3px; }
+.rcpt-qr { width: 84px; height: 84px; background: #fff; }
+.rcpt-qr svg { width: 100%; height: 100%; display: block; }
+.rcpt-sys { text-align: right; font-size: 11px; color: #6b7587; }
+.rcpt-sys strong { display: block; color: #0b1220; font-size: 12px; margin-bottom: 3px; }
+.rcpt-contact { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 24px 24px 0; padding: 11px 14px; background: #050d1f; color: #b8c0d4; font-size: 11px; }
+@media (max-width: 640px) { .rcpt-boxes { grid-template-columns: 1fr; } .rcpt-title { flex-direction: column; } .rcpt-head { gap: 14px; padding: 12px 16px; } .rcpt-head strong { font-size: 15px; } .rcpt-head span { font-size: 12px; } .rcpt-head img { width: 84px; } .rcpt-totals { width: auto; margin: 12px 24px 0; } }
+@media print { .rcpt { box-shadow: none; margin: 0 auto; } }
+
+/* Public receipt verification page */
+.verify-card { border-radius: 16px; padding: 24px 26px; margin-bottom: 24px; border: 1px solid var(--line, #263154); background: var(--card, #0e1530); }
+.verify-card h2 { margin: 6px 0 8px; }
+.verify-ok { border-color: #1fbf75; }
+.verify-ok h2, .verify-ok .verify-mark { color: #1fbf75; }
+.verify-bad { border-color: #ff6b8b; }
+.verify-bad h2, .verify-bad .verify-mark { color: #ff6b8b; }
+.verify-mark { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 2px solid currentColor; font-size: 22px; font-weight: 700; }

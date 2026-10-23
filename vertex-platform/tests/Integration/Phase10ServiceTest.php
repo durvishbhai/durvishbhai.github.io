@@ -226,7 +226,7 @@ final class Phase10ServiceTest extends DatabaseTestCase
         $n = CreditNoteService::issue($this->owner, InvoiceService::find($i['public_id']), '500', 'Reduction for client');
         $docs = [
             'invoice' => [DocumentPdf::invoice(InvoiceService::find($i['public_id'])), [$i['reference'], '11,110.95', 'SAVE10', 'Tax is not applicable']],
-            'receipt' => [DocumentPdf::receipt($p, InvoiceService::find($i['public_id'])), [$p['reference'], '1,000.00']],
+            'receipt' => [DocumentPdf::receiptDocument(\Vertex\Services\ReceiptService::present(\Vertex\Services\ReceiptService::forPayment((int) $p['id']) ?? $this->fail('a receipt is made when the payment is verified'))), ['KIS-PR-', '1,000.00', 'TOTAL PAID']],
             'credit' => [DocumentPdf::creditNote(CreditNoteService::find($n['public_id'])), [$n['reference'], '500.00']],
         ];
         foreach ($docs as $name => [$bytes, $needles]) {

@@ -35,6 +35,7 @@ final class CrmReference
         'agreement' => ['AGR', 5],
         'scope_request' => ['SCR', 5],
         'career' => ['CAR', 5],
+        'receipt' => ['KIS-PR', 4],
     ];
 
     public static function next(string $scope, ?int $year = null): string

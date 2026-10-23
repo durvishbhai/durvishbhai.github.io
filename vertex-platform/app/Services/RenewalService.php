@@ -470,9 +470,11 @@ final class RenewalService
             }
             throw $e;
         }
+        $paymentRowId = Database::insertId();
         $paid = (int) $cycle['paid_minor'] + $amount;
         Database::run('UPDATE renewal_cycles SET paid_minor = ?, payment_complete_at = IF(? >= invoice_amount_minor, UTC_TIMESTAMP(), NULL), updated_at = UTC_TIMESTAMP() WHERE id = ?', [$paid, $paid, $cycle['id']]);
         Audit::record('renewal.payment_recorded', 'renewal_service', (int) $s['id'], ['paid_minor' => (int) $cycle['paid_minor']], ['paid_minor' => $paid, 'amount_minor' => $amount, 'method' => $method], [], $actorId);
+        ReceiptService::issueForRenewalPayment($paymentRowId, $actorId);
         if ($paid >= (int) $cycle['invoice_amount_minor']) {
             $s = self::moveTo($s, 'payment_received', 'payment', 'Payment complete (the provider has NOT been asked to renew yet).', $actorId);
             self::notifyStaff('renewal.payment_received', $s, 'Payment received: ' . $s['identifier'], 'Start the renewal with the provider and record their confirmation.', 'rnw:' . $s['id'] . ':' . $s['cycle_no'] . ':paid' . ((int) $cycle['adjustment_minor'] > 0 ? ':' . (int) $cycle['invoice_amount_minor'] : ''), ['renewals.manage', 'renewals.confirm_provider']);

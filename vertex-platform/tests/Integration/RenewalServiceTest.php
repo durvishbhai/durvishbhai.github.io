@@ -710,6 +710,12 @@ final class RenewalServiceTest extends DatabaseTestCase
         $this->assertSame('Razorpay pay_RenewPaid001', $p[0]['reference']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) AS c FROM client_payments')['c'], 'renewal money never lands in the billing-invoice payments');
         $this->assertSame('completed', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$o['id']])['status']);
+        $rc = Database::all('SELECT * FROM receipts');
+        $this->assertCount(1, $rc, 'a receipt is made when Razorpay confirms the payment, once');
+        $this->assertSame('renewal_payment', $rc[0]['source']);
+        $this->assertSame(40000, (int) $rc[0]['paid_minor']);
+        $this->assertSame('gateway', $rc[0]['method']);
+        $this->assertStringContainsString('example-shop.com', $rc[0]['lines_json']);
     }
 
     public function testAGatewayPaymentThatCannotBeCountedIsReportedToStaffNotLost(): void

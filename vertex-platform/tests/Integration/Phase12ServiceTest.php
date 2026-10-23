@@ -742,6 +742,8 @@ final class Phase12ServiceTest extends DatabaseTestCase
         $p = Database::one('SELECT * FROM client_payments');
         $this->assertSame(['verified', 'gateway', 'gateway', 100000, (int) $inv['id']], [$p['status'], $p['source'], $p['method'], (int) $p['gross_minor'], (int) $p['invoice_id']]);
         $this->assertSame('Razorpay pay_QrPaid0001', $p['external_ref']);
+        $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM receipts')['c'], 'a receipt is made for an online payment');
+        $this->assertSame(100000, (int) Database::one('SELECT paid_minor FROM receipts')['paid_minor']);
         $this->assertSame('paid', InvoiceService::find($inv['public_id'])['status']);
         $row = Database::one('SELECT * FROM gateway_orders');
         $this->assertSame(['completed', 'pay_QrPaid0001', (int) $p['id']], [$row['status'], $row['provider_txn_id'], (int) $row['payment_id']]);

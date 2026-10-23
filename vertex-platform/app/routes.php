@@ -50,6 +50,7 @@ use Vertex\Http\Controllers\Admin\CmsController;
 use Vertex\Http\Controllers\Admin\SettingsController;
 use Vertex\Http\Controllers\AiController;
 use Vertex\Http\Controllers\PublicPageController;
+use Vertex\Http\Controllers\Billing\ReceiptController;
 use Vertex\Http\Controllers\SitePageController;
 use Vertex\Http\Controllers\EnquiryFileController;
 use Vertex\Http\Controllers\Admin\SiteAdminController;
@@ -292,6 +293,18 @@ return static function (Router $router): void {
     $router->get('/credit-notes/{note}/pdf', [DocumentController::class, 'creditNotePdf'], $iv);
     $router->get('/my/invoices/{invoice}/pdf', [DocumentController::class, 'myInvoicePdf'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/quotes/{quote}/pdf', [DocumentController::class, 'myQuotePdf'], ['auth', 'can:quotes.view']);
+    $router->get('/receipts', [ReceiptController::class, 'index'], ['auth', 'can:receipts.view_all']);
+    $router->get('/receipts/new', [ReceiptController::class, 'create'], ['auth', 'can:receipts.issue']);
+    $router->post('/receipts', [ReceiptController::class, 'store'], ['auth', 'can:receipts.issue']);
+    $router->get('/receipts/{receipt}', [ReceiptController::class, 'show'], ['auth', 'can:receipts.view_all']);
+    $router->get('/receipts/{receipt}/pdf', [ReceiptController::class, 'pdf'], ['auth', 'can:receipts.view_all']);
+    $router->post('/receipts/{receipt}/void', [ReceiptController::class, 'void'], ['auth', 'can:receipts.void']);
+    $router->get('/my/receipts', [ReceiptController::class, 'mine'], ['auth', 'can:receipts.view_own']);
+    $router->get('/my/receipt/{receipt}', [ReceiptController::class, 'mineShow'], ['auth', 'can:receipts.view_own']);
+    $router->get('/my/receipt/{receipt}/pdf', [ReceiptController::class, 'minePdf'], ['auth', 'can:receipts.view_own']);
+    // Public receipt verification (anonymous, read-only, rate limited): the code on the receipt / its QR.
+    $router->get('/verify', [ReceiptController::class, 'verify'], ['nosession']);
+    $router->get('/verify/{code}', [ReceiptController::class, 'verify'], ['nosession']);
     $router->get('/my/receipts/{payment}', [DocumentController::class, 'myReceipt'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/receipts/{payment}/pdf', [DocumentController::class, 'myReceiptPdf'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/credit-notes/{note}', [DocumentController::class, 'myCreditNote'], ['auth', 'can:invoices.view_own']);

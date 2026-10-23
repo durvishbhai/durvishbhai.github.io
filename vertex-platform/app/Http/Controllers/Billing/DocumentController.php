@@ -15,6 +15,7 @@ use Vertex\Services\DocumentPdf;
 use Vertex\Services\Gate;
 use Vertex\Services\InvoiceService;
 use Vertex\Services\QuotationService;
+use Vertex\Services\ReceiptService;
 
 /** Downloadable PDFs and printable receipts / credit notes, for staff and for the client's own documents. Same access rules as the pages they belong to. */
 final class DocumentController extends Controller
@@ -85,7 +86,9 @@ final class DocumentController extends Controller
     {
         [$p, $i] = $this->staffReceipt($params['payment'] ?? '');
 
-        return $this->page('invoices/receipt', ['title' => 'Receipt ' . $p['reference'], 'p' => $p, 'i' => $i, 'back' => '/client-payments/' . $p['public_id'], 'pdf' => '/client-payments/' . $p['public_id'] . '/receipt/pdf'], 'layouts/print');
+        $r = ReceiptService::issueForPayment((int) $p['id'], $this->actorId()) ?? throw new HttpException(404);
+
+        return (new ReceiptController())->document($r, '/client-payments/' . $p['public_id'], '/client-payments/' . $p['public_id'] . '/receipt/pdf', true);
     }
 
     /** @param array<string,string> $params */
@@ -93,7 +96,7 @@ final class DocumentController extends Controller
     {
         [$p, $i] = $this->staffReceipt($params['payment'] ?? '');
 
-        return $this->pdf(DocumentPdf::receipt($p, $i), 'receipt-' . $p['reference']);
+        return (new ReceiptController())->pdfResponse(ReceiptService::issueForPayment((int) $p['id'], $this->actorId()) ?? throw new HttpException(404));
     }
 
     /** @param array<string,string> $params */
@@ -101,7 +104,9 @@ final class DocumentController extends Controller
     {
         [$p, $i] = $this->ownReceipt($params['payment'] ?? '');
 
-        return $this->page('invoices/receipt', ['title' => 'Receipt ' . $p['reference'], 'p' => $p, 'i' => $i, 'back' => $i !== null ? '/my/invoices/' . $i['public_id'] : '/my/invoices', 'pdf' => '/my/receipts/' . $p['public_id'] . '/pdf'], 'layouts/print');
+        $r = ReceiptService::issueForPayment((int) $p['id'], null) ?? throw new HttpException(404);
+
+        return (new ReceiptController())->document($r, $i !== null ? '/my/invoices/' . $i['public_id'] : '/my/receipts', '/my/receipts/' . $p['public_id'] . '/pdf', false);
     }
 
     /** @param array<string,string> $params */
@@ -109,7 +114,7 @@ final class DocumentController extends Controller
     {
         [$p, $i] = $this->ownReceipt($params['payment'] ?? '');
 
-        return $this->pdf(DocumentPdf::receipt($p, $i), 'receipt-' . $p['reference']);
+        return (new ReceiptController())->pdfResponse(ReceiptService::issueForPayment((int) $p['id'], null) ?? throw new HttpException(404));
     }
 
     /** @param array<string,string> $params */

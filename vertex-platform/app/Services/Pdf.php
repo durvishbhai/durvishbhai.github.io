@@ -17,6 +17,8 @@ final class Pdf
 
     /** @var list<string> */
     private array $pages = [];
+    /** @var list<array{w:int,h:int,data:string}> images used by the document (drawn with image()) */
+    private array $images = [];
     private string $buf = '';
     private float $y;
 
@@ -95,14 +97,14 @@ final class Pdf
     }
 
     /** Draws one line of text at x (left edge) or, with $align 'right', ending at x. y is the baseline. */
-    public function text(float $x, float $y, string $text, float $size = 10, bool $bold = false, string $align = 'left', float $gray = 0.0): void
+    public function text(float $x, float $y, string $text, float $size = 10, bool $bold = false, string $align = 'left', float|array $gray = 0.0): void
     {
         if ($align === 'right') {
             $x -= self::width($text, $size, $bold);
         } elseif ($align === 'center') {
             $x -= self::width($text, $size, $bold) / 2;
         }
-        $this->buf .= sprintf("BT /%s %.2F Tf %.2F g %.2F %.2F Td (%s) Tj ET\n", $bold ? 'F2' : 'F1', $size, $gray, $x, $y, self::escape(self::encode($text)));
+        $this->buf .= sprintf("BT /%s %.2F Tf %s %.2F %.2F Td (%s) Tj ET\n", $bold ? 'F2' : 'F1', $size, self::color($gray), $x, $y, self::escape(self::encode($text)));
     }
 
     /** Writes wrapped text at the cursor and moves the cursor down. */
@@ -121,9 +123,80 @@ final class Pdf
         $this->buf .= sprintf("%.2F G %.2F w %.2F %.2F m %.2F %.2F l S\n", $gray, $width, $x1, $y, $x2, $y);
     }
 
-    public function fill(float $x, float $y, float $w, float $h, float $gray): void
+    /** @param float|array{0:float,1:float,2:float} $gray a gray level (0 black .. 1 white) or an [r, g, b] colour with parts 0..1 */
+    public function fill(float $x, float $y, float $w, float $h, float|array $gray): void
     {
-        $this->buf .= sprintf("%.2F g %.2F %.2F %.2F %.2F re f\n", $gray, $x, $y, $w, $h);
+        $this->buf .= sprintf("%s %.2F %.2F %.2F %.2F re f\n", self::color($gray), $x, $y, $w, $h);
+    }
+
+    /** An outlined rectangle. @param float|array{0:float,1:float,2:float} $gray */
+    public function box(float $x, float $y, float $w, float $h, float|array $gray = 0.8, float $width = 0.6): void
+    {
+        $this->buf .= sprintf("%s %.2F w %.2F %.2F %.2F %.2F re S\n", self::color($gray, true), $width, $x, $y, $w, $h);
+    }
+
+    /** Draws a QR code (a matrix of dark/light modules) with its lower-left corner at x, y and a side of $size points. @param list<list<bool>> $matrix */
+    public function qr(array $matrix, float $x, float $y, float $size, float|array $gray = 0.0): void
+    {
+        $n = count($matrix);
+        $cell = $size / $n;
+        $this->buf .= self::color($gray) . "\n";
+        foreach ($matrix as $r => $row) {
+            foreach ($row as $c => $dark) {
+                if ($dark) {
+                    $this->buf .= sprintf("%.3F %.3F %.3F %.3F re f\n", $x + $c * $cell, $y + $size - ($r + 1) * $cell, $cell + 0.02, $cell + 0.02);
+                }
+            }
+        }
+    }
+
+    /**
+     * Turns a PNG into a drawable image (needs PHP's GD; null without it). Transparent areas are flattened onto $background so no soft mask is needed.
+     *
+     * @param array{0:int,1:int,2:int} $background 0..255
+     * @return array{w:int,h:int,data:string}|null
+     */
+    public static function imageFromPng(string $png, array $background = [255, 255, 255]): ?array
+    {
+        if (!function_exists('imagecreatefromstring')) {
+            return null;
+        }
+        $src = @imagecreatefromstring($png);
+        if ($src === false) {
+            return null;
+        }
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $flat = imagecreatetruecolor($w, $h);
+        imagefill($flat, 0, 0, (int) imagecolorallocate($flat, $background[0], $background[1], $background[2]));
+        imagealphablending($flat, true);
+        imagecopy($flat, $src, 0, 0, 0, 0, $w, $h);
+        $raw = '';
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($flat, $x, $y);
+                $raw .= chr(($c >> 16) & 255) . chr(($c >> 8) & 255) . chr($c & 255);
+            }
+        }
+
+        return ['w' => $w, 'h' => $h, 'data' => (string) gzcompress($raw, 6)];
+    }
+
+    /** Draws an image from imageFromPng() in the box x, y (lower-left), $w by $h points. @param array{w:int,h:int,data:string} $img */
+    public function image(array $img, float $x, float $y, float $w, float $h): void
+    {
+        $this->images[] = $img;
+        $this->buf .= sprintf("q %.2F 0 0 %.2F %.2F %.2F cm /Im%d Do Q\n", $w, $h, $x, $y, count($this->images));
+    }
+
+    /** @param float|array{0:float,1:float,2:float} $c */
+    private static function color(float|array $c, bool $stroke = false): string
+    {
+        if (is_array($c)) {
+            return sprintf('%.3F %.3F %.3F %s', $c[0], $c[1], $c[2], $stroke ? 'RG' : 'rg');
+        }
+
+        return sprintf('%.2F %s', $c, $stroke ? 'G' : 'g');
     }
 
     public function output(): string
@@ -145,8 +218,15 @@ final class Pdf
             $footer = sprintf("BT /F1 8 Tf 0.45 g %.2F %.2F Td (%s) Tj ET\n", self::W / 2 - 20, 24, self::escape('Page ' . ($i + 1) . ' of ' . $total));
             $stream = $content . $footer;
             $pageNo = 6 + $i * 2;
-            $objs[$pageNo] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::W . ' ' . self::H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ' . ($pageNo + 1) . ' 0 R >>';
+            $xo = '';
+            foreach ($this->images as $k => $_) {
+                $xo .= ' /Im' . ($k + 1) . ' ' . (6 + $total * 2 + $k) . ' 0 R';
+            }
+            $objs[$pageNo] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::W . ' ' . self::H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>' . ($xo === '' ? '' : ' /XObject <<' . $xo . ' >>') . ' >> /Contents ' . ($pageNo + 1) . ' 0 R >>';
             $objs[$pageNo + 1] = '<< /Length ' . strlen($stream) . " >>\nstream\n" . $stream . 'endstream';
+        }
+        foreach ($this->images as $k => $img) {
+            $objs[6 + $total * 2 + $k] = '<< /Type /XObject /Subtype /Image /Width ' . $img['w'] . ' /Height ' . $img['h'] . ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ' . strlen($img['data']) . " >>\nstream\n" . $img['data'] . "\nendstream";
         }
         $out = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
         $offsets = [];

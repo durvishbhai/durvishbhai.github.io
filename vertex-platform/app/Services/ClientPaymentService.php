@@ -151,6 +151,7 @@ final class ClientPaymentService
             self::event((int) $row['id'], 'verified', $gross, null, $actorId);
             Audit::record('client_payment.verified', 'client_payment', (int) $row['id'], ['status' => 'pending_verification', 'gross_minor' => (int) $row['gross_minor']], ['status' => 'verified', 'gross_minor' => $gross], ['project_id' => $row['project_id'], 'invoice_id' => $row['invoice_id'], 'source' => $row['source']], $actorId);
             self::afterChange($row, $actorId);
+            ReceiptService::issueForPayment((int) $row['id'], $actorId);
             if ($row['source'] === 'client_claim' && $row['recorded_by'] !== null) {
                 Notifier::send([(int) $row['recorded_by']], 'payment.confirmed', 'Payment confirmed: ₹' . FieldRules::formatMinor($gross), 'We received your payment ' . $row['reference'] . '. Thank you.', $row['invoice_id'] === null ? null : '/my/invoices/' . Database::one('SELECT public_id FROM invoices WHERE id = ?', [$row['invoice_id']])['public_id'], null, 'client_payment', (int) $row['id'], "cpay:{$row['id']}:confirmed");
             }
@@ -273,6 +274,7 @@ final class ClientPaymentService
         if ($owner !== null && $owner['user_id'] !== null) {
             Notifier::send([(int) $owner['user_id']], 'payment.confirmed', 'Payment confirmed: ₹' . FieldRules::formatMinor($amountMinor), 'We received your payment ' . $ref . '. Thank you.', '/my/invoices/' . $inv['public_id'], null, 'client_payment', $id, "cpay:{$id}:confirmed");
         }
+        ReceiptService::issueForPayment($id, null);
         Notifier::send(Notifier::withPermission('payments.reconcile'), 'client_payment.gateway_received', 'Online payment received', $ref . ' for invoice ' . $inv['reference'], '/client-payments/' . $pub, null, 'client_payment', $id, "cpay:{$id}:gateway");
 
         return ['id' => $id, 'public_id' => $pub, 'created' => true];
