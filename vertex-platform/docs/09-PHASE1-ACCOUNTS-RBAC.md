@@ -41,7 +41,7 @@ Copy `.env.example` to `.env` (never commit it). Real server variables win over 
 | `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` | MySQL/MariaDB connection (PDO, utf8mb4, strict mode, UTC). |
 | `SESSION_IDLE_MINUTES` (60), `SESSION_ABSOLUTE_MINUTES` (720), `SESSION_FORCE_SECURE`, `SESSION_IDLE_SECONDS` (advanced override) | Server-side session limits; cookie is HttpOnly + SameSite=Lax (+ Secure on HTTPS). |
 | `LOGIN_MAX_ATTEMPTS` (5), `LOGIN_LOCKOUT_MINUTES` (15) | Login throttle. Other limits are in `config/auth.php`. |
-| `REGISTRATION_ENABLED` (false) | Public client self-registration. Also needs working email. |
+| `REGISTRATION_ENABLED` (false) / `REGISTRATION_MODE` | Public client self-registration. Normally chosen by the Owner in *Integrations & settings → Feature switches → Client self-registration*: **Off**, **On with email confirmation** (needs working email) or **On with team approval** (works without email: the new account waits as *pending* until a person with `users.edit` presses *Approve this registration* on the user's page). `REGISTRATION_ENABLED=true` alone still means "email confirmation"; `REGISTRATION_MODE` (off / email / approval) is the .env equivalent of the screen. |
 | `MAIL_DRIVER` (`none`\|`smtp`\|`log`), `MAIL_HOST/PORT/ENCRYPTION/USERNAME/PASSWORD/FROM_ADDRESS/FROM_NAME` | `none`: registration, verification, password reset and invitations are disabled and the UI says so. `smtp`: PHPMailer. `log`: dev only, refused in production. |
 | `TRUSTED_PROXIES` | Only if behind a proxy whose `X-Forwarded-For` you trust. |
 

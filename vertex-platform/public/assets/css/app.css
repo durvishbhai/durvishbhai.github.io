@@ -996,3 +996,28 @@ html { accent-color: var(--violet); }
 .verify-bad { border-color: #ff6b8b; }
 .verify-bad h2, .verify-bad .verify-mark { color: #ff6b8b; }
 .verify-mark { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 2px solid currentColor; font-size: 22px; font-weight: 700; }
+
+/* About page */
+.about-pair .about-card p { margin: 0; color: var(--text-dim); font-size: 1.05rem; line-height: 1.7; max-width: 68ch; }
+.about-grid, .about-badges, .about-steps, .about-points { list-style: none; margin: 0; padding: 0; }
+.about-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 18px; }
+.about-tile, .about-steps li { position: relative; padding: 22px 22px 22px; border: 1px solid var(--line); border-radius: var(--radius); background: linear-gradient(180deg, var(--bg-card), var(--card-end)); transition: transform 0.2s ease, border-color 0.2s ease; }
+.about-tile:hover, .about-steps li:hover { transform: translateY(-3px); border-color: var(--violet); }
+.about-tile h3, .about-steps h3 { margin: 10px 0 6px; font-size: 1.1rem; }
+.about-tile p, .about-steps p { margin: 0; color: var(--text-dim); font-size: 0.95rem; line-height: 1.6; }
+.about-no { display: inline-block; font-weight: 800; font-size: 0.85rem; letter-spacing: 0.08em; background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.about-badges { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+.about-badges li { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-card); font-weight: 600; }
+.about-dot { flex: 0 0 10px; height: 10px; border-radius: 50%; background: var(--brand-grad); }
+.about-services { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.about-service { cursor: default; }
+.about-service:hover { transform: none; }
+.about-points { display: grid; gap: 8px; margin-top: 4px; }
+.about-points li { position: relative; padding-left: 22px; color: var(--text-dim); font-size: 0.94rem; line-height: 1.5; }
+.about-points li::before { content: ""; position: absolute; left: 0; top: 0.6em; width: 10px; height: 2px; background: var(--brand-grad); }
+.about-closing { margin: 28px auto 0; max-width: 70ch; color: var(--text-dim); text-align: center; }
+.about-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; counter-reset: none; }
+.about-steps li { padding: 22px; }
+.about-steps li::before { display: none; }
+.pub-head .lead { margin-top: 10px; color: var(--text-dim); }
+@media (max-width: 640px) { .about-badges li { border-radius: 16px; } }

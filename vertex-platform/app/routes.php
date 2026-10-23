@@ -575,6 +575,7 @@ return static function (Router $router): void {
         $r->post('/users/{user}/send-reset', [UserController::class, 'sendReset'], ['can:users.reset_password']);
         $r->post('/users/{user}/reset-2fa', [UserController::class, 'reset2fa'], ['can:users.reset_2fa']);
         $r->post('/users/{user}/resend-invite', [UserController::class, 'resendInvite'], ['can:users.create']);
+        $r->post('/users/{user}/approve', [UserController::class, 'approve'], ['can:users.edit']);
 
         $r->get('/automation', [AutomationController::class, 'index'], ['can:automation.manage']);
         $r->post('/automation', [AutomationController::class, 'save'], ['can:automation.manage']);

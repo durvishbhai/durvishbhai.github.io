@@ -42,7 +42,7 @@ final class AuthController extends Controller
             Auth::TWO_FACTOR => Response::redirect('/login/two-factor'),
             Auth::LOCKED => $this->back('/login', ['Too many failed attempts. Please wait a few minutes and try again.'], $old),
             // Only reached after the correct password was supplied, so this does not reveal accounts to guessers.
-            Auth::PENDING => $this->back('/login', ['Your account is not active yet. Confirm your email address using the link we sent you, or ask an administrator.'], $old),
+            Auth::PENDING => $this->back('/login', ['Your account is not active yet. If you just registered, our team has to approve it first (or use the confirmation link we emailed you). Otherwise ask an administrator.'], $old),
             // Same message for wrong password and unknown email: no account enumeration.
             default => $this->back('/login', ['Those credentials did not work.'], $old),
         };

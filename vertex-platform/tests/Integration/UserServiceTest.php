@@ -11,6 +11,7 @@ use Vertex\Core\ValidationException;
 use Vertex\Repositories\UserRepository;
 use Vertex\Services\Gate;
 use Vertex\Services\Mailer;
+use Vertex\Services\Registration;
 use Vertex\Services\UserService;
 
 /** Privilege-escalation and account-lifecycle rules, tested directly against the service layer. */
@@ -30,6 +31,8 @@ final class UserServiceTest extends DatabaseTestCase
 
     protected function tearDown(): void
     {
+        Config::set('auth.registration_mode', '');
+        Config::set('auth.registration_enabled', false);
         Config::set('mail.driver', 'none');
         Config::set('app.url', '');
     }
@@ -272,6 +275,70 @@ final class UserServiceTest extends DatabaseTestCase
         $this->assertSame('You already have an account', Mailer::$sent[0]['subject']);
         $this->assertSame('rita@x.test', Mailer::$sent[0]['to']);
         Config::set('auth.registration_enabled', false);
+    }
+
+    public function testRegistrationWithApprovalNeedsNoEmailAndWaitsForTheTeam(): void
+    {
+        Config::set('auth.registration_mode', 'approval');
+        Config::set('mail.driver', 'none'); // works without any email setup
+        $this->assertSame('approval', Registration::mode());
+        $in = ['name' => 'Aman Approval', 'email' => 'aman@x.test', 'phone' => '+91 90000 33333', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9', 'roles' => ['super_admin']];
+        UserService::register($in, '203.0.113.20');
+        $u = (new UserRepository())->findByEmail('aman@x.test');
+        $this->assertSame('pending', $u['status']);
+        $this->assertSame(1, (int) $u['self_registered']);
+        $this->assertSame(['client'], $this->roles((int) $u['id']));
+        $this->assertNull($u['email_verified_at']);
+        $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM auth_tokens WHERE user_id = ?', [$u['id']])['c'], 'no email-confirmation link is issued');
+        $this->assertGreaterThan(0, (int) Database::one("SELECT COUNT(*) c FROM notifications WHERE event_type = 'user.registration_pending'")['c'], 'the team is told');
+        UserService::register($in, '203.0.113.20'); // the same email again: nothing changes, nothing is revealed
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM users WHERE email = 'aman@x.test'")['c']);
+
+        // only a person who may edit users can approve, and only self-registered pending accounts
+        $manager = $this->makeUser('mgr@x.test', ['manager']);
+        $other = $this->makeUser('other-client@x.test', ['client']);
+        foreach ([$manager, $other] as $who) {
+            try {
+                UserService::approveRegistration($who, (int) $u['id']);
+                $this->fail('must be refused');
+            } catch (HttpException $e) {
+                $this->assertContains($e->status, [403, 404]);
+            }
+        }
+        $this->assertSame('pending', (new UserRepository())->findByEmail('aman@x.test')['status']);
+        UserService::approveRegistration($this->admin, (int) $u['id']);
+        $this->assertSame('active', (new UserRepository())->findByEmail('aman@x.test')['status']);
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'user.registration_approved'")['c']);
+        $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND event_type = 'user.registration_approved'", [$u['id']])['c']);
+        try {
+            UserService::approveRegistration($this->admin, (int) $u['id']);
+            $this->fail('already active');
+        } catch (ValidationException $e) {
+            $this->assertStringContainsString('waiting for approval', implode(' ', $e->errors));
+        }
+        // an invited (team-created) pending account is not approvable this way
+        $invited = UserService::adminCreate($this->admin, ['name' => 'Ivy Invited', 'email' => 'ivy@x.test', 'phone' => '+91 90000 44444', 'roles' => ['client']])['user_id'];
+        try {
+            UserService::approveRegistration($this->admin, (int) $invited);
+            $this->fail('an invitation is not a self-registration');
+        } catch (ValidationException) {
+            $this->addToAssertionCount(1);
+        }
+        Config::set('auth.registration_mode', '');
+        Config::set('mail.driver', 'array');
+    }
+
+    public function testTheEmailModeStillNeedsWorkingEmailAndOffMeansOff(): void
+    {
+        Config::set('auth.registration_mode', 'email');
+        Config::set('mail.driver', 'none');
+        $this->assertSame('off', Registration::mode(), 'email mode without email is not offered');
+        Config::set('auth.registration_mode', 'off');
+        Config::set('auth.registration_enabled', true); // the older switch must not override an explicit Off
+        Config::set('mail.driver', 'array');
+        $this->assertSame('off', Registration::mode());
+        $this->expectException(HttpException::class);
+        UserService::register(['name' => 'X', 'email' => 'x@x.test', 'phone' => '+91 90000 33333', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '1.1.1.1');
     }
 
     public function testRegistrationIsDisabledByDefault(): void

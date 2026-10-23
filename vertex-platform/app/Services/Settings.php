@@ -70,7 +70,7 @@ final class Settings
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],
-            'features.registration' => ['group' => 'features', 'label' => 'Client self-registration (also needs working email)', 'type' => 'bool'],
+            'auth.registration_mode' => ['group' => 'features', 'label' => 'Client self-registration', 'type' => 'select', 'options' => Registration::MODES, 'help' => 'Adds a "Create a client account" link on the sign-in page. With approval, new accounts appear under Users as pending and you approve them there.'],
         ];
     }
 

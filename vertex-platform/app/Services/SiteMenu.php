@@ -39,12 +39,11 @@ final class SiteMenu
             $items[] = ['label' => 'Portfolio', 'url' => '/portfolio'];
         }
 
-        $careers = ['label' => 'Careers', 'url' => '/careers'];
         if (SiteHiring::isVisible()) {
-            $careers['children'] = [['label' => 'Open positions', 'url' => '/careers'], ['label' => SiteHiring::isOpen() ? "We're Hiring" : 'Hiring', 'url' => '/hiring']];
+            $items[] = ['label' => SiteHiring::isOpen() ? "We're Hiring" : 'Careers', 'url' => '/careers'];
         }
 
-        return [...$items, $careers, ['label' => 'Contact Us', 'url' => '/contact']];
+        return [...$items, ['label' => 'Contact Us', 'url' => '/contact']];
     }
 
     /** @return list<array{title:string,links:list<array{label:string,url:string}>}> the non-empty footer columns */
@@ -63,7 +62,7 @@ final class SiteMenu
         }
         $defaults = [
             'footer_explore' => ['Explore', $explore],
-            'footer_opportunities' => ['Opportunities', [['label' => 'Our Clients', 'url' => '/our-clients'], ['label' => 'Our Partners', 'url' => '/our-partners'], ['label' => 'Careers', 'url' => '/careers'], ...(SiteHiring::isVisible() ? [['label' => 'Hiring', 'url' => '/hiring']] : []), ['label' => 'Project Requirements', 'url' => '/request-quote']]],
+            'footer_opportunities' => ['Opportunities', [['label' => 'Our Clients', 'url' => '/our-clients'], ['label' => 'Our Partners', 'url' => '/our-partners'], ...(SiteHiring::isVisible() ? [['label' => 'Careers', 'url' => '/careers']] : []), ['label' => 'Project Requirements', 'url' => '/request-quote']]],
             'footer_support' => ['Support', [['label' => 'Contact Us', 'url' => '/contact'], ['label' => 'FAQ', 'url' => '/faq'], ['label' => 'Verify a Receipt', 'url' => '/verify']]],
             'footer_legal' => ['Legal', $legal],
         ];
@@ -102,7 +101,7 @@ final class SiteMenu
             if (in_array($path, $all, true) && !in_array($path, $policies, true)) {
                 continue;
             }
-            if ($path === 'hiring' && !SiteHiring::isVisible()) {
+            if (in_array($path, ['hiring', 'careers'], true) && !SiteHiring::isVisible()) {
                 continue;
             }
             if (CmsText::safeUrl($url) === null) {

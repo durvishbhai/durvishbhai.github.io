@@ -35,7 +35,8 @@ final class UserService
      */
     public static function register(array $in, string $ip): void
     {
-        if (!Config::get('auth.registration_enabled') || !Mailer::enabled()) {
+        $mode = Registration::mode();
+        if ($mode === 'off') {
             throw new HttpException(404);
         }
         $name = self::name($in['name'] ?? '');
@@ -55,20 +56,51 @@ final class UserService
 
         $repo = new UserRepository();
         if ($repo->findByEmail($email) !== null) {
-            AccountMail::alreadyRegistered($email);
+            if (Mailer::enabled()) {
+                AccountMail::alreadyRegistered($email);
+            }
             Audit::record('auth.register.duplicate', 'user', null, [], [], ['email' => $email], null, $ip);
 
             return;
         }
 
-        $token = Database::transaction(function () use ($repo, $name, $email, $phone, $password, $ip): string {
+        $token = Database::transaction(function () use ($repo, $name, $email, $phone, $password, $ip, $mode): ?string {
             $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), 'pending', ['client'], null, $phone);
+            Database::run('UPDATE users SET self_registered = 1 WHERE id = ?', [$id]);
             self::ensureClientProfile($id);
-            Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $email, 'roles' => ['client'], 'status' => 'pending'], [], $id, $ip);
+            Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $email, 'roles' => ['client'], 'status' => 'pending'], ['mode' => $mode], $id, $ip);
+            if ($mode === 'approval') {
+                $pub = (string) Database::one('SELECT public_id FROM users WHERE id = ?', [$id])['public_id'];
+                Notifier::send(Notifier::withPermission('users.edit'), 'user.registration_pending', 'New client account waiting for approval', $name . ' (' . $email . ') registered. Open the account to approve it.', '/admin/users/' . $pub, null, 'user', $id, 'reg:' . $id . ':pending');
+
+                return null;
+            }
 
             return TokenService::issue($id, TokenService::VERIFY, (int) Config::get('auth.email_verify_ttl_minutes'), $ip);
         });
-        AccountMail::verify($email, $name, $token);
+        if ($token !== null) {
+            AccountMail::verify($email, $name, $token);
+        }
+    }
+
+    /**
+     * Approves a client who registered through the public form while self-registration needs the team's approval. Only self-registered accounts that are still
+     * pending can be approved this way (an invited account becomes active when its owner sets a password).
+     */
+    public static function approveRegistration(int $actorId, int $targetId): void
+    {
+        $target = self::guardTarget($actorId, $targetId, 'users.edit');
+        if ($target['status'] !== 'pending' || (int) ($target['self_registered'] ?? 0) !== 1) {
+            throw new ValidationException(['Only a self-registered account that is waiting for approval can be approved here.']);
+        }
+        Database::transaction(function () use ($actorId, $targetId, $target): void {
+            Database::run("UPDATE users SET status = 'active', updated_at = UTC_TIMESTAMP() WHERE id = ? AND status = 'pending'", [$targetId]);
+            Audit::record('user.registration_approved', 'user', $targetId, ['status' => 'pending'], ['status' => 'active'], [], $actorId);
+            Notifier::send([$targetId], 'user.registration_approved', 'Your account was approved', 'You can now sign in to your client account.', '/dashboard', null, 'user', $targetId, 'reg:' . $targetId . ':approved');
+        });
+        if (Mailer::enabled()) {
+            AccountMail::approved((string) $target['email'], (string) $target['name']);
+        }
     }
 
     public static function resendVerification(string $email, string $ip): void

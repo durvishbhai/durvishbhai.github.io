@@ -7,6 +7,8 @@ use Vertex\Core\Env;
 return [
     // Public self-registration (creates CLIENT accounts only). Off by default; also needs working email.
     'registration_enabled' => (bool) Env::get('REGISTRATION_ENABLED', false),
+    // off | email | approval. Normally chosen in Integrations & settings; empty means "follow REGISTRATION_ENABLED".
+    'registration_mode' => (string) Env::get('REGISTRATION_MODE', ''),
     'password_min_length' => 12,
     // Two-factor login is optional for everyone. Set TWO_FACTOR_REQUIRED_LEVEL to a role level (e.g. 90 = Administrator and above) to make it compulsory; 0 = off.
     'two_factor_required_level' => (int) Env::get('TWO_FACTOR_REQUIRED_LEVEL', 0),

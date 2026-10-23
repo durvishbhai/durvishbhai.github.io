@@ -64,7 +64,10 @@ $u = '/admin/users/' . $target['public_id'];
                 <button class="btn btn-danger btn-sm" type="submit">Reset two-factor login</button>
             </form>
         <?php endif; ?>
-        <?php if (can('users.create') && $status === 'pending' && $mailEnabled) : ?>
+        <?php if (can('users.edit') && $status === 'pending' && !empty($target['self_registered'])) : ?>
+            <form method="post" action="<?= e($u) ?>/approve" class="inline-form" data-confirm="Approve this client account? They will be able to sign in straight away."><?= csrf_field() ?><button class="btn btn-primary btn-sm" type="submit">Approve this registration</button></form>
+        <?php endif; ?>
+        <?php if (can('users.create') && $status === 'pending' && $mailEnabled && empty($target['self_registered'])) : ?>
             <form method="post" action="<?= e($u) ?>/resend-invite" class="inline-form"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Resend invitation</button></form>
         <?php endif; ?>
         </div>

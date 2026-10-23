@@ -203,6 +203,18 @@ final class UserController extends Controller
     }
 
     /** @param array<string,string> $params */
+    public function approve(Request $request, array $params = []): Response
+    {
+        $target = $this->target($params);
+
+        return $this->guarded(function () use ($target): Response {
+            UserService::approveRegistration($this->actorId(), (int) $target['id']);
+
+            return $this->ok($this->url($target), 'The account was approved. The client can sign in now.');
+        }, $this->url($target));
+    }
+
+    /** @param array<string,string> $params */
     public function resendInvite(Request $request, array $params = []): Response
     {
         $target = $this->target($params);

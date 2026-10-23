@@ -17,7 +17,7 @@ final class CareerService
 {
     public const STATUSES = ['new' => 'New', 'reviewing' => 'Under review', 'shortlisted' => 'Shortlisted', 'not_selected' => 'Not selected', 'withdrawn' => 'Withdrawn', 'archived' => 'Archived'];
 
-    /** @return array<string,string> the roles a visitor may apply for: published openings, the listed categories and "Other" */
+    /** @return array<string,string> the roles a visitor may apply for: the open roles, published openings and "Other" */
     public static function roleChoices(): array
     {
         $out = [];
@@ -28,9 +28,6 @@ final class CareerService
         }
         foreach (SiteContent::published('jobs') as $j) {
             $out[(string) $j['title']] = (string) $j['title'];
-        }
-        foreach (SiteText::items(SiteSections::get('careers', 'categories')['items'] ?? '') as $c) {
-            $out[$c] = $c;
         }
         $out['Other'] = 'Other';
 

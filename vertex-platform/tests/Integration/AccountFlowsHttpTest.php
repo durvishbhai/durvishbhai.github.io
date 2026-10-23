@@ -27,6 +27,43 @@ final class AccountFlowsHttpTest extends HttpTestCase
         ]);
     }
 
+    public function testTheOwnerCanSwitchRegistrationToTeamApprovalAndApproveANewClient(): void
+    {
+        $this->makeUser('owner@x.test', ['super_admin']);
+        $owner = $this->loggedIn('owner@x.test');
+        $page = $owner->get('/admin/settings')['body'];
+        $this->assertStringContainsString('name="auth__registration_mode"', $page, 'the option is on the Feature switches screen');
+        $owner->post('/admin/settings/features', ['features__cms' => '1', 'features__public_forms' => '1', 'features__ai' => '1', 'auth__registration_mode' => 'approval', 'confirm_password' => self::PASSWORD], '/admin/settings');
+
+        $c = $this->client();
+        $this->assertStringContainsString('Create a client account', $c->get('/login')['body']);
+        $this->assertStringContainsString('approves each new account', $c->get('/register')['body']);
+        $r = $this->register($c, ['email' => 'approval@x.test', 'name' => 'Aisha Approval']);
+        $this->assertSame('/login', $r['location']);
+        $this->assertStringContainsString('waiting for our team to approve', $c->get('/login')['body']);
+        $row = Database::one("SELECT * FROM users WHERE email = 'approval@x.test'");
+        $this->assertSame('pending', $row['status']);
+
+        $c->login('approval@x.test', self::NEWPW);
+        $this->assertStringContainsString('has to approve it first', $c->get('/login')['body']);
+
+        $show = $owner->get('/admin/users/' . $row['public_id']);
+        $this->assertStringContainsString('Approve this registration', $show['body']);
+        $this->assertStringContainsString('Aisha Approval', $owner->get('/admin/users')['body']);
+        $res = $owner->post('/admin/users/' . $row['public_id'] . '/approve', [], '/admin/users/' . $row['public_id']);
+        $this->assertSame(303, $res['status']);
+        $this->assertSame('active', Database::one("SELECT status FROM users WHERE email = 'approval@x.test'")['status']);
+        $this->assertSame('/dashboard', $this->client()->login('approval@x.test', self::NEWPW)['location'], 'the client can sign in once approved');
+        $cl = $this->client();
+        $cl->login('approval@x.test', self::NEWPW);
+        $this->assertSame(403, $cl->post('/admin/users/' . $row['public_id'] . '/approve', [], '/account')['status'], 'a client cannot approve accounts');
+
+        // switching it Off removes the link and the page
+        $owner->post('/admin/settings/features', ['features__cms' => '1', 'features__public_forms' => '1', 'features__ai' => '1', 'auth__registration_mode' => 'off', 'confirm_password' => self::PASSWORD], '/admin/settings');
+        $this->assertStringNotContainsString('Create a client account', $this->client()->get('/login')['body']);
+        $this->assertSame(404, $this->client()->get('/register')['status']);
+    }
+
     public function testRegistrationVerificationThenLogin(): void
     {
         $c = $this->client();

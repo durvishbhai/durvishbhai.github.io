@@ -20,7 +20,7 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 | Our Clients | `/our-clients` | Website -> Clients (name, country, logo, description, website); shown grouped by country; page wording under Page wording -> Our Clients page |
 | Our Partners | `/our-partners` | Website -> Partners + the existing referral-partner application (`/partners/apply`) |
 | Portfolio | `/portfolio`, `/portfolio/{slug}` | Website -> Portfolio (hidden until a project is published) |
-| Hiring | `/hiring`, `/hiring/apply` | Administration -> Website -> Hiring (status switch) and Page wording -> Hiring page (roles, salary note, steps) |
+| Careers (jobs and hiring: one page) | `/careers`, `/careers/apply`, `/careers/{opening}` (the old `/hiring…` addresses forward here) | Administration -> Website -> Careers page (status switch), Page wording -> Careers page (roles, salary note, steps, form) and Openings |
 | Careers | `/careers`, `/careers/{slug}`, `/careers/apply` | Website -> Openings; applications in Administration -> Job applications |
 | Contact Us | `/contact` | Contact form; staff see it in CRM -> Enquiries |
 | Project Requirements | `/request-quote` (alias `/project-requirements`) | Requirements form; staff see it in CRM -> Enquiries |
@@ -38,9 +38,11 @@ copy uses the tokens `{company}` and `{abbr}`. They are replaced with the compan
 * **Contact details and social links**: Integrations & settings -> Website. Empty values are not displayed anywhere.
 * **Form settings**: wording of both forms; inquiry types, project categories and timelines are fixed lists in code (`EnquiryExtras`), services offered come from published Services.
 
-## Hiring page
+## Careers page (one page for jobs and hiring)
 
-`/hiring` lists the open roles (shipped: Full Stack Developer, Frontend Developer, Backend Developer, Video Editor), states that **salary is decided after the meeting**, explains the steps and has an interactive application form (click a role card to select it, live progress bar, character counters, drag-and-drop file box, hints that change for developer vs video roles). Submissions are ordinary job applications (Administration -> Job applications) with the role, experience and availability recorded.
+Careers and Hiring used to be two pages; there is now **one**: `/careers`. It carries the role cards, the published openings (Website -> Openings, each with its own detail page), the salary note, the steps and the application form. `/hiring`, `/hiring/received` and `/hiring/apply` forward to it (301/308) so old links, bookmarks and search results keep working. The old separate Careers wording (heading, "areas we work in" list, openings text, form note) is gone; the page wording is the one under *Page wording → Careers page*. If you saved your own header menu, remove the duplicate entry yourself: the built-in menu now has a single "We're Hiring" / "Careers" link.
+
+`/careers` lists the open roles (shipped: Full Stack Developer, Frontend Developer, Backend Developer, Video Editor), states that **salary is decided after the meeting**, explains the steps and has an interactive application form (click a role card to select it, live progress bar, character counters, drag-and-drop file box, hints that change for developer vs video roles). Submissions are ordinary job applications (Administration -> Job applications) with the role, experience and availability recorded.
 
 **Admin switch** (Website -> Hiring, needs `cms.publish`): *Open* shows roles and form and a small "We're hiring" bar on the other pages; *Closed* keeps the page but shows "Hiring is currently closed" (editable) with no form and refuses applications; *Hidden* makes the page return 404 and removes it from the header, footer and sitemaps. The state is stored separately from the wording, so "reset wording" never changes it. A header menu saved by hand under Menus overrides the built-in links; add or remove the Hiring link there yourself (a link to `/hiring` is dropped automatically while the page is hidden). Roles, intro, salary note, steps and closed message are edited under Page wording -> Hiring page (one role per line: `Title | Short description`).
 

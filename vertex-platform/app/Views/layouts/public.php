@@ -4,7 +4,7 @@
 $meta = isset($meta) && is_array($meta) ? $meta : [];
 $siteDesc = (string) config('site.default_seo_description', '');
 $metaDesc = (string) ($meta['description'] ?? '') !== '' ? (string) $meta['description'] : $siteDesc;
-$pageTitle = isset($title) && $title !== '' && $title !== config('app.name') ? $title . ' · ' . config('app.name') : (string) config('app.name');
+$pageTitle = !empty($meta['title']) ? (string) $meta['title'] : (isset($title) && $title !== '' && $title !== config('app.name') ? $title . ' · ' . config('app.name') : (string) config('app.name'));
 ?><!doctype html>
 <html lang="en">
 <head>

@@ -57,7 +57,7 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         $this->seed();
         $c = $this->client();
-        foreach (['/', '/about', '/services', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/careers', '/hiring', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
+        foreach (['/', '/about', '/services', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/careers', '/contact', '/request-quote', '/faq', '/sitemap'] as $path) {
             $r = $c->get($path);
             $this->assertSame(200, $r['status'], $path);
             $this->assertSame(1, preg_match_all('#<h1[ >]#', $r['body']), "{$path} has exactly one h1");
@@ -341,6 +341,35 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM enquiry_files')['c']);
     }
 
+    public function testTheAboutPageCarriesTheApprovedContentWithItsSearchTextAndWorkingButtons(): void
+    {
+        $r = $this->client()->get('/about');
+        $this->assertSame(200, $r['status']);
+        $html = $r['body'];
+        foreach (['ABOUT KRAZY INTEGRATED SOLUTIONS', 'Turning Ideas Into Digital Solutions', 'Why We Exist', 'Where We Want to Go', 'What Drives Us', 'Understand First', 'Improve Continuously',
+            'Principles Behind Every Project', 'Client-Centric Thinking', 'Security and Responsible Technology', 'Digital Services for Modern Businesses', 'Creative and Video Production', 'Graphic Design and Branding',
+            'Website and Software Development', 'Content and Digital Management', 'AI Solutions and Automation', 'Every project is different.', 'From Requirements to Delivery', 'Discover', 'Deliver and Improve',
+            'Built Around Your Requirements', 'Have an Idea? Let', 'Explore Our Services', 'Get in Touch'] as $needle) {
+            $this->assertStringContainsString($needle, html_entity_decode($html, ENT_QUOTES), $needle);
+        }
+        $this->assertStringContainsString('<title>About Us | Krazy Integrated Solutions</title>', $html);
+        $this->assertStringContainsString('content="Discover Krazy Integrated Solutions, a digital solutions company offering creative services', $html);
+        $this->assertSame(1, substr_count($html, '<h1'), 'one top-level heading');
+        $this->assertSame(8, substr_count($html, 'class="about-dot"'), 'eight principles');
+        $this->assertSame(6, substr_count($html, 'class="about-tile"'), 'six mission points');
+        $this->assertSame(5, substr_count($html, 'service-card about-service"'), 'five service groups');
+        $this->assertSame(4, substr_count($html, 'class="about-no"') - 6, 'four steps');
+        // buttons use the pages that exist
+        $this->assertMatchesRegularExpression('#<a class="btn btn-primary" href="/services">Explore Our Services</a>#', $html);
+        $this->assertMatchesRegularExpression('#<a class="btn btn-ghost" href="/contact">Get in Touch</a>#', $html);
+        $this->assertSame(200, $this->client()->get('/services')['status']);
+        $this->assertSame(200, $this->client()->get('/contact')['status']);
+        // nothing invented
+        foreach (['testimonial', 'award', 'certified', 'ISO ', 'guarantee', 'zero downtime', 'Founded in'] as $bad) {
+            $this->assertStringNotContainsStringIgnoringCase($bad, strip_tags(substr($html, (int) strpos($html, '<main'))), $bad);
+        }
+    }
+
     // ------------------------------------------------------------------------------------------------ careers
 
     public function testJobApplicationIsStoredPrivatelyAndReviewedByAuthorisedStaffOnly(): void
@@ -387,6 +416,41 @@ final class PublicWebsiteTest extends HttpTestCase
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'an executable résumé is refused');
     }
 
+    public function testCareersAndHiringAreOnePageAndTheOldAddressForwards(): void
+    {
+        $c = $this->client();
+        $r = $c->get('/hiring');
+        $this->assertSame(301, $r['status']);
+        $this->assertSame('/careers', $r['location']);
+        $this->assertSame('/careers?role=Video%20Editor', $c->get('/hiring?role=Video+Editor')['location']);
+        $this->assertSame('/careers/received', $c->get('/hiring/received')['location']);
+        $old = $c->postNoToken('/hiring/apply', []);
+        $this->assertContains($old['status'], [308, 419], 'an old form post is passed on, never lost silently');
+
+        // the header and footer link to ONE page, and the sitemap lists it once
+        $home = $c->get('/')['body'];
+        $head = (string) substr($home, 0, (int) strpos($home, '<main'));
+        $this->assertSame(preg_match_all('#<a[^>]+href="/about"#', $head) + 1, preg_match_all('#<a[^>]+href="/careers"#', $head), 'one menu link plus the "We\'re hiring" bar, and no second Hiring entry');
+        $this->assertGreaterThan(0, preg_match_all('#<a[^>]+href="/careers"#', $head));
+        $this->assertStringNotContainsString('href="/hiring"', $home);
+        $this->assertSame(1, substr_count($c->get('/sitemap.xml')['body'], '/careers</loc>'));
+        $this->assertStringNotContainsString('/hiring</loc>', $c->get('/sitemap.xml')['body']);
+
+        // the one page carries both the published openings and the role cards and the form
+        $job = SiteContent::save($this->admin, 'jobs', null, ['title' => 'Freelance Video Editor', 'engagement_type' => 'freelance']);
+        SiteContent::setStatus($this->admin, 'jobs', SiteContent::find('jobs', $job['public_id']), 'published');
+        $page = $c->get('/careers')['body'];
+        foreach (['role-card', 'id="openings"', 'Freelance Video Editor', 'action="/careers/apply"', 'id="apply"'] as $needle) {
+            $this->assertStringContainsString($needle, $page, $needle);
+        }
+
+        // hidden hides everything, including the openings
+        $this->loggedIn('admin@x.test')->post('/admin/site/hiring/state', ['state' => 'hidden'], '/admin/site/hiring');
+        $this->assertSame(404, $c->get('/careers')['status']);
+        $this->assertSame(404, $c->get('/careers/' . $job['slug'])['status']);
+        $this->assertSame(0, substr_count($c->get('/sitemap.xml')['body'], '/careers</loc>'));
+    }
+
     // ------------------------------------------------------------------------------------------------ hiring page
 
     /** @return array<string,string> */
@@ -408,7 +472,7 @@ final class PublicWebsiteTest extends HttpTestCase
     public function testHiringPageListsTheFourRolesWithTheSalaryNoteAndAnInteractiveForm(): void
     {
         $c = $this->client();
-        $r = $c->get('/hiring');
+        $r = $c->get('/careers');
         $this->assertSame(200, $r['status']);
         foreach (['Full Stack Developer', 'Frontend Developer', 'Backend Developer', 'Video Editor'] as $role) {
             $this->assertStringContainsString('data-role="' . $role . '"', $r['body'], $role);
@@ -416,25 +480,25 @@ final class PublicWebsiteTest extends HttpTestCase
         }
         $this->assertStringContainsString('Salary will be decided after the meeting', $r['body']);
         $this->assertStringContainsString('data-hire-form', $r['body']);
-        $this->assertStringContainsString('action="/hiring/apply"', $r['body']);
-        $this->assertStringContainsString('/hiring', $c->get('/sitemap.xml')['body']);
+        $this->assertStringContainsString('action="/careers/apply"', $r['body']);
+        $this->assertStringContainsString('/careers', $c->get('/sitemap.xml')['body']);
         $this->assertStringContainsString("We're hiring", $c->get('/about')['body'], 'an announcement bar shows on other pages while hiring is open');
         $this->assertStringNotContainsString('announce', $r['body'], 'but not on the hiring page itself');
-        $this->assertStringContainsString('href="/hiring"', $c->get('/')['body']);
-        $this->assertStringContainsString('role-card is-selected', $c->get('/hiring?role=Backend+Developer')['body'], 'a role can be pre-selected from a link');
+        $this->assertStringContainsString('href="/careers"', $c->get('/')['body']);
+        $this->assertStringContainsString('role-card is-selected', $c->get('/careers?role=Backend+Developer')['body'], 'a role can be pre-selected from a link');
     }
 
     public function testHiringApplicationIsStoredWithTheRoleExperienceAvailabilityAndLinkedIn(): void
     {
         $c = $this->client();
-        $r = $c->upload('/hiring/apply', $this->hiringForm(), $this->resumeFile(), '/hiring');
+        $r = $c->upload('/careers/apply', $this->hiringForm(), $this->resumeFile(), '/careers');
         $this->assertSame(303, $r['status'], $r['body']);
-        $this->assertSame('/hiring/received', $r['location']);
+        $this->assertSame('/careers/received', $r['location']);
         $app = Database::one("SELECT * FROM site_job_applications WHERE email = 'hira@web.test'");
         $this->assertNotNull($app);
         $this->assertSame(['Video Editor', '1 to 3 years', 'Within 2 weeks', 'https://www.linkedin.com/in/hira-hiring', '+91 98765 43210'], [$app['role_applied'], $app['experience'], $app['availability'], $app['linkedin_url'], $app['phone']]);
         $this->assertNotNull($app['file_id']);
-        $this->assertStringContainsString($app['reference'], $c->get('/hiring/received')['body']);
+        $this->assertStringContainsString($app['reference'], $c->get('/careers/received')['body']);
         $page = $this->loggedIn('admin@x.test')->get('/admin/careers/' . $app['public_id'])['body'];
         $this->assertStringContainsString('Hira Hiring', $page);
         $this->assertStringContainsString('linkedin.com/in/hira-hiring', $page);
@@ -450,15 +514,15 @@ final class PublicWebsiteTest extends HttpTestCase
             $n++;
             $form = $this->hiringForm(['email' => "req{$n}@web.test"]);
             $form[$field] = '';
-            $c->upload('/hiring/apply', $form, $this->resumeFile(), '/hiring');
+            $c->upload('/careers/apply', $form, $this->resumeFile(), '/careers');
         }
-        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'nofile@web.test']), [], '/hiring');
+        $c->upload('/careers/apply', $this->hiringForm(['email' => 'nofile@web.test']), [], '/careers');
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'a missing field (or missing résumé) stores nothing');
         foreach (['https://example.com/in/x', 'http://www.linkedin.com/in/x', 'https://www.linkedin.com/', 'https://evil.test/linkedin.com/in/x', 'javascript:alert(1)'] as $bad) {
-            $c->upload('/hiring/apply', $this->hiringForm(['linkedin_url' => $bad, 'email' => 'badli@web.test']), $this->resumeFile(), '/hiring');
+            $c->upload('/careers/apply', $this->hiringForm(['linkedin_url' => $bad, 'email' => 'badli@web.test']), $this->resumeFile(), '/careers');
         }
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'only a real https LinkedIn profile address is accepted');
-        $html = $c->get('/hiring')['body'];
+        $html = $c->get('/careers')['body'];
         $this->assertStringNotContainsString('(optional', $html, 'no field is marked optional');
         $this->assertStringContainsString('name="linkedin_url"', $html);
         foreach (['phone', 'experience', 'availability', 'portfolio_url', 'linkedin_url', 'resume'] as $f) {
@@ -471,22 +535,23 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         $admin = $this->loggedIn('admin@x.test');
         $this->assertStringContainsString('name="s[fields][f][linkedin_label]"', $admin->get('/admin/site/sections/hiring')['body']);
-        $admin->post('/admin/site/sections/hiring', ['s' => ['fields' => ['enabled' => '1', 'f' => [
+        $admin->post('/admin/site/sections/hiring', ['s' => ['roles' => ['enabled' => '1', 'f' => ['heading' => 'Open roles', 'items' => "Video Editor | Edit videos.\nBackend Developer | Build APIs."]], 'fields' => ['enabled' => '1', 'f' => [
             'role_label' => 'Which role?', 'name_label' => 'Your full name', 'email_label' => 'Email', 'phone_label' => 'Mobile', 'experience_label' => 'Experience',
             'experience_options' => "Under 2 years\nOver 2 years", 'availability_label' => 'Start date', 'availability_options' => "Now\nLater",
             'skills_label_dev' => 'Stack', 'skills_hint_dev' => 'Languages', 'skills_label_video' => 'Tools', 'skills_hint_video' => 'Software', 'link_label_dev' => 'Code link', 'link_label_video' => 'Reel',
             'linkedin_label' => 'Your LinkedIn page', 'resume_label' => 'CV', 'intro_label' => 'About you', 'consent_text' => 'I agree to storage, see the', 'submit_label' => 'Send it',
         ]]]], '/admin/site/sections/hiring');
-        $html = $this->client()->get('/hiring')['body'];
+        $html = $this->client()->get('/careers')['body'];
         foreach (['Which role?', 'Your LinkedIn page', 'Under 2 years', 'Over 2 years', 'Send it', 'Mobile'] as $t) {
             $this->assertStringContainsString($t, $html, $t);
         }
         $this->assertStringNotContainsString('1 to 3 years', $html);
         // the new choices are the ones that are accepted
         $c = $this->client();
-        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'old@web.test']), $this->resumeFile(), '/hiring');
+        $c->upload('/careers/apply', $this->hiringForm(['email' => 'old@web.test']), $this->resumeFile(), '/careers');
         $this->assertSame(0, (int) Database::one("SELECT COUNT(*) c FROM site_job_applications WHERE email = 'old@web.test'")['c'], 'a removed choice is refused');
-        $c->upload('/hiring/apply', $this->hiringForm(['email' => 'new@web.test', 'experience' => 'Over 2 years', 'availability' => 'Now']), $this->resumeFile(), '/hiring');
+        $c->upload('/careers/apply', $this->hiringForm(['email' => 'new@web.test', 'experience' => 'Over 2 years', 'availability' => 'Now']), $this->resumeFile(), '/careers');
+
         $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM site_job_applications WHERE email = 'new@web.test'")['c']);
         $this->assertSame(403, $this->loggedIn('alpha@client.test')->post('/admin/site/sections/hiring', ['s' => []], '/account')['status']);
     }
@@ -496,33 +561,33 @@ final class PublicWebsiteTest extends HttpTestCase
         $admin = $this->loggedIn('admin@x.test');
         $c = $this->client();
         $this->assertSame(200, $admin->get('/admin/site/hiring')['status']);
-        $this->assertStringContainsString('Hiring page status', $admin->get('/admin/site/hiring')['body']);
+        $this->assertStringContainsString('Careers page status', $admin->get('/admin/site/hiring')['body']);
 
         // Closed: the page stays, says so, and has no form; applications are refused
         $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
-        $closed = $c->get('/hiring');
+        $closed = $c->get('/careers');
         $this->assertSame(200, $closed['status']);
         $this->assertStringContainsString('Hiring is currently closed', $closed['body']);
         $this->assertStringNotContainsString('data-hire-form', $closed['body']);
         $this->assertStringNotContainsString("We're hiring", $c->get('/about')['body'], 'no announcement while closed');
         $before = (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'];
-        $r = $c->post('/hiring/apply', $this->hiringForm(['email' => 'late@web.test']));
-        $this->assertSame('/hiring', $r['location']);
+        $r = $c->post('/careers/apply', $this->hiringForm(['email' => 'late@web.test']));
+        $this->assertSame('/careers', $r['location']);
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'no application is taken while closed');
-        $this->assertStringContainsString('/hiring', $c->get('/sitemap.xml')['body'], 'a closed page is still a page');
+        $this->assertStringContainsString('/careers', $c->get('/sitemap.xml')['body'], 'a closed page is still a page');
 
         // Hidden: gone for visitors, menus, footer and sitemap
         $admin->post('/admin/site/hiring/state', ['state' => 'hidden'], '/admin/site/hiring');
-        $this->assertSame(404, $c->get('/hiring')['status']);
+        $this->assertSame(404, $c->get('/careers')['status']);
         $home = $c->get('/')['body'];
-        $this->assertStringNotContainsString('href="/hiring"', $home);
-        $this->assertStringNotContainsString('/hiring', $c->get('/sitemap.xml')['body']);
-        $this->assertStringNotContainsString('/hiring', $c->get('/sitemap')['body']);
+        $this->assertStringNotContainsString('href="/careers"', $home);
+        $this->assertStringNotContainsString('/careers', $c->get('/sitemap.xml')['body']);
+        $this->assertStringNotContainsString('/careers', $c->get('/sitemap')['body']);
 
         // Open again
         $admin->post('/admin/site/hiring/state', ['state' => 'open'], '/admin/site/hiring');
-        $this->assertSame(200, $c->get('/hiring')['status']);
-        $this->assertStringContainsString('data-hire-form', $c->get('/hiring')['body']);
+        $this->assertSame(200, $c->get('/careers')['status']);
+        $this->assertStringContainsString('data-hire-form', $c->get('/careers')['body']);
         $this->assertGreaterThan(0, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'site.hiring_state'")['c']);
         $this->assertSame('invalid', $admin->post('/admin/site/hiring/state', ['state' => 'bogus'], '/admin/site/hiring')['status'] === 422 ? 'invalid' : 'other');
     }
@@ -532,7 +597,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $m = $this->loggedIn('mgr@x.test');
         $this->assertSame(200, $m->get('/admin/site/hiring')['status'], 'a manager can see the screen');
         $this->assertSame(403, $m->post('/admin/site/hiring/state', ['state' => 'hidden'], '/admin/site/hiring')['status']);
-        $this->assertSame(200, $this->client()->get('/hiring')['status'], 'unchanged');
+        $this->assertSame(200, $this->client()->get('/careers')['status'], 'unchanged');
         $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/admin/site/hiring')['status']);
         $this->assertSame(303, $this->client()->get('/admin/site/hiring')['status']);
     }
@@ -543,13 +608,13 @@ final class PublicWebsiteTest extends HttpTestCase
         $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
         $admin->post('/admin/site/sections/hiring', ['s' => ['roles' => ['enabled' => '1', 'f' => ['heading' => 'Where we need people', 'items' => "Data Analyst | Make sense of numbers.\nVideo Editor | Edit videos."]]]], '/admin/site/sections/hiring');
         $admin->post('/admin/site/hiring/state', ['state' => 'open'], '/admin/site/hiring');
-        $page = $this->client()->get('/hiring')['body'];
+        $page = $this->client()->get('/careers')['body'];
         $this->assertStringContainsString('Where we need people', $page);
         $this->assertStringContainsString('data-role="Data Analyst"', $page);
         $this->assertStringNotContainsString('data-role="Backend Developer"', $page);
         $admin->post('/admin/site/hiring/state', ['state' => 'closed'], '/admin/site/hiring');
         $admin->post('/admin/site/sections/hiring/reset', ['confirm_password' => self::PASSWORD], '/admin/site/sections/hiring');
-        $this->assertStringContainsString('Hiring is currently closed', $this->client()->get('/hiring')['body'], 'resetting the wording keeps the status');
+        $this->assertStringContainsString('Hiring is currently closed', $this->client()->get('/careers')['body'], 'resetting the wording keeps the status');
     }
 
     public function testTheLoginLinkIsInTheHeaderOnlyAndBecomesDashboardWhenSignedIn(): void

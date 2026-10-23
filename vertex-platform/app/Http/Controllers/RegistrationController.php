@@ -9,7 +9,7 @@ use Vertex\Core\HttpException;
 use Vertex\Core\Request;
 use Vertex\Core\Response;
 use Vertex\Core\Session;
-use Vertex\Services\Mailer;
+use Vertex\Services\Registration;
 use Vertex\Services\TokenService;
 use Vertex\Services\UserService;
 
@@ -18,7 +18,7 @@ final class RegistrationController extends Controller
 {
     private function enabled(): bool
     {
-        return (bool) Config::get('auth.registration_enabled') && Mailer::enabled();
+        return Registration::enabled();
     }
 
     /** @param array<string,string> $params */
@@ -27,7 +27,7 @@ final class RegistrationController extends Controller
         if (!$this->enabled()) {
             throw new HttpException(404);
         }
-        $r = $this->page('pages/register', ['title' => 'Create account'], 'layouts/public');
+        $r = $this->page('pages/register', ['title' => 'Create account', 'approval' => Registration::mode() === 'approval'], 'layouts/public');
         Session::forget('_old');
 
         return $r;
@@ -51,7 +51,9 @@ final class RegistrationController extends Controller
             ], $request->ip());
 
             // Identical response whether or not the email already had an account.
-            return $this->ok('/login', 'Check your email: we sent a link to confirm your address. You can sign in once it is confirmed.');
+            return $this->ok('/login', Registration::mode() === 'approval'
+                ? 'Thank you. Your account was created and is waiting for our team to approve it. You will be able to sign in as soon as it is approved.'
+                : 'Check your email: we sent a link to confirm your address. You can sign in once it is confirmed.');
         }, '/register', ['name' => $request->string('name'), 'email' => $request->string('email'), 'phone' => $request->string('phone')]);
     }
 
@@ -78,7 +80,7 @@ final class RegistrationController extends Controller
     /** @param array<string,string> $params */
     public function showResend(Request $request, array $params = []): Response
     {
-        if (!Mailer::enabled()) {
+        if (!\Vertex\Services\Mailer::enabled()) {
             throw new HttpException(404);
         }
 

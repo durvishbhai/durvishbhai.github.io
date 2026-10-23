@@ -19,7 +19,7 @@
         </form>
         <p class="auth-links">
             <?php if (Mailer::enabled()) : ?><a href="/forgot-password">Forgot password?</a><?php endif; ?>
-            <?php if (Config::get('auth.registration_enabled') && Mailer::enabled()) : ?><a href="/register">Create a client account</a><?php endif; ?>
+            <?php if (\Vertex\Services\Registration::enabled()) : ?><a href="/register">Create a client account</a><?php endif; ?>
         </p>
     </div>
 </section>

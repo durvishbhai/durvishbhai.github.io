@@ -1,7 +1,7 @@
 <?php
 /**
- * The fields of the job application form, shared by the Hiring and Careers pages. Every field is required; the wording and the two drop-down lists are edited in
- * Administration -> Website -> Page wording -> Hiring page. @var list<array{title:string,family:string}> $roles @var string $sel @var string $limit @var string $extensions
+ * The fields of the job application form, used by the Careers page. Every field is required; the wording and the two drop-down lists are edited in
+ * Administration -> Website -> Page wording -> Careers page. @var list<array{title:string,family:string}> $roles @var string $sel @var string $limit @var string $extensions
  */
 use Vertex\Services\SiteContent;
 use Vertex\Services\SiteHiring;

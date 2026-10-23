@@ -114,7 +114,7 @@ final class SiteAdminController extends Controller
         $uid = $this->actorId();
         $apps = (Gate::can('careers.view', $uid) || Gate::can('careers.manage', $uid)) ? (int) \Vertex\Core\Database::one("SELECT COUNT(*) AS c FROM site_job_applications WHERE status = 'new'")['c'] : null;
 
-        return $this->page('admin/site/hiring', ['title' => 'Hiring', 'state' => SiteHiring::state(), 'states' => SiteHiring::STATES, 'roles' => SiteHiring::roles(), 'canPublish' => Gate::can('cms.publish', $uid), 'newApplications' => $apps]);
+        return $this->page('admin/site/hiring', ['title' => 'Careers', 'state' => SiteHiring::state(), 'states' => SiteHiring::STATES, 'roles' => SiteHiring::roles(), 'canPublish' => Gate::can('cms.publish', $uid), 'newApplications' => $apps]);
     }
 
     /** @param array<string,string> $params */
@@ -122,7 +122,7 @@ final class SiteAdminController extends Controller
     {
         return $this->guarded(function () use ($request): Response {
             SiteHiring::set($this->actorId(), $request->string('state'));
-            $msg = ['open' => 'Hiring is open: the page shows the roles and the form.', 'closed' => 'Hiring is closed: the page says so and takes no applications.', 'hidden' => 'The Hiring page is hidden from visitors.'];
+            $msg = ['open' => 'Hiring is open: the page shows the roles and the form.', 'closed' => 'Hiring is closed: the page says so and takes no applications.', 'hidden' => 'The Careers page is hidden from visitors.'];
 
             return $this->ok('/admin/site/hiring', $msg[SiteHiring::state()] ?? 'Saved.');
         }, '/admin/site/hiring');

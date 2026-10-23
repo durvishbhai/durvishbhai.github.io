@@ -32,6 +32,11 @@ final class AccountMail
             . self::link('/verify-email/' . $token) . "\n\nThis link works once and expires in {$ttl} hours. If you did not create an account, ignore this email.\n");
     }
 
+    public static function approved(string $to, string $name): bool
+    {
+        return Mailer::send($to, 'Your account was approved', "Hello {$name},\n\nYour " . self::app() . " client account was approved. You can sign in here:\n\n" . self::link('/login') . "\n");
+    }
+
     public static function invite(string $to, string $name, string $token): bool
     {
         $ttl = (int) Config::get('auth.invite_ttl_minutes') / 60;

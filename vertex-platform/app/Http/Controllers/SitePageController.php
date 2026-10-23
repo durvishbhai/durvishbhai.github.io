@@ -33,11 +33,12 @@ final class SitePageController extends Controller
     }
 
     /** @param array<string,mixed> $data */
-    private function render(string $view, string $title, array $data = [], string $desc = '', string $path = '', string $image = '', bool $noindex = false): Response
+    private function render(string $view, string $title, array $data = [], string $desc = '', string $path = '', string $image = '', bool $noindex = false, array $metaExtra = []): Response
     {
         $base = rtrim((string) Config::get('app.url'), '/');
         $site = (array) Config::get('site', []);
-        $meta = ['description' => $desc !== '' ? $desc : (string) ($site['default_seo_description'] ?? ''), 'canonical' => $base !== '' && $path !== '' ? $base . $path : '', 'ogImage' => $image !== '' && $base !== '' ? $base . $image : '', 'ogTitle' => $title];
+        $meta = ['description' => $desc !== '' ? $desc : (string) ($site['default_seo_description'] ?? ''), 'canonical' => $base !== '' && $path !== '' ? $base . $path : '', 'ogImage' => $image !== '' && $base !== '' ? $base . $image : '', 'ogTitle' => $title] + [];
+        $meta = $metaExtra + $meta;
         $live = session_status() === PHP_SESSION_ACTIVE; // pages without a form do not start a session for anonymous visitors
         $r = Response::html(View::render($view, ['title' => $title, 'meta' => $meta, 'noindex' => $noindex, 'errors' => $live ? Session::pullFlash('errors', []) : [], 'notice' => $live ? Session::pullFlash('notice') : null] + $data), 200, $live ? ['Cache-Control' => 'private, no-store'] : ['Cache-Control' => 'public, max-age=60']);
         if ($live) {
@@ -84,7 +85,11 @@ final class SitePageController extends Controller
         $this->guard();
         $h = SiteSections::get('about', 'header');
 
-        return $this->render('site/about', SiteText::tokens($h['title']), ['visible' => SiteSections::visible('about')], self::plain($h['intro']), '/about');
+        $seoTitle = trim((string) ($h['seo_title'] ?? ''));
+        $seoDesc = trim((string) ($h['seo_description'] ?? ''));
+
+        return $this->render('site/about', SiteText::tokens($h['title']), ['visible' => SiteSections::visible('about')], $seoDesc !== '' ? self::plain($seoDesc, 300) : self::plain($h['intro']), '/about', '', false,
+            $seoTitle !== '' ? ['title' => SiteText::tokens($seoTitle), 'ogTitle' => SiteText::tokens($seoTitle)] : []);
     }
 
     /** @param array<string,string> $params */
@@ -181,36 +186,50 @@ final class SitePageController extends Controller
     public function careers(Request $request, array $params = []): Response
     {
         $this->guard();
-        $h = SiteSections::get('careers', 'header');
-        $r = $this->render('site/careers', SiteText::tokens($h['title']), ['errorsInline' => true, 'jobs' => SiteContent::published('jobs'), 'roles' => CareerService::roleChoices(), 'preselect' => (string) ($request->query['role'] ?? ''),
-            'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/careers');
+        if (!SiteHiring::isVisible()) {
+            throw new HttpException(404);
+        }
+        $h = SiteSections::get('hiring', 'header');
+        $open = SiteHiring::isOpen();
+        $jobs = $open ? SiteContent::published('jobs') : [];
+        $roles = SiteHiring::roles();
+        $have = array_column($roles, 'title');
+        foreach ($jobs as $j) { // a published opening can be chosen in the form too
+            if (!in_array((string) $j['title'], $have, true)) {
+                $roles[] = ['title' => (string) $j['title'], 'summary' => '', 'family' => stripos((string) $j['title'], 'video') !== false || stripos((string) $j['title'], 'edit') !== false ? 'video' : 'dev'];
+            }
+        }
 
-        return $r;
+        return $this->render('site/careers', SiteText::tokens($h['title']), ['errorsInline' => true, 'open' => $open, 'jobs' => $jobs, 'roles' => $roles, 'preselect' => (string) ($request->query['role'] ?? ''),
+            'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/careers');
     }
 
     /** @param array<string,string> $params */
     public function job(Request $request, array $params = []): Response
     {
         $this->guard();
+        if (!SiteHiring::isVisible()) {
+            throw new HttpException(404);
+        }
         $j = SiteContent::publishedBySlug('jobs', (string) ($params['slug'] ?? '')) ?? throw new HttpException(404);
 
         return $this->render('site/job', (string) $j['title'], ['j' => $j], self::plain((string) $j['title'] . ' at ' . SiteText::company()), '/careers/' . $j['slug']);
     }
 
-    /** @param array<string,string> $params */
+    /** The application form. Applications are only taken while the page is Open. @param array<string,string> $params */
     public function apply(Request $request, array $params = []): Response
     {
+        if (!SiteHiring::isOpen()) {
+            return Response::redirect('/careers');
+        }
+
         return $this->submitApplication($request, '/careers#apply', '/careers/received');
     }
 
-    /** The Hiring page's form. Applications are only taken while the page is Open. @param array<string,string> $params */
+    /** The old Hiring page address: there is one page now, Careers. Forms posted to the old address are passed on with their data (308). @param array<string,string> $params */
     public function hiringApply(Request $request, array $params = []): Response
     {
-        if (!SiteHiring::isOpen()) {
-            return Response::redirect('/hiring');
-        }
-
-        return $this->submitApplication($request, '/hiring#apply', '/hiring/received');
+        return Response::redirect('/careers/apply', 308);
     }
 
     private function submitApplication(Request $request, string $back, string $done): Response
@@ -244,25 +263,15 @@ final class SitePageController extends Controller
     /** @param array<string,string> $params */
     public function hiring(Request $request, array $params = []): Response
     {
-        $this->guard();
-        if (!SiteHiring::isVisible()) {
-            throw new HttpException(404);
-        }
-        $h = SiteSections::get('hiring', 'header');
-        $open = SiteHiring::isOpen();
-        $r = $this->render('site/hiring', SiteText::tokens($h['title']), ['errorsInline' => true, 'open' => $open, 'roles' => SiteHiring::roles(), 'preselect' => (string) ($request->query['role'] ?? ''),
-            'limit' => FileStore::humanSize(FileStore::effectiveLimit('career')), 'extensions' => implode(', ', FileStore::allowedExtensions())], self::plain($h['intro']), '/hiring');
+        $role = (string) ($request->query['role'] ?? '');
 
-        return $r;
+        return Response::redirect('/careers' . ($role !== '' ? '?role=' . rawurlencode($role) : ''), 301);
     }
 
     /** @param array<string,string> $params */
     public function hiringReceived(Request $request, array $params = []): Response
     {
-        $this->guard();
-        $ref = Session::pull('career_ref');
-
-        return $this->render('site/career-received', 'Application received', ['ref' => is_string($ref) ? $ref : null, 'back' => '/hiring'], '', '', '', true);
+        return Response::redirect('/careers/received', 301);
     }
 
     /** @param array<string,string> $params */
@@ -300,10 +309,10 @@ final class SitePageController extends Controller
     public function sitemap(Request $request, array $params = []): Response
     {
         $this->guard();
-        $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Clients', '/our-clients'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio'], ['Careers', '/careers']],
+        $groups = ['Company' => [['About Us', '/about'], ['Services', '/services'], ['Our Team', '/our-team'], ['Our Clients', '/our-clients'], ['Our Partners', '/our-partners'], ['Portfolio', '/portfolio']],
             'Get in touch' => [['Contact Us', '/contact'], ['Project Requirements', '/request-quote'], ['FAQ', '/faq'], ['Become a referral partner', '/partners/apply']]];
         if (SiteHiring::isVisible()) {
-            $groups['Company'][] = ['Hiring', '/hiring'];
+            $groups['Company'][] = ['Careers', '/careers'];
         }
         foreach (SiteContent::published('services') as $s) {
             $groups['Services'][] = [(string) $s['name'], '/services/' . $s['slug']];

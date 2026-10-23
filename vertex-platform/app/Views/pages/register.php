@@ -1,7 +1,7 @@
 <section class="auth">
     <div class="auth-card reveal">
         <h1>Create account</h1>
-        <p class="muted">For clients. We will email you a link to confirm your address.</p>
+        <p class="muted"><?= !empty($approval) ? 'For clients. Our team approves each new account before it can sign in.' : 'For clients. We will email you a link to confirm your address.' ?></p>
         <form method="post" action="/register" novalidate>
             <?= csrf_field() ?>
             <div class="field"><label for="name">Full name</label><input id="name" name="name" required maxlength="120" autocomplete="name" value="<?= e(old('name')) ?>"></div>
