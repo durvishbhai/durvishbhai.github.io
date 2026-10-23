@@ -39,6 +39,8 @@ return [
         'payment_claim_user' => [10, 3600],
         'ai_user' => [30, 3600],
         'payment_request_user' => [30, 3600],
+        'test_email_user' => [10, 3600],
+        'checkout_order_ip' => [60, 3600],
         'receipt_verify_ip' => [40, 600],
         'checkout_order_user' => [60, 3600],
         'backup_download_user' => [10, 3600],

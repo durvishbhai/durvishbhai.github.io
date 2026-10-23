@@ -10,6 +10,9 @@ use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\AiService;
+use Vertex\Services\Auth;
+use Vertex\Services\Mailer;
+use Vertex\Services\RateLimiter;
 use Vertex\Services\RazorpayGateway;
 use Vertex\Services\Settings;
 
@@ -53,5 +56,28 @@ final class SettingsController extends Controller
 
             return $this->ok('/admin/settings#' . $group, Settings::groups()[$group] . ' saved.');
         }, '/admin/settings#' . $group, array_diff_key($in, array_flip(array_map(static fn (string $k): string => str_replace('.', '__', $k), array_keys(array_filter(Settings::definitions(), static fn (array $d): bool => $d['type'] === 'secret'))))));
+    }
+
+    /**
+     * Sends a test email to the signed-in Owner using the saved email settings and tells them exactly what happened, including the mail server's own error
+     * text, so a wrong password, port or From address can be fixed without reading server logs.
+     *
+     * @param array<string,string> $params
+     */
+    public function testEmail(Request $request, array $params = []): Response
+    {
+        if (!RateLimiter::hit('test_email_user', (string) $this->actorId())) {
+            throw new HttpException(429);
+        }
+        $user = Auth::user() ?? throw new HttpException(403);
+        $to = (string) $user['email'];
+        if (!Mailer::enabled()) {
+            return $this->back('/admin/settings#email', ['Email is switched off or incomplete: choose "SMTP", and fill the host, From address and (for most hosts) the username and password, then save and try again.']);
+        }
+        if (Mailer::send($to, 'Test email from ' . (string) \Vertex\Core\Config::get('app.name'), "This is a test email.\n\nIf you can read it, your email settings work: password resets, invitations and reminders will be delivered.\n")) {
+            return $this->ok('/admin/settings#email', 'A test email was sent to ' . $to . '. Check that inbox (and the spam folder).');
+        }
+
+        return $this->back('/admin/settings#email', ['The test email could not be sent. The mail server said: ' . (Mailer::$lastError !== '' ? Mailer::$lastError : 'no answer') . ' Check the host, port, encryption, username and password (for Hostinger: smtp.hostinger.com with SSL 465 or STARTTLS 587, the full mailbox address as the username).']);
     }
 }

@@ -381,6 +381,11 @@ return static function (Router $router): void {
     $router->get('/payment-requests/{order}', [PaymentRequestController::class, 'show'], $pr);
     $router->get('/payment-requests/{order}/status', [PaymentRequestController::class, 'status'], $pr);
     $router->post('/payment-requests/{order}/cancel', [PaymentRequestController::class, 'cancel'], $pr);
+    // The shareable pay page: no sign-in; the 128-bit id in the address is the secret (see PaymentRequestController::publicPay).
+    $router->get('/pay/{order}', [PaymentRequestController::class, 'publicPay']);
+    $router->get('/pay/{order}/status', [PaymentRequestController::class, 'publicStatus']);
+    $router->post('/pay/{order}/checkout', [PaymentRequestController::class, 'publicCheckout']);
+    $router->post('/pay/{order}/verify', [PaymentRequestController::class, 'publicVerify']);
     $router->get('/my/pay/{order}', [PaymentRequestController::class, 'mine'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/pay/{order}/checkout', [PaymentRequestController::class, 'checkout'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/pay/{order}/verify', [PaymentRequestController::class, 'verify'], ['auth', 'can:invoices.view_own']);
@@ -504,6 +509,7 @@ return static function (Router $router): void {
     $router->group('/admin', ['auth'], static function (Router $r): void {
         $r->get('/system', [SystemController::class, 'index'], ['can:settings.view']);
         $r->get('/settings', [SettingsController::class, 'index'], ['can:settings.view']);
+        $r->post('/settings-test-email', [SettingsController::class, 'testEmail'], ['can:settings.manage']);
         $r->post('/settings/{group}', [SettingsController::class, 'save'], ['can:settings.manage']);
 
         // Website content (services, team, partners, portfolio, openings, FAQs, policies, page sections) and job applications

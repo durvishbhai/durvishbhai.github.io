@@ -38,5 +38,6 @@ $canManage = can('settings.manage'); ?>
     <?php endforeach; ?>
     <?php if ($canManage) : ?><div class="field"><label for="pw-<?= e($g) ?>">Your password</label><input id="pw-<?= e($g) ?>" name="confirm_password" type="password" required autocomplete="current-password"></div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Save <?= e(strtolower($label)) ?></button></div><?php endif; ?>
-    </form></div>
+    </form>
+    <?php if ($g === 'email' && $canManage) : ?><form method="post" action="/admin/settings-test-email" class="inline-form"><?= csrf_field() ?><p class="muted">Saved your email settings? Send a test email to your own address. If it fails, the page shows the mail server's exact answer.</p><button class="btn btn-ghost btn-sm" type="submit">Send a test email to me</button></form><?php endif; ?></div>
 <?php endforeach; ?>

@@ -382,6 +382,60 @@ final class Phase12HttpTest extends HttpTestCase
         $this->assertSame(419, $client->postNoToken('/my/pay/' . $o['public_id'] . '/checkout')['status']);
     }
 
+    public function testTheSharedPayLinkOpensWithoutSigningInAndShowsOnlyWhatIsNeeded(): void
+    {
+        $inv = $this->issuedInvoicePublic();
+        $qr = $this->openRequest($inv, 25050);
+        $anon = $this->client();
+        $page = $anon->get('/pay/' . $qr['public_id']);
+        $this->assertSame(200, $page['status'], 'no sign-in needed');
+        $this->assertStringContainsString('₹250.50', $page['body']);
+        $this->assertSame(1, substr_count($page['body'], '<svg class="qr-svg"'));
+        foreach (['alpha@client.test', 'Alpha', 'STAFF', 'Withdraw this request', 'All requests'] as $private) {
+            $this->assertStringNotContainsString($private, $page['body'], $private);
+        }
+        $this->assertStringContainsString('noindex', $page['body']);
+        $this->assertSame('no-referrer', $anon->lastHeaders['referrer-policy']);
+        $this->assertStringNotContainsString('razorpay.com', $anon->lastHeaders['content-security-policy'], 'a QR page keeps the strict policy');
+        $st = $anon->get('/pay/' . $qr['public_id'] . '/status');
+        $this->assertSame(200, $st['status']);
+        $this->assertSame('pending', json_decode($st['body'], true)['status']);
+        $this->assertSame(404, $anon->get('/pay/' . str_repeat('a', 32))['status']);
+        $this->assertSame(404, $anon->get('/pay/not-an-id')['status']);
+
+        // the team's copy box now holds this link
+        $this->assertStringContainsString('/pay/' . $qr['public_id'], $this->loggedIn('fin@x.test')->get('/payment-requests/' . $qr['public_id'])['body']);
+
+        // a checkout request: the page carries the pay button, Razorpay's own hosts are allowed on this page only, and the endpoints answer without a login
+        $co = $this->openRequest($inv, 10000);
+        Database::run("UPDATE gateway_orders SET flow = 'checkout', qr_payload = '', provider_order_id = 'order_TestOrder01' WHERE id = ?", [$co['id']]);
+        $page = $anon->get('/pay/' . $co['public_id']);
+        $this->assertStringContainsString('data-checkout-start="/pay/' . $co['public_id'] . '"', $page['body']);
+        $this->assertStringContainsString('data-csrf="', $page['body']);
+        $this->assertStringContainsString('script-src \'self\' https://checkout.razorpay.com', $anon->lastHeaders['content-security-policy']);
+        $r = $anon->post('/pay/' . $co['public_id'] . '/checkout', [], '/login');
+        $this->assertSame(500, $r['status'], 'Razorpay is not configured on the test server: a clear JSON error');
+        $this->assertArrayHasKey('error', json_decode($r['body'], true));
+        $r = $anon->post('/pay/' . $co['public_id'] . '/verify', ['razorpay_payment_id' => 'pay_X'], '/login');
+        $this->assertSame(400, $r['status']);
+        $r = $anon->post('/pay/' . $co['public_id'] . '/verify', ['razorpay_payment_id' => 'pay_ABCDEF123', 'razorpay_order_id' => 'order_TestOrder01', 'razorpay_signature' => str_repeat('a', 64)], '/login');
+        $this->assertSame(400, $r['status']);
+        $this->assertSame('pending', Database::one('SELECT status FROM gateway_orders WHERE id = ?', [$co['id']])['status']);
+        $this->assertSame(419, $anon->postNoToken('/pay/' . $co['public_id'] . '/checkout')['status'], 'the endpoints still need the form token');
+    }
+
+    public function testOnlyTheOwnerCanSendATestEmail(): void
+    {
+        $this->assertSame(403, $this->loggedIn('fin@x.test')->post('/admin/settings-test-email', [], '/account')['status']);
+        $owner = $this->loggedIn('owner@x.test');
+        $page = $owner->get('/admin/settings');
+        $this->assertStringContainsString('Send a test email to me', $page['body']);
+        $r = $owner->post('/admin/settings-test-email', [], '/admin/settings');
+        $this->assertSame(303, $r['status']);
+        $body = $owner->get('/admin/settings')['body'];
+        $this->assertTrue(str_contains($body, 'A test email was sent to owner@x.test') || str_contains($body, 'switched off or incomplete') || str_contains($body, 'mail server said'), 'the result of the attempt is shown');
+    }
+
     public function testAnExpiredRequestShowsNoQr(): void
     {
         $inv = $this->issuedInvoicePublic();

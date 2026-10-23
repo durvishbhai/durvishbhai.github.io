@@ -152,11 +152,8 @@ final class PaymentRequestController extends Controller
             return Response::json(['error' => 'Too many attempts. Please wait a little and try again.'], 429);
         }
         $u = Database::one('SELECT name, email FROM users WHERE id = ?', [$this->actorId()]) ?? [];
-        try {
-            return Response::json(RazorpayGateway::createCheckoutOrder($o, ['name' => (string) ($u['name'] ?? ''), 'email' => (string) ($u['email'] ?? '')]));
-        } catch (\RuntimeException $e) {
-            return Response::json(['error' => $e->getMessage()], in_array($e->getCode(), [400, 401], true) ? $e->getCode() : 500);
-        }
+
+        return $this->checkoutFor($o, ['name' => (string) ($u['name'] ?? ''), 'email' => (string) ($u['email'] ?? '')]);
     }
 
     /**
@@ -167,7 +164,71 @@ final class PaymentRequestController extends Controller
      */
     public function verify(Request $request, array $params = []): Response
     {
-        $o = $this->ownOrder($params['order'] ?? '');
+        return $this->verifyFor($this->ownOrder($params['order'] ?? ''), $request);
+    }
+
+    // ------------------------------------------------------------------------------------------------ the shareable pay page (no sign-in)
+
+    /**
+     * The link the team shares with a client (/pay/{id}). The id is 128 random bits, so only someone who was given the link can open it; it shows only the
+     * amount, what it is for and the pay button/QR, and anyone who holds it may pay (paying needs no secret). Nothing about the client is shown.
+     *
+     * @param array<string,string> $params
+     */
+    public function publicPay(Request $request, array $params = []): Response
+    {
+        $o = RazorpayGateway::findRequest($params['order'] ?? '') ?? throw new HttpException(404);
+        $data = self::view($o, true);
+        $data['statusUrl'] = '/pay/' . $o['public_id'] . '/status';
+        $data['public'] = true;
+        $data['inv']['client_name'] = '';
+        $title = 'Pay ' . money((int) $o['amount_minor']);
+        $headers = ['Cache-Control' => 'no-store', 'Referrer-Policy' => 'no-referrer'];
+        if ($o['flow'] === 'checkout' && RazorpayGateway::isLive($o)) {
+            $headers += SecurityHeadersPolicy::checkout();
+        }
+
+        return Response::html(\Vertex\Core\View::render('billing/payments/show', $data + ['title' => $title, 'meta' => ['description' => '', 'canonical' => '', 'ogImage' => '', 'ogTitle' => $title], 'noindex' => true, 'errors' => [], 'notice' => null], 'layouts/public'), 200, $headers);
+    }
+
+    /** @param array<string,string> $params */
+    public function publicStatus(Request $request, array $params = []): Response
+    {
+        $o = RazorpayGateway::findRequest($params['order'] ?? '') ?? throw new HttpException(404);
+
+        return Response::json(self::poll($o), 200);
+    }
+
+    /** @param array<string,string> $params */
+    public function publicCheckout(Request $request, array $params = []): Response
+    {
+        $o = RazorpayGateway::findRequest($params['order'] ?? '') ?? throw new HttpException(404);
+        if (!RateLimiter::hit('checkout_order_ip', $request->ip())) {
+            return Response::json(['error' => 'Too many attempts. Please wait a little and try again.'], 429);
+        }
+
+        return $this->checkoutFor($o, []);
+    }
+
+    /** @param array<string,string> $params */
+    public function publicVerify(Request $request, array $params = []): Response
+    {
+        return $this->verifyFor(RazorpayGateway::findRequest($params['order'] ?? '') ?? throw new HttpException(404), $request);
+    }
+
+    /** @param array<string,mixed> $o @param array<string,string> $hint @return Response JSON: the Razorpay order for checkout.js, or {error} with 400/401/500 */
+    private function checkoutFor(array $o, array $hint): Response
+    {
+        try {
+            return Response::json(RazorpayGateway::createCheckoutOrder($o, $hint));
+        } catch (\RuntimeException $e) {
+            return Response::json(['error' => $e->getMessage()], in_array($e->getCode(), [400, 401], true) ? $e->getCode() : 500);
+        }
+    }
+
+    /** @param array<string,mixed> $o */
+    private function verifyFor(array $o, Request $request): Response
+    {
         $pay = $request->string('razorpay_payment_id');
         $ord = $request->string('razorpay_order_id');
         $sig = $request->string('razorpay_signature');

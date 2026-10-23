@@ -86,6 +86,14 @@ Domain and hosting renewals use the same Razorpay requests:
 * A confirmed payment is counted on the renewal (method *Payment gateway*, reference `Razorpay pay_…`), once only, and moves the renewal to **Payment Received** when the invoice is covered. It never touches the billing-invoice payments. If a payment arrives that cannot be counted (the renewal was cancelled or is already covered) it is not lost: an audit entry is written and staff with renewal rights are notified to settle it by hand.
 * Migration `0023_renewal_payment_requests.sql` adds `renewal_cycles.adjustment_minor` and lets a payment request point at a renewal cycle instead of an invoice.
 
+### Sharing a payment link with a client
+
+The request page's copy box holds `https://YOUR-SITE/pay/{id}`. It opens **without signing in** (the id is 128 random bits, so only someone given the link can open it), shows only the amount, what it is for and the QR or Pay button, never the client's details, is not indexed and sends no referrer. Anyone holding the link can pay it (paying needs no secret); the payment is still recorded only after Razorpay's own confirmation. The signed-in client page `/my/pay/{id}` still exists for clients with an account and is the link in their notification; it answers 404 to anyone who is not that client, so staff should send the `/pay/` link.
+
+### Email (password reset, invitations, reminders)
+
+SMTP settings are under *Integrations & settings → Email*. The platform signs in with the SMTP username (the real mailbox) and uses it as the envelope sender, while the From header shows the From address, so an alias such as `noreply@` works on hosts that refuse an alias as sender. If the host still refuses the alias, the message is sent once more from the mailbox with the alias as Reply-To. After saving, press **Send a test email to me**: it shows the mail server's exact error if anything is wrong. Password-reset emails never say whether an address exists, so a failed send is only visible through this test or `storage/logs`.
+
 ### Test-mode checklist (do this before going live)
 
 1. In the Razorpay Dashboard (Test Mode) create API keys: *Account & Settings → API Keys*. Note the **Key ID** (`rzp_test_…`) and **Key Secret**.

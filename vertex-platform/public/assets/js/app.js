@@ -411,7 +411,7 @@
         var verifyUrl = btn.getAttribute('data-checkout-verify');
         var errEl = document.querySelector('[data-checkout-error]');
         var meta = document.querySelector('meta[name="csrf-token"]');
-        var csrf = meta ? meta.getAttribute('content') : '';
+        var csrf = meta ? meta.getAttribute('content') : (btn.getAttribute('data-csrf') || '');
         var label = btn.textContent;
         var fail = function (msg) {
             if (errEl) { errEl.textContent = msg; errEl.hidden = false; }
