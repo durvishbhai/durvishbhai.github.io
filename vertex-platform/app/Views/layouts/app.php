@@ -65,6 +65,7 @@ $nav = [
     ['/admin/data', 'Import & export', can('data.export') || can('data.import')],
     ['/admin/backup', 'Backup (.sql)', can('backups.manage')],
     ['/admin/recycle-bin', 'Recycle bin', can('recycle.view')],
+    ['/admin/activity', 'Account activity', can('activity.view_all')],
     ['/admin/audit', 'Audit log', can('audit.view')],
     ['/admin/business', 'Business details', can('billing.configure')],
     ['/admin/manual-upi', 'Manual UPI payments', can('billing.configure')],
@@ -89,7 +90,7 @@ $groupOf = [
     'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
     'Website' => ['/admin/site', '/admin/cms', '/admin/careers'],
-    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
+    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/activity', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
     'Account' => ['/account', '/account#change-password'],
 ];
 $byHref = [];

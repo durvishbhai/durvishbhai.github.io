@@ -62,6 +62,15 @@ final class AccountController extends Controller
         }, '/account');
     }
 
+    /** The signed-in person's own sign-ins and the actions on their account, newest first. @param array<string,string> $params */
+    public function activity(Request $request, array $params = []): Response
+    {
+        $page = $request->page();
+        $feed = \Vertex\Services\ActivityService::feed(['user' => $this->actorId(), 'direction' => 'both'], $page, 25);
+
+        return $this->page('pages/my-activity', ['title' => 'My account activity', 'page' => $page, 'perPage' => 25] + $feed);
+    }
+
     /** @param array<string,string> $params */
     public function twoFactor(Request $request, array $params = []): Response
     {

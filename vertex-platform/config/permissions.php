@@ -41,6 +41,7 @@ $p = [
     ],
     'platform' => [
         'audit.view' => 'View audit logs',
+        'activity.view_all' => 'See what every account on the platform has done (Owner)',
         'settings.view' => 'View system settings',
         'settings.manage' => 'Change system settings',
         'reports.operational' => 'View operational reports',
@@ -261,7 +262,7 @@ $p = [
 
 /** Granting/revoking these through the UI needs `roles.manage_sensitive`. */
 $sensitive = [
-    'users.assign_roles', 'users.reset_2fa', 'roles.manage', 'roles.manage_sensitive', 'roles.create', 'audit.view',
+    'users.assign_roles', 'users.reset_2fa', 'roles.manage', 'roles.manage_sensitive', 'roles.create', 'audit.view', 'activity.view_all',
     'settings.manage', 'backups.manage', 'recycle.restore', 'data.export', 'data.import', 'reports.financial', 'finance.view',
     'projects.assign', 'transactions.approve', 'payments.record', 'payments.reconcile', 'payments.request',
     'invoices.issue', 'invoices.void', 'receipts.issue', 'receipts.void', 'payouts.approve', 'payouts.record',
@@ -301,7 +302,7 @@ $roles = [
         'description' => 'Runs day-to-day administration, assigns projects, approves payouts. Cannot change sensitive permission grants or system settings.',
         'level' => 90, 'locked' => false, 'assignable_in_ui' => true, 'phone_required' => false,
         'permissions' => array_values(array_diff($all, [
-            'roles.manage_sensitive', 'roles.create', 'settings.manage', 'backups.manage',
+            'roles.manage_sensitive', 'roles.create', 'settings.manage', 'backups.manage', 'activity.view_all',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
             'referrals.submit', 'referrals.view_own', 'renewals.view_own', 'quotes.respond',

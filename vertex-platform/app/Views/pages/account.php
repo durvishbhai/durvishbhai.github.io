@@ -26,6 +26,11 @@ $tz = old('timezone', (string) ($user['timezone'] ?? ''));
 </div>
 
 <div class="panel">
+    <h2>Account activity</h2>
+    <p class="muted">See your recent sign-ins and what happened on your account. <a href="/account/activity">Open my activity</a></p>
+</div>
+
+<div class="panel">
     <h2>Two-factor login</h2>
     <p class="muted">Protect your account with a code from an authenticator app. <a href="/account/two-factor">Manage two-factor login</a></p>
 </div>

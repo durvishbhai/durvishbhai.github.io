@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Vertex\Core\Router;
 use Vertex\Http\Controllers\AccountController;
+use Vertex\Http\Controllers\Admin\ActivityController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\AutomationController;
@@ -152,6 +153,7 @@ return static function (Router $router): void {
     $router->get('/account', [AccountController::class, 'show'], ['auth']);
     $router->post('/account', [AccountController::class, 'update'], ['auth']);
     $router->post('/account/password', [AccountController::class, 'password'], ['auth']);
+    $router->get('/account/activity', [AccountController::class, 'activity'], ['auth']);
     $router->get('/account/two-factor', [AccountController::class, 'twoFactor'], ['auth']);
     $router->post('/account/two-factor/start', [AccountController::class, 'twoFactorStart'], ['auth']);
     $router->post('/account/two-factor/enable', [AccountController::class, 'twoFactorEnable'], ['auth']);
@@ -625,6 +627,8 @@ return static function (Router $router): void {
         $r->get('/revision-policies', [RevisionTermsController::class, 'index'], ['can:revisions.policy,revisions.classify,revisions.override']);
         $r->post('/revision-policies', [RevisionTermsController::class, 'save'], ['can:revisions.policy']);
 
+        $r->get('/activity', [ActivityController::class, 'index'], ['can:activity.view_all']);
+        $r->get('/activity/{user}', [ActivityController::class, 'show'], ['can:activity.view_all']);
         $r->get('/audit', [AuditController::class, 'index'], ['can:audit.view']);
         $r->post('/audit/verify', [AuditController::class, 'verify'], ['can:audit.view']);
     });
