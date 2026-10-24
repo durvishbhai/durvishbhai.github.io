@@ -506,9 +506,28 @@
         var steps = Array.prototype.slice.call(form.querySelectorAll('.wiz-step'));
         var dots = Array.prototype.slice.call(form.querySelectorAll('[data-step-dot]'));
         var prev = form.querySelector('[data-prev]'), next = form.querySelector('[data-next]'), submit = form.querySelector('[data-submit]');
-        var review = form.querySelector('[data-review]');
-        var cur = 0, reached = 0;
+        var extra = form.querySelector('[data-extra]'), review = form.querySelector('[data-review]');
+        var cur = 0;
         form.classList.add('wiz-on');
+
+        // "Add another" lists (custom features, roles): a template is cloned, a cross removes a row, the row count is capped.
+        form.querySelectorAll('[data-repeat]').forEach(function (box) {
+            var list = box.querySelector('[data-repeat-list]'), tpl = box.querySelector('template[data-repeat-template]'), add = box.querySelector('[data-repeat-add]');
+            var max = parseInt(box.getAttribute('data-max') || '10', 10);
+            function number() {
+                list.querySelectorAll('[data-role-card]').forEach(function (c, i) { var t = c.querySelector('.role-title'); if (t) { t.textContent = 'Role #' + (i + 1); } });
+                if (add) { add.hidden = list.children.length >= max; }
+            }
+            if (add && tpl) { add.addEventListener('click', function () { if (list.children.length < max) { list.appendChild(tpl.content.cloneNode(true)); number(); var f = list.lastElementChild.querySelector('input'); if (f) { f.focus(); } } }); }
+            box.addEventListener('click', function (e) {
+                var del = e.target.closest ? e.target.closest('[data-repeat-del]') : null;
+                if (!del) { return; }
+                var row = del.closest('.repeat-row, .role-card');
+                if (row && list.children.length > 1) { row.remove(); } else if (row) { row.querySelectorAll('input').forEach(function (i) { i.value = ''; }); }
+                number();
+            });
+            number();
+        });
 
         function stepValid(i) {
             var ok = true, first = null;
@@ -523,36 +542,67 @@
             if (!ok && first) { if (first.reportValidity && first.type !== 'checkbox') { first.reportValidity(); } first.focus(); }
             return ok;
         }
-        function values(el) {
-            if (el.type === 'checkbox') { return null; }
+        function val(el) {
             if (el.tagName === 'SELECT') { return el.value === '' ? '' : el.options[el.selectedIndex].text; }
             return el.value.trim();
         }
         function buildReview() {
             if (!review) { return; }
             review.textContent = '';
-            function row(label, text) {
+            function heading(text) { var h = document.createElement('h3'); h.textContent = text; review.appendChild(h); }
+            function dl() { var d = document.createElement('dl'); d.className = 'kv'; review.appendChild(d); return d; }
+            function row(d, label, text) {
                 if (!text) { return; }
                 var dt = document.createElement('dt'), dd = document.createElement('dd');
-                dt.textContent = label; dd.textContent = text; review.appendChild(dt); review.appendChild(dd);
+                dt.textContent = label; dd.textContent = text; d.appendChild(dt); d.appendChild(dd);
             }
-            steps.slice(0, steps.length - 1).forEach(function (st) {
+            function table(head, rows) {
+                var t = document.createElement('table'); t.className = 'table wiz-table';
+                var tr = document.createElement('tr');
+                head.forEach(function (h) { var th = document.createElement('th'); th.textContent = h; tr.appendChild(th); });
+                var thead = document.createElement('thead'); thead.appendChild(tr); t.appendChild(thead);
+                var tb = document.createElement('tbody');
+                rows.forEach(function (r) { var x = document.createElement('tr'); r.forEach(function (c) { var td = document.createElement('td'); td.textContent = c || '-'; x.appendChild(td); }); tb.appendChild(x); });
+                t.appendChild(tb); review.appendChild(t);
+            }
+            var titles = ['Project type & basic info', 'Project details', 'Features', 'User roles & permissions'];
+            steps.slice(0, 4).forEach(function (st, n) {
+                heading(titles[n]);
+                var d = dl(), feats = [];
                 st.querySelectorAll('[data-label]').forEach(function (el) {
-                    if (el.tagName === 'FIELDSET') {
+                    if (el.hasAttribute('data-repeat')) {
+                        if (el.querySelector('.role-card')) {
+                            var rows = [];
+                            el.querySelectorAll('.role-card').forEach(function (c, i) {
+                                var name = c.querySelector('input[name="role_name[]"]').value.trim();
+                                if (name) { rows.push([String(rows.length + 1), name, val(c.querySelector('select[name="role_access[]"]')), val(c.querySelector('select[name="role_permissions[]"]'))]); }
+                            });
+                            if (rows.length) { table(['#', 'Role', 'Access level', 'Permissions'], rows); }
+                        } else {
+                            el.querySelectorAll('input[name="custom_features[]"]').forEach(function (i) { if (i.value.trim()) { feats.push(i.value.trim()); } });
+                        }
+                    } else if (el.tagName === 'FIELDSET') {
                         var picked = Array.prototype.map.call(el.querySelectorAll('input:checked'), function (c) { return c.getAttribute('data-text') || c.value; });
-                        row(el.getAttribute('data-label'), picked.join(', '));
-                    } else { row(el.getAttribute('data-label'), values(el)); }
+                        if (el.getAttribute('data-label') === 'Features') { feats = picked.concat(feats); } else { row(d, el.getAttribute('data-label'), picked.join(', ')); }
+                    } else { row(d, el.getAttribute('data-label'), val(el)); }
                 });
+                if (n === 2) {
+                    var all = [];
+                    st.querySelectorAll('input[name="feature_list[]"]:checked').forEach(function (c) { all.push([c.getAttribute('data-text'), 'Standard']); });
+                    st.querySelectorAll('input[name="custom_features[]"]').forEach(function (i) { if (i.value.trim()) { all.push([i.value.trim(), 'Custom']); } });
+                    all.forEach(function (r, i) { r.unshift(String(i + 1)); });
+                    if (all.length) { table(['#', 'Feature / Module', 'Type'], all); }
+                }
             });
         }
         function show(i) {
             cur = Math.max(0, Math.min(steps.length - 1, i));
-            reached = Math.max(reached, cur);
             steps.forEach(function (st, n) { st.hidden = n !== cur; });
             dots.forEach(function (d, n) { d.classList.toggle('is-current', n === cur); d.classList.toggle('is-done', n < cur); });
             if (prev) { prev.hidden = cur === 0; }
             if (next) { next.hidden = cur === steps.length - 1; }
             if (submit) { submit.hidden = cur !== steps.length - 1; }
+            if (extra) { extra.hidden = cur !== steps.length - 1; }
             if (cur === steps.length - 1) { buildReview(); }
             var top = form.getBoundingClientRect().top + window.pageYOffset - 90;
             if (window.pageYOffset > top) { window.scrollTo({ top: top, behavior: 'smooth' }); }
@@ -564,10 +614,13 @@
         if (next) { next.addEventListener('click', function () { go(cur + 1); }); }
         if (prev) { prev.addEventListener('click', function () { show(cur - 1); }); }
         form.querySelectorAll('[data-step-go]').forEach(function (b) { b.addEventListener('click', function () { go(parseInt(b.getAttribute('data-step-go'), 10)); }); });
+        var clear = form.querySelector('[data-clear]');
+        if (clear) { clear.addEventListener('click', function () { if (window.confirm('Clear everything you entered and start over?')) { form.reset(); form.querySelectorAll('[data-role-card]:not(:first-child), .repeat-row:nth-child(n+3)').forEach(function (r) { r.remove(); }); show(0); } }); }
         form.addEventListener('keydown', function (e) {
             if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit' && cur < steps.length - 1) { e.preventDefault(); go(cur + 1); }
         });
         form.addEventListener('submit', function (e) {
+            if (e.submitter && e.submitter.hasAttribute('data-pdf')) { return; }
             for (var i = 0; i < steps.length - 1; i++) { if (!stepValid(i)) { e.preventDefault(); show(i); return; } }
         });
         show(0);

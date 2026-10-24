@@ -314,6 +314,7 @@ return static function (Router $router): void {
     $router->get('/my/project-requests', [ClientProjectRequestController::class, 'index'], ['auth', 'can:requirements.submit']);
     $router->get('/my/project-requests/new', [ClientProjectRequestController::class, 'create'], ['auth', 'can:requirements.submit']);
     $router->post('/my/project-requests', [ClientProjectRequestController::class, 'store'], ['auth', 'can:requirements.submit']);
+    $router->post('/my/project-requests/pdf', [ClientProjectRequestController::class, 'pdf'], ['auth', 'can:requirements.submit']);
     $router->get('/my/receipts', [ReceiptController::class, 'mine'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/receipt/{receipt}', [ReceiptController::class, 'mineShow'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/receipt/{receipt}/pdf', [ReceiptController::class, 'minePdf'], ['auth', 'can:receipts.view_own']);
@@ -358,6 +359,8 @@ return static function (Router $router): void {
     $router->post('/agreements', [AgreementController::class, 'store'], ['auth', 'can:agreements.manage']);
     $router->get('/agreements/{agreement}', [AgreementController::class, 'show'], $ag);
     $router->post('/agreements/{agreement}', [AgreementController::class, 'action'], $ag);
+    $router->post('/agreements/{agreement}/official', [AgreementController::class, 'officialSave'], ['auth', 'can:agreements.manage']);
+    $router->get('/agreements/{agreement}/official.pdf', [AgreementController::class, 'officialPdf'], $ag);
     $router->get('/agreements/{agreement}/document', [AgreementController::class, 'document'], $ag);
     $router->get('/agreements/{agreement}/files/{version}', [AgreementController::class, 'file'], $ag);
     $router->get('/agreement-templates', [AgreementController::class, 'templates'], $ag);
@@ -475,6 +478,7 @@ return static function (Router $router): void {
     // Public website forms (anonymous): requirements, contact, appointment REQUEST. CSRF + rate limit + honeypot + consent.
     $router->get('/request-quote', [PublicFormController::class, 'requirements']);
     $router->post('/request-quote', [PublicFormController::class, 'submitRequirements']);
+    $router->post('/request-quote/pdf', [PublicFormController::class, 'requirementsPdf']);
     $router->get('/contact', [PublicFormController::class, 'contact']);
     $router->post('/contact', [PublicFormController::class, 'submitContact']);
     $router->get('/book-appointment', [PublicFormController::class, 'appointment']);
@@ -488,6 +492,7 @@ return static function (Router $router): void {
     $router->get('/crm/enquiries/create', [EnquiryController::class, 'create'], ['auth', 'can:enquiries.create']);
     $router->post('/crm/enquiries', [EnquiryController::class, 'store'], ['auth', 'can:enquiries.create']);
     $router->get('/crm/enquiries/{enquiry}/files/{file}', [EnquiryFileController::class, 'download'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned']);
+    $router->get('/crm/enquiries/{enquiry}/requirements.pdf', [EnquiryController::class, 'requirementsPdf'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned']);
     $router->get('/crm/enquiries/{enquiry}', [EnquiryController::class, 'show'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned,enquiries.view_own']);
     $router->post('/crm/enquiries/{enquiry}', [EnquiryController::class, 'update'], ['auth', 'can:enquiries.edit']);
     $router->post('/crm/enquiries/{enquiry}/stage', [EnquiryController::class, 'stage'], ['auth', 'can:enquiries.move_stage']);

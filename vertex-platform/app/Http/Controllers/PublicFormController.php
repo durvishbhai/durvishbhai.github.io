@@ -51,6 +51,19 @@ final class PublicFormController extends Controller
         return $this->show('appointment_request', $request);
     }
 
+    /** A copy of the answers so far as a requirements document (nothing is saved). @param array<string,string> $params */
+    public function requirementsPdf(Request $request, array $params = []): Response
+    {
+        if (!\Vertex\Services\RateLimiter::hit('requirements_pdf_ip', $request->ip())) {
+            throw new \Vertex\Core\HttpException(429);
+        }
+        $b = $request->body;
+        $pdf = \Vertex\Services\RequirementsPdf::fromForm($b, ['name' => mb_substr(trim((string) ($b['contact_name'] ?? '')), 0, 120), 'email' => mb_substr(trim((string) ($b['email'] ?? '')), 0, 190),
+            'phone' => mb_substr(trim((string) ($b['phone'] ?? '')), 0, 32), 'company' => mb_substr(trim((string) ($b['company_name'] ?? '')), 0, 160)]);
+
+        return new Response(200, $pdf, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="project-requirements.pdf"', 'Cache-Control' => 'no-store', 'X-Robots-Tag' => 'noindex']);
+    }
+
     /** @param array<string,string> $params */
     public function submitRequirements(Request $request, array $params = []): Response
     {

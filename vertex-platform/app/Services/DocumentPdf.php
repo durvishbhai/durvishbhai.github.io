@@ -170,7 +170,7 @@ final class DocumentPdf
     }
 
     /** The brand logo for the PDF, flattened onto the dark header colour (null when it cannot be read or GD is missing). @return array{w:int,h:int,data:string}|null */
-    private static function logo(): ?array
+    public static function logo(): ?array
     {
         $public = defined('VERTEX_PUBLIC') ? VERTEX_PUBLIC : VERTEX_ROOT . '/public';
         $png = is_file($public . '/assets/img/krazy-logo.png') ? (string) file_get_contents($public . '/assets/img/krazy-logo.png') : '';

@@ -4,5 +4,5 @@ $choices = $serviceChoices !== [] ? $serviceChoices : $services;
 $h = \Vertex\Services\SiteSections::get('requirements', 'header'); ?>
 <section class="pub-page-head"><div class="container narrow"><p class="eyebrow">Project requirements</p><h1><?= st($h['title']) ?></h1><p class="lead"><?= st($h['intro']) ?></p></div></section>
 <section class="pub-section"><div class="container narrow"><div class="panel wizard-panel">
-    <?= \Vertex\Core\View::partial('requirements-wizard', ['action' => '/request-quote', 'identity' => true, 'public' => true, 'preselect' => $preselect, 'categories' => $categories, 'timelines' => $timelines, 'budgets' => $budgets, 'serviceChoices' => $choices, 'limit' => $limit, 'extensions' => $extensions]) ?>
+    <?= \Vertex\Core\View::partial('requirements-wizard', ['action' => '/request-quote', 'pdfAction' => '/request-quote/pdf', 'identity' => true, 'public' => true, 'preselect' => $preselect, 'categories' => $categories, 'timelines' => $timelines, 'budgets' => $budgets, 'serviceChoices' => $choices, 'limit' => $limit, 'extensions' => $extensions]) ?>
 </div></div></section>

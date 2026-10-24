@@ -22,6 +22,9 @@ final class EnquiryExtras
     public const TECHNOLOGIES = ['Not sure: recommend the best fit', 'Website or CMS (for example WordPress)', 'Custom PHP and MySQL web application', 'JavaScript web application (React, Node.js)', 'Mobile app (Android or iOS)', 'No-code or low-code tool', 'Other (mention in the notes)'];
     public const FEATURES = ['Login and user accounts', 'Admin dashboard', 'Online payments', 'Invoices and receipts', 'Email, SMS or WhatsApp notifications', 'Reports and analytics', 'File uploads and documents', 'Search and filters', 'Multiple languages', 'Mobile-friendly design', 'Integrations with other tools (API)', 'Chat or support tickets', 'Booking or appointments', 'Content management (edit pages yourself)'];
     public const ROLES = ['Owner or admin', 'Staff or employees', 'Customers or clients', 'Vendors or partners', 'Public visitors (no login)'];
+    public const PRIORITIES = ['All listed features are must-have', 'Core features first, extras later', 'MVP version first, then improve', 'Focus on the must-haves only'];
+    public const ROLE_ACCESS = ['full' => 'Full Access', 'limited' => 'Limited Access', 'view' => 'View Only'];
+    public const PERMISSION_SETS = ['Full system access', 'Manage users and content', 'Manage own department only', 'View and edit assigned records', 'Submit requests / forms only', 'Read-only access to reports'];
     public const USER_COUNTS = ['1 to 5', '6 to 20', '21 to 100', 'More than 100'];
     private const SERVICE_MAP = ['short-form-video-editing' => 'video_editing', 'youtube-long-form-video-editing' => 'video_editing', 'social-media-management' => 'social_media', 'thumbnail-design' => 'graphic_design',
         'poster-and-creative-design' => 'graphic_design', 'graphic-design' => 'graphic_design', 'content-writing' => 'content_writing', 'website-development' => 'website_development', 'ai-solutions' => 'ai_solutions', 'ai-automation' => 'ai_solutions'];
@@ -87,22 +90,13 @@ final class EnquiryExtras
         if ($outcome !== null && $outcomeNote !== null && $outcomeNote !== '') {
             $outcome .= ' (' . $outcomeNote . ')';
         }
+        $st = self::structure($in);
+        $featureNames = array_column($st['features'], 'name');
         $featuresExtra = $try(fn () => FieldRules::text($in['features'] ?? '', 'Other feature requirements', 3, 3000, false));
-        $pick = static function (mixed $v, array $allowed): array {
-            $out = [];
-            foreach ((array) $v as $x) {
-                if (is_string($x) && in_array($x, $allowed, true) && !in_array($x, $out, true)) {
-                    $out[] = $x;
-                }
-            }
-
-            return $out;
-        };
-        $chosenFeatures = $pick($in['feature_list'] ?? [], self::FEATURES);
-        $features = implode('; ', $chosenFeatures) . ($featuresExtra !== null && $featuresExtra !== '' ? ($chosenFeatures !== [] ? "\nOther: " : '') . $featuresExtra : '');
+        $features = implode('; ', $featureNames) . ($featuresExtra !== null && $featuresExtra !== '' ? ($featureNames !== [] ? "\nOther: " : '') . $featuresExtra : '');
         $features = $features === '' ? null : $features;
-        $roles = $pick($in['roles'] ?? [], self::ROLES);
-        $userCount = isset($in['user_count']) && in_array($in['user_count'], self::USER_COUNTS, true) ? (string) $in['user_count'] : null;
+        $rolesText = implode('; ', array_map(static fn (array $r): string => $r['name'] . ($r['access'] !== '' ? ' (' . $r['access'] . ($r['permissions'] !== '' ? ': ' . $r['permissions'] : '') . ')' : ''), $st['roles']));
+        $userCount = $st['user_count'] === '' ? null : $st['user_count'];
         $roleNotes = $try(fn () => FieldRules::text($in['role_notes'] ?? '', 'Notes about who uses it', 2, 1000, false));
         $tech = $try(fn () => FieldRules::line($in['preferred_tech'] ?? '', 'Preferred technology', 2, 200, false));
         $timeline = $try(fn () => FieldRules::choice($in['timeline'] ?? '', self::TIMELINES, 'timeline', false));
@@ -125,10 +119,57 @@ final class EnquiryExtras
         $service = isset($workflow[$first]) ? $first : (self::SERVICE_MAP[$first] ?? 'other');
         $names = array_map(static fn (string $s): string => (string) $allowed[$s], $services);
         $details = ['form' => 'requirements', 'Project name' => $project, 'Project category' => self::CATEGORIES[$cat], 'Required services' => implode(', ', $names), 'Problem statement' => $problem, 'Expected outcome' => $outcome,
-            'Feature requirements' => $features, 'Who will use it' => $roles === [] ? null : implode(', ', $roles), 'Expected number of users' => $userCount, 'Notes about who uses it' => $roleNotes,
+            'Feature requirements' => $features, 'Feature priority' => $st['priority'] === '' ? null : $st['priority'], 'Who will use it' => $rolesText === '' ? null : $rolesText, 'Expected number of users' => $userCount, 'Notes about who uses it' => $roleNotes,
             'Preferred technology' => $tech, 'Desired timeline' => $timeline === null ? null : self::TIMELINES[$timeline], 'Additional notes' => $notes];
+        $struct = ['features' => $st['features'], 'roles' => $st['roles'], 'priority' => $st['priority'], 'user_count' => $st['user_count'], 'extra_features' => (string) ($featuresExtra ?? '')];
 
-        return ['base' => ['service' => $service, 'description' => "Project: {$project}\n\nProblem: {$problem}\n\nExpected outcome: {$outcome}"], 'details' => array_filter($details, static fn ($v): bool => $v !== null && $v !== '')];
+        return ['base' => ['service' => $service, 'description' => "Project: {$project}\n\nProblem: {$problem}\n\nExpected outcome: {$outcome}"], 'details' => array_filter($details, static fn ($v): bool => $v !== null && $v !== '') + ['_structured' => $struct]];
+    }
+
+    /**
+     * The step-by-step form's answers in a tidy, safe shape (lenient: it never throws, it only drops what is not allowed). Used to build the requirements
+     * document and to store the structured lists beside the enquiry.
+     *
+     * @param array<string,mixed> $in
+     * @return array{features:list<array{name:string,type:string}>,roles:list<array{name:string,access:string,permissions:string}>,priority:string,user_count:string}
+     */
+    public static function structure(array $in): array
+    {
+        $clean = static fn (mixed $v, int $max): string => mb_substr(trim(preg_replace('/[\x00-\x1F<>]+/u', ' ', is_string($v) ? $v : '') ?? ''), 0, $max);
+        $features = [];
+        foreach ((array) ($in['feature_list'] ?? []) as $x) {
+            if (is_string($x) && in_array($x, self::FEATURES, true) && !in_array($x, array_column($features, 'name'), true)) {
+                $features[] = ['name' => $x, 'type' => 'Standard'];
+            }
+        }
+        foreach (array_slice((array) ($in['custom_features'] ?? []), 0, 12) as $x) {
+            $n = $clean($x, 120);
+            if (mb_strlen($n) >= 2 && !in_array($n, array_column($features, 'name'), true)) {
+                $features[] = ['name' => $n, 'type' => 'Custom'];
+            }
+        }
+        $roles = [];
+        $names = (array) ($in['role_name'] ?? []);
+        $access = (array) ($in['role_access'] ?? []);
+        $perms = (array) ($in['role_permissions'] ?? []);
+        foreach (array_slice($names, 0, 8, true) as $i => $n) {
+            $n = $clean($n, 60);
+            if (mb_strlen($n) < 2) {
+                continue;
+            }
+            $a = (string) ($access[$i] ?? '');
+            $p = (string) ($perms[$i] ?? '');
+            $roles[] = ['name' => $n, 'access' => self::ROLE_ACCESS[$a] ?? '', 'permissions' => in_array($p, self::PERMISSION_SETS, true) ? $p : ''];
+        }
+        foreach ((array) ($in['roles'] ?? []) as $x) { // the earlier simple tick-list
+            if (is_string($x) && in_array($x, self::ROLES, true) && !in_array($x, array_column($roles, 'name'), true)) {
+                $roles[] = ['name' => $x, 'access' => '', 'permissions' => ''];
+            }
+        }
+        $priority = isset($in['feature_priority']) && in_array($in['feature_priority'], self::PRIORITIES, true) ? (string) $in['feature_priority'] : '';
+        $count = isset($in['user_count']) && in_array($in['user_count'], self::USER_COUNTS, true) ? (string) $in['user_count'] : '';
+
+        return ['features' => $features, 'roles' => $roles, 'priority' => $priority, 'user_count' => $count];
     }
 
     /**

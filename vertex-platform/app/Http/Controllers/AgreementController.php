@@ -10,6 +10,7 @@ use Vertex\Core\Request;
 use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Services\AgreementService;
+use Vertex\Services\OfficialAgreement;
 use Vertex\Services\DocumentPdf;
 use Vertex\Services\Gate;
 
@@ -135,6 +136,26 @@ final class AgreementController extends Controller
     public function document(Request $request, array $params = []): Response
     {
         return $this->pdf(AgreementService::requireStaff($this->actorId(), $params['agreement'] ?? ''));
+    }
+
+    /** Saves the details filled into the official KIS agreement. @param array<string,string> $params */
+    public function officialSave(Request $request, array $params = []): Response
+    {
+        $a = AgreementService::requireStaff($this->actorId(), $params['agreement'] ?? '');
+
+        return $this->guarded(function () use ($request, $a): Response {
+            OfficialAgreement::save($this->actorId(), $a, $request->body);
+
+            return $this->ok('/agreements/' . $a['public_id'], 'The details of the official agreement were saved.');
+        }, '/agreements/' . $a['public_id']);
+    }
+
+    /** The official KIS agreement, filled in, ready to print and sign. @param array<string,string> $params */
+    public function officialPdf(Request $request, array $params = []): Response
+    {
+        $a = AgreementService::requireStaff($this->actorId(), $params['agreement'] ?? '');
+
+        return new Response(200, OfficialAgreement::pdf($a), ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="KIS-agreement-' . preg_replace('/[^A-Za-z0-9-]/', '', (string) $a['reference']) . '.pdf"', 'Cache-Control' => 'no-store']);
     }
 
     // ---------------------------------------------------------------------------------------------- templates

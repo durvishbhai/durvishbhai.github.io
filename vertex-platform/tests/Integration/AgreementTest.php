@@ -178,4 +178,40 @@ final class AgreementTest extends HttpTestCase
         $this->assertSame(403, $c->get('/agreements')['status']);
         $this->assertSame(403, $this->loggedIn('mgr@x.test')->post('/agreements/' . $a['public_id'], ['action' => 'sign_company', 'typed_name' => 'Manager Person', 'declare' => '1', 'confirm_password' => self::PASSWORD], '/account')['status'], 'managers cannot sign for the company');
     }
+
+    public function testTheOfficialKisAgreementIsFilledFromTheSystemAndNeverEditedByHand(): void
+    {
+        $r = AgreementService::create($this->owner, $this->clientPublic, ['title' => 'Signed on paper', 'mode' => 'physical', 'template' => '', 'project' => $this->alpha['public_id'], 'body' => '', 'expires_on' => '']);
+        $a = AgreementService::find($r['public_id']);
+        $d = \Vertex\Services\OfficialAgreement::details($a);
+        $this->assertSame('Alpha Website', $d['projects'][0]['name'], 'the linked project is the first row');
+        $this->assertSame('alpha@client.test', $d['email']);
+
+        $c = $this->loggedIn('admin@x.test');
+        $page = $c->get('/agreements/' . $r['public_id'])['body'];
+        $this->assertStringContainsString('Official KIS agreement', $page);
+        $post = $c->post('/agreements/' . $r['public_id'] . '/official', [
+            'date' => '2026-10-24', 'client_name' => 'Asha Fictional', 'business' => 'Fictional Crafts', 'phone' => '+91 90000 00000', 'email' => 'asha@example.test',
+            'project_name' => ['Shop website', 'Mobile app', '', '', ''], 'project_value' => ['50,000', '25000.50', '', '', ''], 'advance' => '30000', 'advance_date' => '2026-10-25', 'remaining' => '45000.50', 'due_date' => '2026-12-01',
+            'renewal_year' => '2027', 'renewal_due' => '2027-09-30', 'domain_date' => '2027-10-10', 'hosting_date' => '2027-10-12', 'domain_cost' => '899', 'hosting_cost' => '3000', 'place' => 'Pune',
+        ], '/agreements/' . $r['public_id']);
+        $this->assertSame(303, $post['status']);
+        $saved = json_decode((string) Database::one('SELECT official_json FROM agreements WHERE public_id = ?', [$r['public_id']])['official_json'], true);
+        $this->assertSame(5000000, $saved['projects'][0]['value']);
+        $this->assertSame(2500050, $saved['projects'][1]['value']);
+        $this->assertSame(89900, $saved['domain_cost']);
+
+        $pdf = $c->get('/agreements/' . $r['public_id'] . '/official.pdf');
+        $this->assertSame(200, $pdf['status']);
+        $this->assertStringStartsWith('%PDF-1.4', $pdf['body']);
+        $this->assertStringContainsString('attachment', $c->lastHeaders['content-disposition']);
+        $text = \Vertex\Services\OfficialAgreement::pdf(AgreementService::find($r['public_id']));
+        $this->assertGreaterThan(4000, strlen($text));
+
+        $bad = $c->post('/agreements/' . $r['public_id'] . '/official', ['advance' => 'abc', 'date' => 'not-a-date'], '/agreements/' . $r['public_id']);
+        $this->assertSame(303, $bad['status']);
+        $this->assertSame(5000000, json_decode((string) Database::one('SELECT official_json FROM agreements WHERE public_id = ?', [$r['public_id']])['official_json'], true)['projects'][0]['value'], 'a refused save changes nothing');
+
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/agreements/' . $r['public_id'] . '/official.pdf')['status'], 'clients cannot open the staff download');
+    }
 }

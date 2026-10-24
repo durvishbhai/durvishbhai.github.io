@@ -1,4 +1,5 @@
 <?php
+$pdfAction = $pdfAction ?? '';
 /**
  * The step-by-step project requirements form (website and client dashboard). Without JavaScript every step is simply shown one under another; with it, one
  * step at a time with a progress bar and a review before sending. Fields keep the names the server already validates (EnquiryExtras::requirements).
@@ -59,21 +60,39 @@ $steps = ['Type &amp; Basics' => 'M3 6h18M3 12h18M3 18h18', 'Project Details' =>
     </section>
 
     <section class="wiz-step" data-step="2" aria-labelledby="ws2">
-        <h2 id="ws2">Features</h2><p class="muted">Tick what you would like. You can add anything else below.</p>
-        <fieldset class="field" data-label="Features"><legend class="sr-only">Features</legend><div class="check-grid"><?php foreach (EnquiryExtras::FEATURES as $ft) : ?><label class="check"><input type="checkbox" name="feature_list[]" value="<?= e($ft) ?>" data-text="<?= e($ft) ?>"> <span><?= e($ft) ?></span></label><?php endforeach; ?></div></fieldset>
-        <div class="field"><label for="features">Anything else you need? <span class="muted">(optional)</span></label><textarea id="features" name="features" rows="4" maxlength="3000" data-label="Other features"><?= e($f('features')) ?></textarea></div>
+        <h2 id="ws2">Features required</h2><p class="muted">Select and describe the features you need.</p>
+        <fieldset class="field" data-label="Features"><legend>Common features <span class="muted">(select all that apply)</span></legend><div class="toggle-grid"><?php foreach (EnquiryExtras::FEATURES as $ft) : ?><label class="toggle-card"><input type="checkbox" name="feature_list[]" value="<?= e($ft) ?>" data-text="<?= e($ft) ?>"><span class="switch" aria-hidden="true"></span><span class="toggle-text"><?= e($ft) ?></span></label><?php endforeach; ?></div></fieldset>
+        <fieldset class="field" data-repeat data-max="10" data-label="Custom features"><legend>Custom features <span class="muted">(add specific features you need)</span></legend>
+            <div class="repeat-list" data-repeat-list><?php for ($i = 0; $i < 2; $i++) : ?><div class="repeat-row"><input name="custom_features[]" maxlength="120" placeholder="Describe a custom feature" aria-label="Custom feature" data-text-input><button type="button" class="repeat-del" data-repeat-del aria-label="Remove this feature">&times;</button></div><?php endfor; ?></div>
+            <template data-repeat-template><div class="repeat-row"><input name="custom_features[]" maxlength="120" placeholder="Describe a custom feature" aria-label="Custom feature" data-text-input><button type="button" class="repeat-del" data-repeat-del aria-label="Remove this feature">&times;</button></div></template>
+            <button type="button" class="btn btn-ghost btn-sm" data-repeat-add>+ Add another feature</button></fieldset>
+        <div class="field"><label for="features">Anything else about the features? <span class="muted">(optional)</span></label><textarea id="features" name="features" rows="3" maxlength="3000" data-label="Other feature notes"><?= e($f('features')) ?></textarea></div>
+        <div class="field"><label for="feature_priority">Feature priority approach <span class="muted">(optional)</span></label><select id="feature_priority" name="feature_priority" data-label="Feature priority"><option value="">Select an approach</option><?= $opts(EnquiryExtras::PRIORITIES, $f('feature_priority'), false) ?></select></div>
     </section>
 
     <section class="wiz-step" data-step="3" aria-labelledby="ws3">
-        <h2 id="ws3">Who will use it?</h2><p class="muted">Different people often need different access.</p>
-        <fieldset class="field" data-label="Who will use it"><legend class="sr-only">Who will use it</legend><div class="check-grid"><?php foreach (EnquiryExtras::ROLES as $ro) : ?><label class="check"><input type="checkbox" name="roles[]" value="<?= e($ro) ?>" data-text="<?= e($ro) ?>"> <span><?= e($ro) ?></span></label><?php endforeach; ?></div></fieldset>
-        <div class="field"><label for="user_count">Approximate number of users <span class="muted">(optional)</span></label><select id="user_count" name="user_count" data-label="Number of users"><option value="">Not sure</option><?= $opts(EnquiryExtras::USER_COUNTS, $f('user_count'), false) ?></select></div>
-        <div class="field"><label for="role_notes">What should each kind of user be able to do? <span class="muted">(optional)</span></label><textarea id="role_notes" name="role_notes" rows="3" maxlength="1000" data-label="Notes about users"><?= e($f('role_notes')) ?></textarea></div>
+        <h2 id="ws3">User roles &amp; permissions</h2><p class="muted">Define the different kinds of users and what each can do.</p>
+        <?php $roleCard = static function (int $n, bool $first) use ($opts): string {
+            ob_start(); ?>
+            <div class="role-card" data-role-card>
+                <div class="role-head"><strong class="role-title">Role #<?= $n ?></strong><?php if (!$first) : ?><button type="button" class="repeat-del" data-repeat-del aria-label="Remove this role">&times;</button><?php endif; ?></div>
+                <div class="grid-2">
+                    <div class="field"><label>Role name</label><input name="role_name[]" maxlength="60" placeholder="e.g. Admin, Customer, Staff" value="<?= $first ? 'Admin' : '' ?>" data-text-input></div>
+                    <div class="field"><label>Access level</label><select name="role_access[]"><?= $opts(EnquiryExtras::ROLE_ACCESS, $first ? 'full' : 'limited') ?></select></div>
+                </div>
+                <div class="field"><label>Permission template</label><select name="role_permissions[]"><option value="">Select a permission set</option><?= $opts(EnquiryExtras::PERMISSION_SETS, $first ? 'Full system access' : '', false) ?></select></div>
+            </div>
+        <?php return (string) ob_get_clean(); }; ?>
+        <fieldset class="field" data-repeat data-max="8" data-label="User roles"><legend class="sr-only">User roles</legend>
+            <div class="repeat-list roles" data-repeat-list><?= $roleCard(1, true) ?></div>
+            <template data-repeat-template><?= $roleCard(0, false) ?></template>
+            <button type="button" class="btn btn-ghost btn-sm" data-repeat-add>+ Add another role</button></fieldset>
+        <div class="field role-count"><label for="user_count">Approximate number of users <span class="muted">(optional)</span></label><select id="user_count" name="user_count" data-label="Number of users"><option value="">Not sure</option><?= $opts(EnquiryExtras::USER_COUNTS, $f('user_count'), false) ?></select></div>
     </section>
 
     <section class="wiz-step" data-step="4" aria-labelledby="ws4">
         <h2 id="ws4">Review &amp; send</h2><p class="muted">Check your answers. Use the numbers above to go back and change anything.</p>
-        <dl class="kv wiz-review" data-review></dl>
+        <div class="wiz-review" data-review></div>
         <div class="field"><label for="attachments">Attachments <span class="muted">(optional, up to 3 files, <?= e($limit) ?> each)</span></label><input id="attachments" name="attachments[]" type="file" multiple><p class="hint">Allowed: <?= e($extensions) ?>. Stored privately; only the team handling your request can open them.</p></div>
         <div class="field"><label for="notes">Additional notes <span class="muted">(optional)</span></label><textarea id="notes" name="notes" rows="3" maxlength="2000"><?= e($f('notes')) ?></textarea></div>
         <?php if (!empty($public)) : ?><?= \Vertex\Core\View::partial('public-form-consent') ?><?php endif; ?>
@@ -81,6 +100,7 @@ $steps = ['Type &amp; Basics' => 'M3 6h18M3 12h18M3 18h18', 'Project Details' =>
 
     <div class="wiz-nav">
         <button class="btn btn-ghost" type="button" data-prev hidden>&larr; Previous</button>
+        <span class="wiz-extra" data-extra hidden><button class="btn btn-ghost" type="submit" formaction="<?= e($pdfAction) ?>" formtarget="_blank" formnovalidate data-pdf>Download as PDF</button> <button class="btn btn-ghost" type="button" data-clear>Clear all &amp; start over</button></span>
         <button class="btn btn-primary" type="button" data-next>Next &rarr;</button>
         <button class="btn btn-primary" type="submit" data-submit><?= e($submitLabel ?? 'Send request') ?></button>
     </div>

@@ -5,6 +5,32 @@ $signed = array_column($signatures, 'party'); $open = in_array($a['status'], ['d
     <div class="actions"><?php if ($a['mode'] === 'online') : ?><a class="btn btn-ghost" href="<?= e($u) ?>/document">Download PDF</a><?php endif; ?>
     <?php if ($canManage && $a['status'] === 'draft' && $a['mode'] === 'online') : ?><form method="post" action="<?= e($u) ?>" class="inline-form" data-confirm="Send this agreement to the client for signature? The text can no longer be changed."><?= csrf_field() ?><input type="hidden" name="action" value="send"><button class="btn btn-primary" type="submit">Send to client</button></form><?php endif; ?></div></div>
 <?php if ($a['mode'] === 'online') : ?><div class="panel"><h2>Text</h2><div class="prewrap agreement-text"><?= e($a['body']) ?></div><p class="muted">Fingerprint (SHA-256): <code><?= e($a['body_sha256']) ?></code><?= $a['template_name'] ? ' &middot; from template ' . e($a['template_name']) . ' v' . (int) $a['template_version'] : '' ?></p></div><?php endif; ?>
+<?php $od = \Vertex\Services\OfficialAgreement::details($a); $money = static fn ($m): string => $m === null ? '' : \Vertex\Services\FieldRules::formatMinor((int) $m); $pr = array_values((array) $od['projects']); ?>
+<div class="panel"><h2>Official KIS agreement (print and sign)</h2>
+    <p class="muted">The business's own <em>Website Development &amp; Service Agreement</em>. Its eleven clauses are fixed. Fill in what is known; anything left empty prints as a blank line to complete by hand. Print it, attach the approved quotation, sign, then upload the signed scan below.</p>
+    <form method="post" action="<?= e($u) ?>/official" class="form-grid"><?= csrf_field() ?>
+        <div class="field"><label for="od-date">Agreement date</label><input id="od-date" name="date" type="date" value="<?= e((string) $od['date']) ?>"></div>
+        <div class="field"><label for="od-cn">Client / authorized person</label><input id="od-cn" name="client_name" maxlength="160" value="<?= e((string) $od['client_name']) ?>"></div>
+        <div class="field"><label for="od-bu">Business / organization</label><input id="od-bu" name="business" maxlength="160" value="<?= e((string) $od['business']) ?>"></div>
+        <div class="field"><label for="od-ph">Contact number</label><input id="od-ph" name="phone" maxlength="40" value="<?= e((string) $od['phone']) ?>"></div>
+        <div class="field"><label for="od-em">Email</label><input id="od-em" name="email" maxlength="190" value="<?= e((string) $od['email']) ?>"></div>
+        <fieldset class="field"><legend>Projects covered (up to 5) and their value (Rs.)</legend>
+            <?php for ($i = 0; $i < \Vertex\Services\OfficialAgreement::MAX_PROJECTS; $i++) : ?><div class="repeat-row"><input name="project_name[]" maxlength="160" placeholder="Website / project / product name" aria-label="Project <?= $i + 1 ?> name" value="<?= e((string) ($pr[$i]['name'] ?? '')) ?>"><input name="project_value[]" inputmode="decimal" placeholder="Value" aria-label="Project <?= $i + 1 ?> value" value="<?= e($money($pr[$i]['value'] ?? null)) ?>"></div><?php endfor; ?>
+            <p class="hint">The total and the amount in words are worked out from these.</p></fieldset>
+        <div class="field"><label for="od-ad">Advance amount (Rs.)</label><input id="od-ad" name="advance" inputmode="decimal" value="<?= e($money($od['advance'])) ?>"></div>
+        <div class="field"><label for="od-add">Advance payment date</label><input id="od-add" name="advance_date" type="date" value="<?= e((string) $od['advance_date']) ?>"></div>
+        <div class="field"><label for="od-re">Remaining amount (Rs.)</label><input id="od-re" name="remaining" inputmode="decimal" value="<?= e($money($od['remaining'])) ?>"></div>
+        <div class="field"><label for="od-du">Full payment due date</label><input id="od-du" name="due_date" type="date" value="<?= e((string) $od['due_date']) ?>"></div>
+        <div class="field"><label for="od-ry">Renewal year</label><input id="od-ry" name="renewal_year" maxlength="20" value="<?= e((string) $od['renewal_year']) ?>"></div>
+        <div class="field"><label for="od-rd">Renewal payment due on or before</label><input id="od-rd" name="renewal_due" type="date" value="<?= e((string) $od['renewal_due']) ?>"></div>
+        <div class="field"><label for="od-dd">Domain renewal date</label><input id="od-dd" name="domain_date" type="date" value="<?= e((string) $od['domain_date']) ?>"></div>
+        <div class="field"><label for="od-hd">Hosting renewal date</label><input id="od-hd" name="hosting_date" type="date" value="<?= e((string) $od['hosting_date']) ?>"></div>
+        <div class="field"><label for="od-dc">Domain annual cost (Rs.)</label><input id="od-dc" name="domain_cost" inputmode="decimal" value="<?= e($money($od['domain_cost'])) ?>"></div>
+        <div class="field"><label for="od-hc">Hosting annual cost (Rs.)</label><input id="od-hc" name="hosting_cost" inputmode="decimal" value="<?= e($money($od['hosting_cost'])) ?>"></div>
+        <div class="field"><label for="od-pl">Place of signing</label><input id="od-pl" name="place" maxlength="120" value="<?= e((string) $od['place']) ?>"></div>
+        <div class="form-actions"><?php if ($canManage) : ?><button class="btn btn-ghost" type="submit">Save details</button> <?php endif; ?><a class="btn btn-primary" href="<?= e($u) ?>/official.pdf">Download the official agreement (PDF)</a></div>
+    </form>
+</div>
 <div class="panel"><h2>Signatures</h2><?php if ($signatures === []) : ?><p class="muted">Nobody has signed yet.</p><?php endif; ?>
     <ul class="plain"><?php foreach ($signatures as $s) : ?><li><strong><?= e(ucfirst((string) $s['party'])) ?></strong>: <?= e($s['signer_name']) ?> &middot; <?= e(local_time($s['signed_at'])) ?> &middot; <?= e($s['method']) ?><?= $s['ip'] ? ' &middot; from ' . e($s['ip']) : '' ?></li><?php endforeach; ?></ul>
     <?php if ($a['mode'] === 'online' && $canSign && in_array($a['status'], ['sent', 'partially_signed'], true) && !in_array('company', $signed, true)) : ?>

@@ -74,6 +74,21 @@ final class EnquiryController extends Controller
         }, '/crm/enquiries/create', $in);
     }
 
+    /** The stored requirements as a document, for staff who may open the enquiry. @param array<string,string> $params */
+    public function requirementsPdf(Request $request, array $params = []): Response
+    {
+        $enq = EnquiryPolicy::requireView($this->actorId(), $params['enquiry'] ?? '');
+        if (!in_array(EnquiryPolicy::level($this->actorId(), $enq), ['all', 'assigned'], true)) {
+            throw new \Vertex\Core\HttpException(404);
+        }
+        $details = \Vertex\Services\EnquiryExtras::details((int) $enq['id']);
+        if ($details === null || ($details['form'] ?? '') !== 'requirements') {
+            throw new \Vertex\Core\HttpException(404);
+        }
+
+        return new Response(200, \Vertex\Services\RequirementsPdf::fromEnquiry($enq, $details), ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'attachment; filename="requirements-' . preg_replace('/[^A-Za-z0-9-]/', '', (string) $enq['reference']) . '.pdf"', 'Cache-Control' => 'no-store']);
+    }
+
     /** @param array<string,string> $params */
     public function show(Request $request, array $params = []): Response
     {

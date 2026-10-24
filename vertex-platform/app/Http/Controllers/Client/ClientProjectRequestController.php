@@ -35,6 +35,18 @@ final class ClientProjectRequestController extends Controller
         return $r;
     }
 
+    /** A copy of the answers so far as a requirements document (nothing is saved). @param array<string,string> $params */
+    public function pdf(Request $request, array $params = []): Response
+    {
+        $client = ClientProjectRequestService::client($this->actorId());
+        if (!\Vertex\Services\RateLimiter::hit('requirements_pdf_ip', $request->ip())) {
+            throw new \Vertex\Core\HttpException(429);
+        }
+        $pdf = \Vertex\Services\RequirementsPdf::fromForm($request->body, ['name' => (string) $client['contact_name'], 'email' => (string) $client['email'], 'phone' => (string) ($client['phone'] ?? ''), 'company' => (string) ($client['company_name'] ?? '')]);
+
+        return new Response(200, $pdf, ['Content-Type' => 'application/pdf', 'Content-Disposition' => 'inline; filename="project-requirements.pdf"', 'Cache-Control' => 'no-store']);
+    }
+
     /** @param array<string,string> $params */
     public function store(Request $request, array $params = []): Response
     {

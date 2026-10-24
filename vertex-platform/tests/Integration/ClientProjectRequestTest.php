@@ -166,12 +166,14 @@ final class ClientProjectRequestTest extends HttpTestCase
     {
         $site = $this->client()->get('/request-quote')['body'];
         $this->assertStringContainsString('data-wizard', $site);
-        foreach (['Project type &amp; basic info', 'Project details', 'Features', 'Who will use it?', 'Review &amp; send'] as $heading) {
+        foreach (['Project type &amp; basic info', 'Project details', 'Features required', 'User roles &amp; permissions', 'Review &amp; send'] as $heading) {
             $this->assertStringContainsString($heading, $site);
         }
         $this->assertSame(5, substr_count($site, 'data-step-dot='), 'five steps in the progress bar');
         $this->assertStringContainsString('name="feature_list[]"', $site);
-        $this->assertStringContainsString('name="roles[]"', $site);
+        $this->assertStringContainsString('name="role_name[]"', $site);
+        $this->assertStringContainsString('name="custom_features[]"', $site);
+        $this->assertStringContainsString('/request-quote/pdf', $site, 'Download as PDF');
 
         $alpha = $this->loggedIn('alpha@client.test');
         $page = $alpha->get('/my/project-requests/new')['body'];
@@ -180,13 +182,23 @@ final class ClientProjectRequestTest extends HttpTestCase
 
         $r = $alpha->post('/my/project-requests', $this->form([
             'expected_outcome' => 'Save time on manual work', 'outcome_note' => 'Mostly invoicing', 'preferred_tech' => 'Custom PHP and MySQL web application',
-            'feature_list' => ['Online payments', 'Reports and analytics', 'Not a real feature'], 'features' => 'Dark mode', 'roles' => ['Owner or admin', 'Customers or clients', 'Hacker'], 'user_count' => '6 to 20', 'role_notes' => 'Customers only see their own orders.',
+            'feature_list' => ['Online payments', 'Reports and analytics', 'Not a real feature'], 'features' => 'Dark mode', 'custom_features' => ['Public landing page', '', 'Contact form'], 'feature_priority' => 'MVP version first, then improve',
+            'role_name' => ['Admin', 'Customer', ''], 'role_access' => ['full', 'limited', 'view'], 'role_permissions' => ['Full system access', 'Submit requests / forms only', ''], 'user_count' => '6 to 20', 'role_notes' => 'Customers only see their own orders.',
         ]), '/my/project-requests/new');
         $this->assertSame(303, $r['status']);
         $e = Database::one("SELECT id, description FROM enquiries WHERE source = 'client_portal'");
         $d = json_decode((string) Database::one('SELECT details_json FROM enquiry_details WHERE enquiry_id = ?', [$e['id']])['details_json'], true);
-        $this->assertSame("Online payments; Reports and analytics\nOther: Dark mode", $d['Feature requirements'], 'only listed features are accepted');
-        $this->assertSame('Owner or admin, Customers or clients', $d['Who will use it']);
+        $this->assertSame("Online payments; Reports and analytics; Public landing page; Contact form\nOther: Dark mode", $d['Feature requirements'], 'only listed features plus the custom ones are accepted');
+        $this->assertSame('MVP version first, then improve', $d['Feature priority']);
+        $this->assertSame('Admin (Full Access: Full system access); Customer (Limited Access: Submit requests / forms only)', $d['Who will use it']);
+        $this->assertSame([['name' => 'Public landing page', 'type' => 'Custom'], ['name' => 'Contact form', 'type' => 'Custom']], array_slice($d['_structured']['features'], 2));
+        $staff = $this->loggedIn('admin@x.test');
+        $pdf = $staff->get('/crm/enquiries/' . Database::one('SELECT public_id FROM enquiries WHERE id = ?', [$e['id']])['public_id'] . '/requirements.pdf');
+        $this->assertSame(200, $pdf['status']);
+        $this->assertStringStartsWith('%PDF-1.4', $pdf['body']);
+        $this->assertStringContainsString('requirements-', $staff->lastHeaders['content-disposition']);
+        $this->assertStringNotContainsString('requirements.pdf', $this->loggedIn('alpha@client.test')->get('/my/project-requests')['body']);
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->get('/crm/enquiries/x/requirements.pdf')['status'], 'clients cannot open the staff download');
         $this->assertSame('6 to 20', $d['Expected number of users']);
         $this->assertSame('Customers only see their own orders.', $d['Notes about who uses it']);
         $this->assertStringContainsString('Save time on manual work (Mostly invoicing)', $e['description']);
@@ -194,5 +206,24 @@ final class ClientProjectRequestTest extends HttpTestCase
         $list = $alpha->get('/my/project-requests')['body'];
         $this->assertStringContainsString('data-filter-state="confirmed"', $list, 'status chips');
         $this->assertStringContainsString('data-filter-q', $list, 'search box');
+    }
+
+    public function testTheAnswersSoFarCanBeDownloadedAsARequirementsPdfWithoutSavingAnything(): void
+    {
+        $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
+        $form = ['contact_name' => 'Visitor Fictional', 'email' => 'v@example.test', 'project_name' => 'Draft shop', 'project_category' => 'website', 'services' => ['website_development'], 'feature_list' => ['Online payments'],
+            'custom_features' => ['Wishlist'], 'role_name' => ['Admin'], 'role_access' => ['full'], 'role_permissions' => ['Full system access'], 'problem_statement' => 'A draft that is not finished yet'];
+        $c = $this->client();
+        $r = $c->post('/request-quote/pdf', $form, '/request-quote');
+        $this->assertSame(200, $r['status']);
+        $this->assertStringStartsWith('%PDF-1.4', $r['body']);
+        $this->assertStringContainsString('application/pdf', $c->lastHeaders['content-type']);
+        $this->assertSame('no-store', $c->lastHeaders['cache-control']);
+        $alpha = $this->loggedIn('alpha@client.test');
+        $r2 = $alpha->post('/my/project-requests/pdf', $form, '/my/project-requests/new');
+        $this->assertSame(200, $r2['status']);
+        $this->assertStringStartsWith('%PDF-1.4', $r2['body']);
+        $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'], 'nothing is saved by the download');
+        $this->assertSame(403, $this->client()->postNoToken('/request-quote/pdf', $form)['status'] === 419 ? 403 : 0, 'a form without its token is refused');
     }
 }
