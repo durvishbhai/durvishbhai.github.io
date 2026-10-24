@@ -152,6 +152,7 @@ final class ClientPaymentService
             Audit::record('client_payment.verified', 'client_payment', (int) $row['id'], ['status' => 'pending_verification', 'gross_minor' => (int) $row['gross_minor']], ['status' => 'verified', 'gross_minor' => $gross], ['project_id' => $row['project_id'], 'invoice_id' => $row['invoice_id'], 'source' => $row['source']], $actorId);
             self::afterChange($row, $actorId);
             ReceiptService::issueForPayment((int) $row['id'], $actorId);
+            self::confirmProjectIfAdvance((int) $row['id']);
             if ($row['source'] === 'client_claim' && $row['recorded_by'] !== null) {
                 Notifier::send([(int) $row['recorded_by']], 'payment.confirmed', 'Payment confirmed: ₹' . FieldRules::formatMinor($gross), 'We received your payment ' . $row['reference'] . '. Thank you.', $row['invoice_id'] === null ? null : '/my/invoices/' . Database::one('SELECT public_id FROM invoices WHERE id = ?', [$row['invoice_id']])['public_id'], null, 'client_payment', (int) $row['id'], "cpay:{$row['id']}:confirmed");
             }
@@ -243,7 +244,7 @@ final class ClientPaymentService
      * @param array<string,mixed> $invoice
      * @return array{id:int,public_id:string,created:bool}
      */
-    public static function recordGateway(array $invoice, int $amountMinor, string $reference, string $note): array
+    public static function recordGateway(array $invoice, int $amountMinor, string $reference, string $note, string $role = 'other'): array
     {
         $key = hash('sha256', 'gateway:' . mb_strtolower($reference));
         $row = Database::one('SELECT id, public_id, invoice_id, gross_minor FROM client_payments WHERE external_key = ? FOR UPDATE', [$key]);
@@ -262,8 +263,8 @@ final class ClientPaymentService
         $pub = uuid_hex();
         Database::run(
             "INSERT INTO client_payments (public_id, reference, project_id, client_id, invoice_id, invoice_ref, payment_role, gross_minor, tax_minor, method, source, external_ref, external_key, received_on, status, notes, recorded_by, verified_by, verified_at, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'other', ?, 0, 'gateway', 'gateway', ?, ?, ?, 'verified', ?, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$pub, $ref, $inv['project_id'], $inv['client_id'], $inv['id'], $inv['reference'], $amountMinor, mb_substr($reference, 0, 120), $key, AppTime::today(), mb_substr($note, 0, 500)],
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'gateway', 'gateway', ?, ?, ?, 'verified', ?, NULL, NULL, UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $ref, $inv['project_id'], $inv['client_id'], $inv['id'], $inv['reference'], $inv['project_id'] === null || !in_array($role, ['advance', 'balance'], true) ? 'other' : $role, $amountMinor, mb_substr($reference, 0, 120), $key, AppTime::today(), mb_substr($note, 0, 500)],
         );
         $id = Database::insertId();
         self::event($id, 'recorded', $amountMinor, null, null);
@@ -275,9 +276,19 @@ final class ClientPaymentService
             Notifier::send([(int) $owner['user_id']], 'payment.confirmed', 'Payment confirmed: ₹' . FieldRules::formatMinor($amountMinor), 'We received your payment ' . $ref . '. Thank you.', '/my/invoices/' . $inv['public_id'], null, 'client_payment', $id, "cpay:{$id}:confirmed");
         }
         ReceiptService::issueForPayment($id, null);
+        self::confirmProjectIfAdvance($id);
         Notifier::send(Notifier::withPermission('payments.reconcile'), 'client_payment.gateway_received', 'Online payment received', $ref . ' for invoice ' . $inv['reference'], '/client-payments/' . $pub, null, 'client_payment', $id, "cpay:{$id}:gateway");
 
         return ['id' => $id, 'public_id' => $pub, 'created' => true];
+    }
+
+    /** A verified ADVANCE payment on a project fixes the project: it moves to Ready to Start by itself. */
+    private static function confirmProjectIfAdvance(int $paymentId): void
+    {
+        $p = Database::one("SELECT project_id, payment_role, reference FROM client_payments WHERE id = ? AND status = 'verified'", [$paymentId]);
+        if ($p !== null && $p['project_id'] !== null && $p['payment_role'] === 'advance') {
+            ProjectService::confirmAfterAdvance((int) $p['project_id'], (string) $p['reference']);
+        }
     }
 
     /** After a payment changed state: re-derive the invoice status and re-evaluate the commission. @param array<string,mixed> $row */

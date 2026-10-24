@@ -171,6 +171,39 @@ final class ProjectService
         });
     }
 
+    /**
+     * The advance payment for a project was verified: the project is now fixed, i.e. Ready to Start. Done by the system (no person's permission is involved:
+     * the verified payment is the evidence), only from the statuses a project has before it is confirmed, and never twice. Anything later is left alone.
+     */
+    public static function confirmAfterAdvance(int $projectId, string $paymentReference): bool
+    {
+        $moved = false;
+        Database::transaction(function () use ($projectId, $paymentReference, &$moved): void {
+            $p = Database::one('SELECT id, code, title, status, client_id, archived_at FROM projects WHERE id = ? FOR UPDATE', [$projectId]);
+            if ($p === null || $p['archived_at'] !== null || !in_array($p['status'], ['draft', 'awaiting_client_approval', 'awaiting_payment'], true)) {
+                return;
+            }
+            Database::run("UPDATE projects SET status = 'ready_to_start', status_changed_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP() WHERE id = ?", [$projectId]);
+            $labels = (array) Config::get('workflow.project_statuses');
+            $note = 'advance payment ' . $paymentReference . ' verified';
+            ProjectActivity::log($projectId, null, 'project.status_changed', "Status: {$labels[$p['status']]} → {$labels['ready_to_start']} ({$note})", 'client', 'project', $projectId, ['from' => $p['status'], 'to' => 'ready_to_start', 'note' => $note, 'automatic' => true]);
+            Audit::record('project.confirmed_by_advance', 'project', $projectId, ['status' => $p['status']], ['status' => 'ready_to_start'], ['payment' => $paymentReference], null);
+            $owner = Database::one('SELECT user_id FROM clients WHERE id = ?', [$p['client_id']]);
+            if ($owner !== null && $owner['user_id'] !== null) {
+                Notifier::send([(int) $owner['user_id']], 'project.confirmed', 'Your project is confirmed', 'We received your advance payment. ' . $p['code'] . ' - ' . $p['title'] . ' is confirmed and will be scheduled.', '/projects/' . self::publicId($projectId), $projectId, 'project', $projectId, "project:{$projectId}:confirmed");
+            }
+            Notifier::send(Notifier::withPermission('projects.assign'), 'project.confirmed', 'Project confirmed by advance payment', $p['code'] . ' - ' . $p['title'] . ' is Ready to Start. Assign the team.', '/projects/' . self::publicId($projectId), $projectId, 'project', $projectId, "project:{$projectId}:confirmed-staff");
+            $moved = true;
+        });
+
+        return $moved;
+    }
+
+    private static function publicId(int $projectId): string
+    {
+        return (string) (Database::one('SELECT public_id FROM projects WHERE id = ?', [$projectId])['public_id'] ?? '');
+    }
+
     public static function setArchived(int $actorId, array $project, bool $archive): void
     {
         Gate::authorize('projects.archive', $actorId);

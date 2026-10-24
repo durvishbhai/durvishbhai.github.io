@@ -97,7 +97,7 @@ final class RazorpayGateway
     /**
      * @return array<string,mixed> the stored order row
      */
-    public static function createRequest(int $actorId, array $invoice, int $amountMinor, string $note = '', string $method = ''): array
+    public static function createRequest(int $actorId, array $invoice, int $amountMinor, string $note = '', string $method = '', string $role = 'other'): array
     {
         Gate::authorize('payments.request', $actorId);
         if (!in_array($invoice['status'], ['issued', 'partially_paid'], true)) {
@@ -107,7 +107,8 @@ final class RazorpayGateway
             throw new ValidationException(['Razorpay payments are not switched on (Administration -> Integrations & settings -> Razorpay).']);
         }
         $target = ['kind' => 'invoice', 'id' => (int) $invoice['id'], 'client_id' => (int) $invoice['client_id'], 'reference' => (string) $invoice['reference'], 'title' => (string) $invoice['title'],
-            'public_id' => (string) $invoice['public_id'], 'label' => 'invoice', 'callback' => '/my/invoices/' . $invoice['public_id']];
+            'public_id' => (string) $invoice['public_id'], 'label' => 'invoice', 'callback' => '/my/invoices/' . $invoice['public_id'],
+            'role' => $invoice['project_id'] !== null && in_array($role, ['advance', 'balance'], true) ? $role : 'other'];
 
         return self::issue($actorId, $target, self::requestable($invoice), $amountMinor, $note, $method);
     }
@@ -221,9 +222,9 @@ final class RazorpayGateway
             [$flow, $payload, $rzpId] = ['payment_link', $url, $id];
         }
         $pub = uuid_hex();
-        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, invoice_id, renewal_cycle_id, client_id, amount_minor, qr_payload, qr_image_url, note, expires_at, status, provider_order_id, created_by, created_at, updated_at)
-            VALUES (?, ?, 'razorpay', ?, ?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-            [$pub, $mid, $flow, $t['kind'] === 'invoice' ? $t['id'] : null, $t['kind'] === 'renewal' ? $t['id'] : null, $t['client_id'], $amountMinor, $payload, $imageUrl, $note === '' ? null : $note, $expiresAt, $rzpId === '' ? null : $rzpId, $actorId]);
+        Database::run("INSERT INTO gateway_orders (public_id, merchant_order_id, provider, flow, payment_role, invoice_id, renewal_cycle_id, client_id, amount_minor, qr_payload, qr_image_url, note, expires_at, status, provider_order_id, created_by, created_at, updated_at)
+            VALUES (?, ?, 'razorpay', ?, ?, ?, ?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?), 'pending', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+            [$pub, $mid, $flow, (string) ($t['role'] ?? 'other'), $t['kind'] === 'invoice' ? $t['id'] : null, $t['kind'] === 'renewal' ? $t['id'] : null, $t['client_id'], $amountMinor, $payload, $imageUrl, $note === '' ? null : $note, $expiresAt, $rzpId === '' ? null : $rzpId, $actorId]);
         $id = Database::insertId();
         Audit::record('gateway.request_created', $t['kind'] === 'invoice' ? 'invoice' : 'renewal_cycle', (int) $t['id'], [], ['amount_minor' => $amountMinor, 'merchant_order_id' => $mid], ['provider' => 'razorpay', 'flow' => $flow], $actorId);
         $clientUser = Database::one('SELECT user_id FROM clients WHERE id = ?', [$t['client_id']]);
@@ -379,7 +380,7 @@ final class RazorpayGateway
                 return;
             }
             $invoice = InvoiceService::find((string) Database::one('SELECT public_id FROM invoices WHERE id = ?', [$order['invoice_id']])['public_id']);
-            $p = ClientPaymentService::recordGateway($invoice, (int) $order['amount_minor'], 'Razorpay ' . $txn, 'Confirmed by Razorpay (order ' . $order['merchant_order_id'] . ')');
+            $p = ClientPaymentService::recordGateway($invoice, (int) $order['amount_minor'], 'Razorpay ' . $txn, 'Confirmed by Razorpay (order ' . $order['merchant_order_id'] . ')', (string) ($locked['payment_role'] ?? 'other'));
             Database::run("UPDATE gateway_orders SET status = 'completed', provider_txn_id = ?, payment_id = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [mb_substr($txn, 0, 80), $p['id'], $order['id']]);
             $recorded = $p['created'];
         });

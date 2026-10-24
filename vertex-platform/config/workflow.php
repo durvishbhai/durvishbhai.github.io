@@ -35,6 +35,7 @@ return [
         'appointment_request' => 'Appointment request',
         'manual' => 'Created by staff',
         'referral_partner' => 'Referral partner',
+        'client_portal' => 'Client dashboard request',
     ],
 
     'contact_channels' => ['call' => 'Phone call', 'email' => 'Email', 'meeting' => 'Meeting', 'message' => 'Message / chat', 'other' => 'Other'],

@@ -142,8 +142,8 @@ final class DashboardService
 
         // Quick actions
         foreach ([['projects.create', '/projects/create', 'New project'], ['enquiries.create', '/crm/enquiries/create', 'New enquiry'], ['clients.create', '/clients/create', 'New client'], ['quotes.create', '/quotations/new', 'New quotation'],
-            ['invoices.create', '/invoices/new', 'New invoice'], ['tickets.create', '/support/tickets/new', 'Get support'], ['scope.request', '/my/scope-requests', 'Request a change'], ['cms.view', '/admin/cms', 'Edit the website'], ['ai.use', '/ai', 'Ask the AI assistant']] as [$perm, $href, $label]) {
-            $customerOnly = in_array($perm, ['tickets.create', 'scope.request'], true);
+            ['invoices.create', '/invoices/new', 'New invoice'], ['requirements.submit', '/my/project-requests/new', 'Request a new project'], ['tickets.create', '/support/tickets/new', 'Get support'], ['scope.request', '/my/scope-requests', 'Request a change'], ['cms.view', '/admin/cms', 'Edit the website'], ['ai.use', '/ai', 'Ask the AI assistant']] as [$perm, $href, $label]) {
+            $customerOnly = in_array($perm, ['tickets.create', 'scope.request', 'requirements.submit'], true);
             if (Gate::can($perm, $userId) && (!$customerOnly || Database::one('SELECT 1 AS x FROM clients WHERE user_id = ?', [$userId]) !== null)) {
                 $actions[] = ['label' => $label, 'href' => $href];
             }

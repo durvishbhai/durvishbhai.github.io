@@ -38,7 +38,7 @@ final class PaymentRequestController extends Controller
     {
         $i = InvoiceService::requireStaff($this->actorId(), $params['invoice'] ?? '');
         $r = $this->page('billing/payments/new', ['title' => 'Request a payment', 'i' => $i, 'due' => RazorpayGateway::requestable($i), 'ready' => RazorpayGateway::status(), 'live' => RazorpayGateway::liveRequests((int) $i['id']),
-            't' => ['back' => '/invoices/' . $i['public_id'], 'action' => '/invoices/' . $i['public_id'] . '/pay-request', 'backLabel' => 'Invoice ' . $i['reference'], 'what' => $i['reference'] . ' · ' . $i['title'], 'detail' => '', 'client' => $i['client_name'], 'kind' => 'invoice']]);
+            't' => ['back' => '/invoices/' . $i['public_id'], 'action' => '/invoices/' . $i['public_id'] . '/pay-request', 'backLabel' => 'Invoice ' . $i['reference'], 'what' => $i['reference'] . ' · ' . $i['title'], 'detail' => '', 'client' => $i['client_name'], 'kind' => 'invoice', 'project' => $i['project_id'] !== null]]);
         \Vertex\Core\Session::forget('_old');
 
         return $r;
@@ -53,10 +53,10 @@ final class PaymentRequestController extends Controller
 
         return $this->guarded(function () use ($request, $uid, $i): Response {
             $amount = FieldRules::moneyMinor($request->input('amount'), 'Amount', true);
-            $o = RazorpayGateway::createRequest($uid, $i, (int) $amount, $request->string('note'), $request->string('method'));
+            $o = RazorpayGateway::createRequest($uid, $i, (int) $amount, $request->string('note'), $request->string('method'), $request->string('role'));
 
             return Response::redirect('/payment-requests/' . $o['public_id']);
-        }, $back, ['amount' => $request->string('amount'), 'note' => $request->string('note'), 'method' => $request->string('method')]);
+        }, $back, ['amount' => $request->string('amount'), 'note' => $request->string('note'), 'method' => $request->string('method'), 'role' => $request->string('role')]);
     }
 
     /** @param array<string,string> $params */

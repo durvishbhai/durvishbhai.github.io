@@ -51,6 +51,7 @@ use Vertex\Http\Controllers\Admin\SettingsController;
 use Vertex\Http\Controllers\AiController;
 use Vertex\Http\Controllers\PublicPageController;
 use Vertex\Http\Controllers\Billing\ReceiptController;
+use Vertex\Http\Controllers\Client\ClientProjectRequestController;
 use Vertex\Http\Controllers\SitePageController;
 use Vertex\Http\Controllers\EnquiryFileController;
 use Vertex\Http\Controllers\Admin\SiteAdminController;
@@ -299,6 +300,9 @@ return static function (Router $router): void {
     $router->get('/receipts/{receipt}', [ReceiptController::class, 'show'], ['auth', 'can:receipts.view_all']);
     $router->get('/receipts/{receipt}/pdf', [ReceiptController::class, 'pdf'], ['auth', 'can:receipts.view_all']);
     $router->post('/receipts/{receipt}/void', [ReceiptController::class, 'void'], ['auth', 'can:receipts.void']);
+    $router->get('/my/project-requests', [ClientProjectRequestController::class, 'index'], ['auth', 'can:requirements.submit']);
+    $router->get('/my/project-requests/new', [ClientProjectRequestController::class, 'create'], ['auth', 'can:requirements.submit']);
+    $router->post('/my/project-requests', [ClientProjectRequestController::class, 'store'], ['auth', 'can:requirements.submit']);
     $router->get('/my/receipts', [ReceiptController::class, 'mine'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/receipt/{receipt}', [ReceiptController::class, 'mineShow'], ['auth', 'can:receipts.view_own']);
     $router->get('/my/receipt/{receipt}/pdf', [ReceiptController::class, 'minePdf'], ['auth', 'can:receipts.view_own']);

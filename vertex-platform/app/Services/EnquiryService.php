@@ -35,7 +35,7 @@ final class EnquiryService
         $services = (array) Config::get('workflow.services');
         $budgets = (array) Config::get('workflow.budget_ranges');
         $priorities = (array) Config::get('workflow.priorities');
-        $public = in_array($source, ['website_requirements', 'contact_form', 'appointment_request'], true);
+        $public = in_array($source, ['website_requirements', 'contact_form', 'appointment_request', 'client_portal'], true);
         $today = AppTime::today();
 
         // Collect every field's error so the person sees all problems at once instead of fixing them one by one.
@@ -53,7 +53,7 @@ final class EnquiryService
         $phone = $try(fn () => FieldRules::phone($in['phone'] ?? '', $source === 'appointment_request'));
         $company = $try(fn () => FieldRules::line($in['company_name'] ?? '', 'Company name', 2, 160, false));
         $description = $try(fn () => match ($source) {
-            'website_requirements' => FieldRules::text($in['description'] ?? '', 'Project description', 20, 5000),
+            'website_requirements', 'client_portal' => FieldRules::text($in['description'] ?? '', 'Project description', 20, 5000),
             'contact_form' => FieldRules::text($in['description'] ?? '', 'Message', 10, 3000),
             'appointment_request' => FieldRules::text($in['description'] ?? '', 'What would you like to discuss', 5, 1000),
             default => FieldRules::text($in['description'] ?? '', 'Project description', 5, 5000),
@@ -65,7 +65,7 @@ final class EnquiryService
             'phone_digits' => FieldRules::phoneDigits($phone),
             'company_name' => $company,
             'company_norm' => FieldRules::companyNorm($company),
-            'service' => $try(fn () => FieldRules::choice($in['service'] ?? '', $services, 'service', in_array($source, ['website_requirements', 'manual', 'referral_partner'], true), 'other')),
+            'service' => $try(fn () => FieldRules::choice($in['service'] ?? '', $services, 'service', in_array($source, ['website_requirements', 'manual', 'referral_partner', 'client_portal'], true), 'other')),
             'description' => $description,
             'budget_range' => $try(fn () => FieldRules::choice($in['budget_range'] ?? '', $budgets, 'budget range', false)),
             'expected_deadline' => $try(fn () => FieldRules::date($in['expected_deadline'] ?? '', 'Expected deadline', false, $public || $source === 'referral_partner' ? $today : null)),
@@ -113,7 +113,8 @@ final class EnquiryService
 
         return Database::transaction(function () use ($actorId, $source, $d, $meta): array {
             $stage = CrmStageService::initial();
-            $dups = self::findDuplicates($d['email'], $d['phone_digits'], $d['company_norm']);
+            // a client sending another request is not a duplicate of their own earlier ones
+            $dups = $source === 'client_portal' ? ['strong' => [], 'weak' => []] : self::findDuplicates($d['email'], $d['phone_digits'], $d['company_norm']);
             $dupOf = $dups['strong'][0]['id'] ?? null;
             $pub = uuid_hex();
             $ref = CrmReference::next('enquiry');
@@ -138,7 +139,7 @@ final class EnquiryService
             }
             Audit::record('enquiry.created', 'enquiry', $id, [], ['reference' => $ref, 'source' => $source, 'service' => $d['service']], ['possible_duplicate' => $dupOf !== null], $actorId);
 
-            if (in_array($source, ['website_requirements', 'contact_form', 'appointment_request'], true)) { // tell the people who work the enquiry queue
+            if (in_array($source, ['website_requirements', 'contact_form', 'appointment_request', 'client_portal'], true)) { // tell the people who work the enquiry queue
                 Notifier::send(Notifier::withPermission('enquiries.view_all'), 'enquiry.received', 'New ' . strtolower((string) Config::get("workflow.sources.{$source}")), $ref . ': ' . $d['contact_name'], '/crm/enquiries/' . $pub, null, 'enquiry', $id, "enquiry:{$id}:received");
             }
 
@@ -499,6 +500,9 @@ final class EnquiryService
                 throw new ValidationException(['This enquiry has already been converted.']);
             }
             $choice = (string) ($in['client'] ?? '');
+            if (($choice === '' || $choice === 'new') && $enq['source'] === 'client_portal' && $enq['client_id'] !== null) { // sent by an existing client from their dashboard: it is theirs
+                $choice = (string) (Database::one('SELECT public_id FROM clients WHERE id = ?', [$enq['client_id']])['public_id'] ?? '');
+            }
             if ($choice === '' || $choice === 'new') {
                 $client = ClientService::create($actorId, [
                     'client_type' => $enq['company_name'] !== null ? 'business' : 'individual',
