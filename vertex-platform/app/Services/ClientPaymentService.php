@@ -187,11 +187,19 @@ final class ClientPaymentService
      * @param array<string,mixed> $in
      * @return array{public_id:string,reference:string}
      */
-    public static function claim(int $userId, array $invoice, array $in): array
+    public static function claim(int $userId, array $invoice, array $in, ?array $proofFile = null): array
     {
         Gate::authorize('payments.pay', $userId);
         if ($invoice['client_user_id'] === null || (int) $invoice['client_user_id'] !== $userId) {
             throw new HttpException(404);
+        }
+        // Manual UPI is the alternative to Razorpay: it is only available while the business has switched it on and Razorpay is off.
+        if (!ManualUpi::active()) {
+            throw new ValidationException(['Paying by UPI and sending the details is not available right now. Please use the payment request from our team, or contact us.']);
+        }
+        $needProof = (int) ManualUpi::settings()['require_proof'] === 1;
+        if ($needProof && ($proofFile === null || (int) ($proofFile['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE)) {
+            throw new ValidationException(['Attach the proof of payment (a screenshot of the payment or a PDF).']);
         }
         if (!RateLimiter::hit('payment_claim_user', (string) $userId)) {
             throw new HttpException(429);
@@ -211,7 +219,24 @@ final class ClientPaymentService
         }
         $key = hash('sha256', $method . ':' . mb_strtolower($ref));
 
-        return Database::transaction(function () use ($userId, $invoice, $amount, $method, $ref, $on, $key): array {
+        $proof = null;
+        if ($proofFile !== null && (int) ($proofFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $proof = ManualUpi::acceptImage($proofFile, true);
+        }
+        try {
+            return self::claimTransaction($userId, $invoice, $amount, $method, $ref, $on, $key, $proof);
+        } catch (\Throwable $e) {
+            if ($proof !== null) {
+                FileStore::discard($proof);
+            }
+            throw $e;
+        }
+    }
+
+    /** @param array<string,mixed> $invoice @param array<string,mixed>|null $proof @return array{public_id:string,reference:string} */
+    private static function claimTransaction(int $userId, array $invoice, int $amount, string $method, string $ref, string $on, string $key, ?array $proof): array
+    {
+        return Database::transaction(function () use ($userId, $invoice, $amount, $method, $ref, $on, $key, $proof): array {
             $inv = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$invoice['id']]);
             if ($inv === null || !in_array($inv['status'], ['issued', 'partially_paid'], true)) {
                 throw new ValidationException(['This invoice cannot take a payment (it is paid, void or not issued).']);
@@ -225,9 +250,10 @@ final class ClientPaymentService
             }
             $pub = uuid_hex();
             $reference = CrmReference::next('client_payment');
-            Database::run("INSERT INTO client_payments (public_id, reference, project_id, client_id, invoice_id, invoice_ref, payment_role, gross_minor, tax_minor, method, source, external_ref, external_key, received_on, status, notes, recorded_by, created_at, updated_at)
-                           VALUES (?, ?, ?, ?, ?, ?, 'other', ?, 0, ?, 'client_claim', ?, ?, ?, 'pending_verification', 'Submitted by the client', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-                [$pub, $reference, $inv['project_id'], $inv['client_id'], $inv['id'], $inv['reference'], $amount, $method, $ref, $key, $on, $userId]);
+            $proofId = $proof === null ? null : FileStore::insert($proof, $userId);
+            Database::run("INSERT INTO client_payments (public_id, reference, project_id, client_id, invoice_id, invoice_ref, payment_role, gross_minor, tax_minor, method, source, external_ref, external_key, received_on, status, notes, proof_file_id, recorded_by, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, 'other', ?, 0, ?, 'client_claim', ?, ?, ?, 'pending_verification', 'Submitted by the client', ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                [$pub, $reference, $inv['project_id'], $inv['client_id'], $inv['id'], $inv['reference'], $amount, $method, $ref, $key, $on, $proofId, $userId]);
             $id = Database::insertId();
             self::event($id, 'claimed', $amount, null, $userId);
             Audit::record('client_payment.claimed', 'client_payment', $id, [], ['reference' => $reference, 'amount_minor' => $amount, 'method' => $method], ['invoice_id' => (int) $inv['id']], $userId);

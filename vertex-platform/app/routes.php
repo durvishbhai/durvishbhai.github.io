@@ -254,6 +254,7 @@ return static function (Router $router): void {
     $router->get('/client-payments/new', [ClientPaymentController::class, 'create'], ['auth', 'can:payments.record']);
     $router->post('/client-payments', [ClientPaymentController::class, 'store'], ['auth', 'can:payments.record']);
     $router->get('/client-payments/{pay}', [ClientPaymentController::class, 'show'], $cp);
+    $router->get('/client-payments/{pay}/proof', [ClientPaymentController::class, 'proof'], $cp);
     $router->post('/client-payments/{pay}/reject', [ClientPaymentController::class, 'reject'], $cp);
     $router->post('/client-payments/{pay}/verify', [ClientPaymentController::class, 'verify'], ['auth', 'can:payments.reconcile']);
     $router->post('/client-payments/{pay}/refund', [ClientPaymentController::class, 'refund'], ['auth', 'can:payments.reconcile']);
@@ -373,6 +374,7 @@ return static function (Router $router): void {
     $router->get('/f/{slug}/thanks', [DynamicFormController::class, 'thanks']);
     $router->get('/my/invoices', [MyBillingController::class, 'invoices'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/upi-qr', [MyBillingController::class, 'upiQr'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
     $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
     // Online payments (Razorpay) are asked for by the KIS team only (amount typed by them); the client just sees and pays the request.
@@ -567,6 +569,9 @@ return static function (Router $router): void {
         $r->post('/cms/{page}/status', [CmsController::class, 'status'], ['can:cms.publish']);
         $r->get('/business', [BillingSettingsController::class, 'business'], ['can:billing.configure']);
         $r->post('/business', [BillingSettingsController::class, 'saveBusiness'], ['can:billing.configure']);
+        $r->get('/manual-upi', [BillingSettingsController::class, 'manualUpi'], ['can:billing.configure']);
+        $r->post('/manual-upi', [BillingSettingsController::class, 'saveManualUpi'], ['can:billing.configure']);
+        $r->get('/manual-upi/qr', [BillingSettingsController::class, 'manualUpiQr'], ['can:billing.configure']);
         $r->get('/users', [UserController::class, 'index'], ['can:users.view']);
         $r->get('/users/create', [UserController::class, 'create'], ['can:users.create']);
         $r->post('/users', [UserController::class, 'store'], ['can:users.create']);

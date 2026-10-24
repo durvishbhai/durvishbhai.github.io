@@ -9,6 +9,7 @@ use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\BusinessProfile;
+use Vertex\Services\ManualUpi;
 
 /** Administration → Business details. Needs `billing.configure` and the password; secrets are written once and never shown again. */
 final class BillingSettingsController extends Controller
@@ -20,6 +21,35 @@ final class BillingSettingsController extends Controller
         Session::forget('_old');
 
         return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function manualUpi(Request $request, array $params = []): Response
+    {
+        $r = $this->page('admin/manual-upi', ['title' => 'Manual UPI payments', 's' => ManualUpi::settings(), 'status' => ManualUpi::status(), 'razorpayOn' => ManualUpi::razorpayOn()]);
+        Session::forget('_old');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function saveManualUpi(Request $request, array $params = []): Response
+    {
+        $in = ['enabled' => $request->string('enabled') === '1' ? '1' : '0', 'require_proof' => $request->string('require_proof') === '1' ? '1' : '0', 'upi_id' => $request->string('upi_id'), 'payee_name' => $request->string('payee_name'), 'instructions' => $request->string('instructions')];
+        $qr = $request->files['qr'] ?? null;
+
+        return $this->guarded(function () use ($request, $in, $qr): Response {
+            $this->requireStepUp($request);
+            ManualUpi::save($this->actorId(), $in, is_array($qr) && !is_array($qr['name'] ?? null) ? $qr : null, $request->string('remove_qr') === '1');
+
+            return $this->ok('/admin/manual-upi', 'Manual UPI settings saved.');
+        }, '/admin/manual-upi', $in);
+    }
+
+    /** The saved QR picture, for the admin page. @param array<string,string> $params */
+    public function manualUpiQr(Request $request, array $params = []): Response
+    {
+        return ManualUpi::qrPreview();
     }
 
     /** @param array<string,string> $params */

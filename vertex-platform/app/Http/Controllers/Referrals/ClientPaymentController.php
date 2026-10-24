@@ -59,6 +59,15 @@ final class ClientPaymentController extends Controller
     }
 
     /** @param array<string,string> $params */
+    public function proof(Request $request, array $params = []): Response
+    {
+        $p = ClientPaymentService::requireView($this->actorId(), $params['pay'] ?? '');
+        $file = $p['proof_file_id'] === null ? null : \Vertex\Services\FileStore::find((int) $p['proof_file_id']);
+
+        return \Vertex\Services\FileStore::send($file ?? throw new \Vertex\Core\HttpException(404));
+    }
+
+    /** @param array<string,string> $params */
     public function show(Request $request, array $params = []): Response
     {
         $uid = $this->actorId();

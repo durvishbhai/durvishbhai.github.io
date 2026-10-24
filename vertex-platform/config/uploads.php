@@ -30,6 +30,7 @@ return [
         'agreement' => $mb('UPLOAD_AGREEMENT_MAX_MB', 15),
         'career' => $mb('UPLOAD_CAREER_MAX_MB', 5),
         'enquiry' => $mb('UPLOAD_ENQUIRY_MAX_MB', 10),
+        'payment' => $mb('UPLOAD_PAYMENT_MAX_MB', 5),
     ],
 
     // extension => [accepted detected MIME types, signature kind]

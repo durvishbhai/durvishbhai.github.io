@@ -30,6 +30,7 @@ final class BillingHttpTest extends HttpTestCase
         $this->setUpPhase6();
         $this->clientPublic = (string) Database::one('SELECT public_id FROM clients WHERE user_id = ?', [$this->client])['public_id'];
         BusinessProfile::save($this->admin, ['trade_name' => 'Vertex Integrated Solutions', 'address' => '12 Test Street', 'tax_statement' => 'Tax is not applicable.', 'payment_instructions' => 'Bank: TEST 123', 'email' => '', 'phone' => '', 'website' => '', 'legal_name' => '', 'invoice_footer' => '']);
+        Database::run("INSERT INTO manual_upi_settings (id, enabled, upi_id, require_proof, updated_at) VALUES (1, 1, 'kis@testbank', 0, UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE enabled = 1, upi_id = 'kis@testbank', require_proof = 0"); // clients' "I have paid" details need manual UPI to be on
     }
 
     protected function tearDown(): void
@@ -103,7 +104,8 @@ final class BillingHttpTest extends HttpTestCase
         $this->assertSame(200, $page['status']);
         $this->assertStringContainsString('Tax is not applicable.', $page['body']);
         $this->assertStringNotContainsString('Google Pay', $page['body'], 'no Google Pay option any more');
-        $this->assertStringContainsString('ask our team for a payment request', $page['body']);
+        $this->assertStringContainsString('Pay by UPI', $page['body'], 'manual UPI is on in this test');
+        $this->assertStringContainsString('kis@testbank', $page['body']);
         $this->assertStringNotContainsString('STAFF-ONLY-NOTE', $page['body']);
         $this->assertSame(404, $c->get('/my/invoices/' . $theirs['public_id'])['status'], 'IDOR across clients');
         $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/invoices/' . $mine['public_id'])['status']);

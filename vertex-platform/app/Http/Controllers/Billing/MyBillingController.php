@@ -13,6 +13,7 @@ use Vertex\Services\AppTime;
 use Vertex\Services\BusinessProfile;
 use Vertex\Services\ClientPaymentService;
 use Vertex\Services\InvoiceService;
+use Vertex\Services\ManualUpi;
 use Vertex\Services\QuotationService;
 
 /** The client's own invoices and quotations. A client can pay, submit proof of payment and accept or decline; nothing else. */
@@ -33,7 +34,7 @@ final class MyBillingController extends Controller
         $payable = in_array($i['status'], ['issued', 'partially_paid'], true) ? max(0, $bal['outstanding'] - $bal['pending']) : 0;
         $r = $this->page('my-billing/invoice', ['title' => $i['reference'], 'i' => $i, 'items' => InvoiceService::items($i), 'bal' => $bal, 'payments' => InvoiceService::clientPayments($i), 'creditNotes' => \Vertex\Services\CreditNoteService::forInvoice($i),
             'biz' => $i['business_snapshot'] ? (array) json_decode((string) $i['business_snapshot'], true) : BusinessProfile::get(), 'payable' => $payable,
-            'today' => AppTime::today(),
+            'today' => AppTime::today(), 'manual' => ManualUpi::active() ? ManualUpi::settings() : null, 'razorpayOn' => \Vertex\Services\ManualUpi::razorpayOn(),
             'claims' => \Vertex\Core\Database::all("SELECT reference, gross_minor, method, status, received_on FROM client_payments WHERE invoice_id = ? AND source = 'client_claim' AND recorded_by = ? ORDER BY id DESC LIMIT 10", [$i['id'], $uid])]);
         Session::forget('_old');
 
@@ -55,12 +56,19 @@ final class MyBillingController extends Controller
         $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
         $to = '/my/invoices/' . $i['public_id'];
         $in = ['amount' => $request->string('amount'), 'method' => $request->string('method'), 'reference' => $request->string('reference'), 'paid_on' => $request->string('paid_on')];
+        $proof = $request->files['proof'] ?? null;
 
-        return $this->guarded(function () use ($uid, $i, $to, $in): Response {
-            $res = ClientPaymentService::claim($uid, $i, $in);
+        return $this->guarded(function () use ($uid, $i, $to, $in, $proof): Response {
+            $res = ClientPaymentService::claim($uid, $i, $in, is_array($proof) && !is_array($proof['name'] ?? null) ? $proof : null);
 
-            return $this->ok($to, "Thank you. We have your payment details ({$res['reference']}). We will check them against our bank and confirm here. Until then the invoice still shows as unpaid.");
+            return $this->ok($to, "Thank you. We have your payment details ({$res['reference']}) and sent them to our team for approval. The payment is successful once they approve it; until then the invoice still shows as unpaid.");
         }, $to, $in);
+    }
+
+    /** The business's UPI QR picture, for signed-in clients while manual UPI is in use. @param array<string,string> $params */
+    public function upiQr(Request $request, array $params = []): Response
+    {
+        return ManualUpi::qrResponse();
     }
 
     /** @param array<string,string> $params */

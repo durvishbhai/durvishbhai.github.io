@@ -31,6 +31,7 @@ final class BillingServiceTest extends DatabaseTestCase
         $this->setUpPhase6();
         $this->clientPublic = (string) Database::one('SELECT public_id FROM clients WHERE user_id = ?', [$this->client])['public_id'];
         $this->client2Public = (string) Database::one('SELECT public_id FROM clients WHERE user_id = ?', [$this->client2])['public_id'];
+        Database::run("INSERT INTO manual_upi_settings (id, enabled, upi_id, require_proof, updated_at) VALUES (1, 1, 'kis@testbank', 0, UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE enabled = 1, upi_id = 'kis@testbank', require_proof = 0"); // clients' "I have paid" details need manual UPI to be on
         Config::set('mail.driver', 'none');
         $this->profile();
     }

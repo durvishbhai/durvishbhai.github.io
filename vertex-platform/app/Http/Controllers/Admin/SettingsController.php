@@ -12,6 +12,7 @@ use Vertex\Http\Controllers\Controller;
 use Vertex\Services\AiService;
 use Vertex\Services\Auth;
 use Vertex\Services\Mailer;
+use Vertex\Services\ManualUpi;
 use Vertex\Services\RateLimiter;
 use Vertex\Services\RazorpayGateway;
 use Vertex\Services\Settings;
@@ -52,6 +53,9 @@ final class SettingsController extends Controller
 
         return $this->guarded(function () use ($request, $group, $in, $clear): Response {
             $this->requireStepUp($request);
+            if ($group === 'razorpay' && ($in['razorpay__enabled'] ?? '0') === '1' && (int) ManualUpi::settings()['enabled'] === 1) {
+                throw new \Vertex\Core\ValidationException(['Manual UPI payments are switched on. Manual UPI and Razorpay are alternatives: switch manual UPI off first (Administration → Manual UPI payments), then switch Razorpay on.']);
+            }
             Settings::save($this->actorId(), $group, $in, $clear);
 
             return $this->ok('/admin/settings#' . $group, Settings::groups()[$group] . ' saved.');

@@ -67,6 +67,7 @@ $nav = [
     ['/admin/recycle-bin', 'Recycle bin', can('recycle.view')],
     ['/admin/audit', 'Audit log', can('audit.view')],
     ['/admin/business', 'Business details', can('billing.configure')],
+    ['/admin/manual-upi', 'Manual UPI payments', can('billing.configure')],
     ['/admin/site', 'Website', can('cms.view')],
     ['/admin/cms', 'Pages & media', can('cms.view')],
     ['/admin/careers', 'Job applications', can('careers.view') || can('careers.manage')],
@@ -87,7 +88,7 @@ $groupOf = [
     'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
     'Website' => ['/admin/site', '/admin/cms', '/admin/careers'],
-    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/audit', '/admin/payments', '/admin/business', '/admin/settings', '/admin/system'],
+    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
     'Account' => ['/account'],
 ];
 $byHref = [];
