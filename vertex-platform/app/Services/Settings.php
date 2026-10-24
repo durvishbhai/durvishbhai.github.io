@@ -78,7 +78,7 @@ final class Settings
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],
-            'auth.registration_mode' => ['group' => 'features', 'label' => 'Client self-registration', 'type' => 'select', 'options' => Registration::MODES, 'help' => 'Adds a "Sign up" tab to the website and sign-in page. Until you choose, new accounts wait for your approval. With approval, new accounts appear under Users as pending and you approve them there.'],
+            'auth.registration_mode' => ['group' => 'features', 'label' => 'Client self-registration', 'type' => 'select', 'options' => Registration::MODES, 'help' => 'Adds a "Sign up" tab to the website and sign-in page. Until you choose, nobody needs approval: clients confirm their email address, or (when email is not set up) the account works at once. With approval, new accounts appear under Users as pending and you approve them there.'],
         ];
     }
 

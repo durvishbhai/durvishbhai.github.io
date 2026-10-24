@@ -1,7 +1,7 @@
 # Sign up and "Continue with Google"
 
 ## Sign up tab
-A **Sign up** button sits beside **Login** in the website header (and "New here? Sign up" on the sign-in page). It appears whenever client self-registration is on. Until the Owner chooses, the mode is **approval**: the client signs up, the team gets an approval notice, and the client signs in once approved. Choose Off / Email-confirmation / Approval under Integrations & settings → Feature switches. The **phone number is compulsory** (server-checked; the form marks it required) in every sign-up path, including Google.
+A **Sign up** button sits beside **Login** in the website header (and "New here? Sign up" on the sign-in page). It appears whenever client self-registration is on. **No approval is needed by default.** Until the Owner chooses, a client who signs up confirms their email address with the link we send and can then sign in; if email is not set up, the account works immediately. Under Integrations & settings → Feature switches the Owner can choose Off, **Instant** (works at once, no email step), Email confirmation, or Approval (the team approves each account first). The **phone number is compulsory** (server-checked; the form marks it required) in every sign-up path, including Google.
 
 ## Continue with Google (clients only)
 1. In the Google Cloud Console create an **OAuth client ID**, type *Web application*. Add the **Authorized redirect URI** shown on Integrations & settings → Google sign-in (`https://<your site>/auth/google/callback`).

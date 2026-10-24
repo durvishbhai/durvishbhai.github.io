@@ -348,12 +348,22 @@ final class UserServiceTest extends DatabaseTestCase
         UserService::register(['name' => 'X', 'email' => 'x@x.test', 'phone' => '+91 90000 33333', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '1.1.1.1');
     }
 
-    public function testRegistrationIsOnWithTeamApprovalUntilTheOwnerChooses(): void
+    public function testUntilTheOwnerChoosesNoApprovalIsNeeded(): void
     {
         Config::set('auth.registration_mode', '');
         Config::set('auth.registration_enabled', false);
-        $this->assertSame('approval', Registration::mode());
+        $this->assertSame('email', Registration::mode(), 'with working email: confirm the address, no approval');
+        Config::set('mail.driver', 'none');
+        $this->assertSame('instant', Registration::mode(), 'without email the account simply works');
         $this->assertTrue(Registration::enabled());
+        UserService::register(['name' => 'Ina Instant', 'email' => 'ina@x.test', 'phone' => '+91 90000 44444', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '6.6.6.6');
+        $u = (new UserRepository())->findByEmail('ina@x.test');
+        $this->assertSame('active', $u['status']);
+        $this->assertSame(['client'], $this->roles((int) $u['id']));
+        $this->assertSame(0, (int) Database::one("SELECT COUNT(*) AS c FROM notifications WHERE event_type = 'user.registration_pending'")['c'], 'nobody is asked to approve');
+        Config::set('auth.registration_mode', 'approval');
+        UserService::register(['name' => 'Al Approve', 'email' => 'al@x.test', 'phone' => '+91 90000 44445', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '6.6.6.7');
+        $this->assertSame('pending', (new UserRepository())->findByEmail('al@x.test')['status'], 'approval stays available as an explicit choice');
     }
 
     public function testRegistrationRejectsWeakPasswordsAndRateLimitsByIp(): void

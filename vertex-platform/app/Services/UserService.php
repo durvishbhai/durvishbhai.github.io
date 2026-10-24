@@ -65,10 +65,14 @@ final class UserService
         }
 
         $token = Database::transaction(function () use ($repo, $name, $email, $phone, $password, $ip, $mode): ?string {
-            $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), 'pending', ['client'], null, $phone);
+            $status = $mode === 'instant' ? 'active' : 'pending';
+            $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), $status, ['client'], null, $phone);
             Database::run('UPDATE users SET self_registered = 1 WHERE id = ?', [$id]);
             self::ensureClientProfile($id);
-            Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $email, 'roles' => ['client'], 'status' => 'pending'], ['mode' => $mode], $id, $ip);
+            Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $email, 'roles' => ['client'], 'status' => $status], ['mode' => $mode], $id, $ip);
+            if ($mode === 'instant') {
+                return null; // nothing to wait for: the account works at once
+            }
             if ($mode === 'approval') {
                 $pub = (string) Database::one('SELECT public_id FROM users WHERE id = ?', [$id])['public_id'];
                 Notifier::send(Notifier::withPermission('users.edit'), 'user.registration_pending', 'New client account waiting for approval', $name . ' (' . $email . ') registered. Open the account to approve it.', '/admin/users/' . $pub, null, 'user', $id, 'reg:' . $id . ':pending');

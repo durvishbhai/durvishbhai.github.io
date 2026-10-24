@@ -27,7 +27,7 @@ final class RegistrationController extends Controller
         if (!$this->enabled()) {
             throw new HttpException(404);
         }
-        $r = $this->page('pages/register', ['title' => 'Create account', 'approval' => Registration::mode() === 'approval'], 'layouts/public');
+        $r = $this->page('pages/register', ['title' => 'Create account', 'approval' => Registration::mode() === 'approval', 'mode' => Registration::mode()], 'layouts/public');
         Session::forget('_old');
 
         return $r;
@@ -51,9 +51,11 @@ final class RegistrationController extends Controller
             ], $request->ip());
 
             // Identical response whether or not the email already had an account.
-            return $this->ok('/login', Registration::mode() === 'approval'
-                ? 'Thank you. Your account was created and is waiting for our team to approve it. You will be able to sign in as soon as it is approved.'
-                : 'Check your email: we sent a link to confirm your address. You can sign in once it is confirmed.');
+            return $this->ok('/login', match (Registration::mode()) {
+                'approval' => 'Thank you. Your account was created and is waiting for our team to approve it. You will be able to sign in as soon as it is approved.',
+                'instant' => 'Your account is ready. Sign in with your email and password. (If you already had an account with this email, use Forgot password.)',
+                default => 'Check your email: we sent a link to confirm your address. You can sign in once it is confirmed.',
+            });
         }, '/register', ['name' => $request->string('name'), 'email' => $request->string('email'), 'phone' => $request->string('phone')]);
     }
 
