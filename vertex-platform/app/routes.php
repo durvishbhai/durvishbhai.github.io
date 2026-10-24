@@ -15,6 +15,7 @@ use Vertex\Http\Controllers\Admin\UserController;
 use Vertex\Http\Controllers\Admin\CrmStageController;
 use Vertex\Http\Controllers\AttachmentController;
 use Vertex\Http\Controllers\AuthController;
+use Vertex\Http\Controllers\GoogleAuthController;
 use Vertex\Http\Controllers\ClientController;
 use Vertex\Http\Controllers\Crm\DashboardController as CrmDashboardController;
 use Vertex\Http\Controllers\Crm\EnquiryController;
@@ -118,6 +119,10 @@ return static function (Router $router): void {
     // Authentication
     $router->get('/login', [AuthController::class, 'showLogin'], ['guest']);
     $router->post('/login', [AuthController::class, 'login'], ['guest']);
+    $router->get('/auth/google', [GoogleAuthController::class, 'start'], ['guest']);
+    $router->get('/auth/google/callback', [GoogleAuthController::class, 'callback'], ['guest']);
+    $router->get('/auth/google/complete', [GoogleAuthController::class, 'showComplete'], ['guest']);
+    $router->post('/auth/google/complete', [GoogleAuthController::class, 'complete'], ['guest']);
     $router->get('/login/two-factor', [AuthController::class, 'showTwoFactor'], ['guest']);
     $router->post('/login/two-factor', [AuthController::class, 'twoFactor'], ['guest']);
     $router->post('/logout', [AuthController::class, 'logout'], ['auth']);

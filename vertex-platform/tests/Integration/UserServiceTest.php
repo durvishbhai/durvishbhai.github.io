@@ -341,11 +341,19 @@ final class UserServiceTest extends DatabaseTestCase
         UserService::register(['name' => 'X', 'email' => 'x@x.test', 'phone' => '+91 90000 33333', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '1.1.1.1');
     }
 
-    public function testRegistrationIsDisabledByDefault(): void
+    public function testRegistrationCanBeSwitchedOff(): void
     {
-        Config::set('auth.registration_enabled', false);
+        Config::set('auth.registration_mode', 'off');
         $this->expectException(HttpException::class);
         UserService::register(['name' => 'X', 'email' => 'x@x.test', 'phone' => '+91 90000 33333', 'password' => 'a-long-unique-passphrase-9', 'password_confirmation' => 'a-long-unique-passphrase-9'], '1.1.1.1');
+    }
+
+    public function testRegistrationIsOnWithTeamApprovalUntilTheOwnerChooses(): void
+    {
+        Config::set('auth.registration_mode', '');
+        Config::set('auth.registration_enabled', false);
+        $this->assertSame('approval', Registration::mode());
+        $this->assertTrue(Registration::enabled());
     }
 
     public function testRegistrationRejectsWeakPasswordsAndRateLimitsByIp(): void

@@ -103,6 +103,95 @@ final class UserService
         }
     }
 
+    // ------------------------------------------------------------------ Google sign-in (clients only)
+
+    /**
+     * Decides what a verified Google identity may do. Only client accounts use Google: a team account (staff, partner or any extra role) always uses its
+     * password. A first-time visitor becomes a client only through completeGoogleSignUp(), which asks for the compulsory phone number.
+     *
+     * @param array{sub:string,email:string,name:string} $g
+     * @return array{action:'login'|'pending'|'complete',user?:array<string,mixed>}
+     * @throws \RuntimeException with a message that is safe to show
+     */
+    public static function googleSignIn(array $g, string $ip): array
+    {
+        $repo = new UserRepository();
+        $u = Database::one('SELECT * FROM users WHERE google_sub = ?', [$g['sub']]) ?? $repo->findByEmail($g['email']);
+        if ($u === null) {
+            if (Registration::configured() === 'off') {
+                throw new \RuntimeException('Sign-up is closed right now. Please contact us to get an account.');
+            }
+
+            return ['action' => 'complete'];
+        }
+        if (($u['google_sub'] ?? null) !== null && $u['google_sub'] !== $g['sub']) {
+            throw new \RuntimeException('This email address is linked to a different Google account.');
+        }
+        if (Gate::roleSlugs((int) $u['id']) !== ['client']) {
+            throw new \RuntimeException('This account signs in with its email and password.');
+        }
+        if ($u['status'] === 'pending') {
+            if ($u['email_verified_at'] !== null || (int) ($u['self_registered'] ?? 0) !== 1 || Registration::configured() !== 'email') {
+                return ['action' => 'pending']; // waiting for the team to approve it
+            }
+            // registered with a password and never confirmed the address: Google has now confirmed it
+            Database::run("UPDATE users SET status = 'active', updated_at = UTC_TIMESTAMP() WHERE id = ? AND status = 'pending'", [$u['id']]);
+            $u['status'] = 'active';
+        }
+        if ($u['status'] !== 'active') {
+            throw new \RuntimeException('This account is not active. Please contact us.');
+        }
+        if (($u['google_sub'] ?? null) === null) {
+            Database::run('UPDATE users SET google_sub = ?, email_verified_at = COALESCE(email_verified_at, UTC_TIMESTAMP()), updated_at = UTC_TIMESTAMP() WHERE id = ?', [$g['sub'], $u['id']]);
+            Audit::record('auth.google.linked', 'user', (int) $u['id'], [], [], [], (int) $u['id'], $ip);
+        }
+
+        return ['action' => 'login', 'user' => $repo->findById((int) $u['id']) ?? $u];
+    }
+
+    /**
+     * Creates the client account of a first-time Google visitor. The phone number is compulsory. The email address is already confirmed by Google; whether the
+     * account may sign in at once follows the sign-up setting (approval = it waits for the team).
+     *
+     * @param array{sub:string,email:string,name:string} $g
+     * @return array{status:string,user_id:int}
+     */
+    public static function completeGoogleSignUp(array $g, mixed $phoneInput, mixed $nameInput, string $ip): array
+    {
+        $mode = Registration::configured();
+        if ($mode === 'off') {
+            throw new HttpException(404);
+        }
+        $phone = self::phone($phoneInput, true);
+        $name = self::name($nameInput !== null && trim((string) $nameInput) !== '' ? $nameInput : $g['name']);
+        if (!RateLimiter::hit('register_ip', $ip)) {
+            throw new HttpException(429);
+        }
+        $status = $mode === 'approval' ? 'pending' : 'active';
+        $repo = new UserRepository();
+        try {
+            $id = Database::transaction(function () use ($repo, $g, $name, $phone, $status, $mode, $ip): int {
+                if ($repo->findByEmail($g['email']) !== null) {
+                    throw new \RuntimeException('exists');
+                }
+                $id = $repo->create($name, $g['email'], password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT), $status, ['client'], null, $phone, true);
+                Database::run('UPDATE users SET self_registered = 1, google_sub = ? WHERE id = ?', [$g['sub'], $id]);
+                self::ensureClientProfile($id);
+                Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $g['email'], 'roles' => ['client'], 'status' => $status], ['mode' => $mode, 'via' => 'google'], $id, $ip);
+                if ($status === 'pending') {
+                    $pub = (string) Database::one('SELECT public_id FROM users WHERE id = ?', [$id])['public_id'];
+                    Notifier::send(Notifier::withPermission('users.edit'), 'user.registration_pending', 'New client account waiting for approval', $name . ' (' . $g['email'] . ') signed up with Google. Open the account to approve it.', '/admin/users/' . $pub, null, 'user', $id, 'reg:' . $id . ':pending');
+                }
+
+                return $id;
+            });
+        } catch (\RuntimeException | \PDOException) {
+            throw new \RuntimeException('An account with this email address already exists. Sign in with your password, or use Forgot password.');
+        }
+
+        return ['status' => $status, 'user_id' => $id];
+    }
+
     public static function resendVerification(string $email, string $ip): void
     {
         if (!Mailer::enabled()) {

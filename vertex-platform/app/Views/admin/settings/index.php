@@ -1,4 +1,4 @@
-<?php /** @var array<string,string> $groups */ /** @var array<string,list<array<string,mixed>>> $screen */ /** @var array{ready:bool,reason:string} $razorpay */ /** @var array{ready:bool,reason:string,used:int,cap:int} $ai */ /** @var string $webhookUrl */
+<?php /** @var array<string,string> $groups */ /** @var array<string,list<array<string,mixed>>> $screen */ /** @var array{ready:bool,reason:string} $razorpay */ /** @var array{ready:bool,reason:string,used:int,cap:int} $ai */ /** @var string $webhookUrl */ /** @var array{ready:bool,reason:string} $google */ /** @var string $googleRedirect */
 $canManage = can('settings.manage'); ?>
 <div class="page-head"><div><p class="eyebrow">Administration</p><h1>Integrations &amp; settings</h1></div></div>
 <p class="muted">Company facts, email, storage, AI, payments and feature switches in one place. A value saved here replaces the one in the server's <code>.env</code> file; "Use the default again" removes it. Secrets (passwords, keys) are stored encrypted and are never shown again — leave a secret box empty to keep the saved one.</p>
@@ -7,10 +7,14 @@ $canManage = can('settings.manage'); ?>
 <?php foreach ($groups as $g => $label) : ?>
 <div class="panel" id="<?= e($g) ?>"><h2><?= e($label) ?>
     <?php if ($g === 'razorpay') : ?><span class="badge badge-sys-<?= $razorpay['ready'] ? 'ok' : 'warn' ?>"><?= $razorpay['ready'] ? 'Ready' : 'Not ready' ?></span><?php endif; ?>
+    <?php if ($g === 'google') : ?><span class="badge badge-sys-<?= $google['ready'] ? 'ok' : 'warn' ?>"><?= $google['ready'] ? 'Ready' : 'Off' ?></span><?php endif; ?>
     <?php if ($g === 'ai') : ?><span class="badge badge-sys-<?= $ai['ready'] ? 'ok' : 'warn' ?>"><?= $ai['ready'] ? 'Ready' : 'Off' ?></span><?php endif; ?></h2>
     <?php if ($g === 'razorpay') : ?>
         <?php if ($razorpay['reason'] !== '') : ?><p class="muted"><?= e($razorpay['reason']) ?></p><?php endif; ?>
         <p class="muted">In the Razorpay Dashboard → Account &amp; Settings → Webhooks, add the address <code class="prewrap"><?= e($webhookUrl) ?></code>, tick <em>order.paid</em>, <em>payment.captured</em>, <em>qr_code.credited</em>, <em>payment_link.paid</em> (and <em>qr_code.closed</em>), and type the same secret you save below. Payments are recorded only after the server has asked Razorpay and found a captured payment of exactly the requested amount; the webhook only tells us when to ask. Try it with test keys (<code>rzp_test_…</code>) first.</p>
+    <?php elseif ($g === 'google') : ?>
+        <?php if ($google['reason'] !== '') : ?><p class="muted"><?= e($google['reason']) ?></p><?php endif; ?>
+        <p class="muted">In the Google Cloud Console → APIs &amp; Services → Credentials → your OAuth client, add this exact address under <em>Authorized redirect URIs</em>: <code class="prewrap"><?= e($googleRedirect) ?></code> (and your site address under <em>Authorized JavaScript origins</em> if Google asks for it). Only client accounts can use Google; team accounts always sign in with their password. A new Google visitor must still give a phone number, and the sign-up setting under Feature switches decides whether the team approves the account first.</p>
     <?php elseif ($g === 'ai') : ?>
         <?php if ($ai['reason'] !== '') : ?><p class="muted"><?= e($ai['reason']) ?></p><?php endif; ?>
         <p class="muted">Requests this month: <?= (int) $ai['used'] ?> of <?= (int) $ai['cap'] ?>. The assistant only drafts text; it never saves, sends or approves anything, and it only sees records the person asking may open.</p>

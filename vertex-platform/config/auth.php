@@ -20,6 +20,7 @@ return [
         'password_reset_ip' => [5, 3600],
         'password_reset_email' => [3, 3600],
         'register_ip' => [5, 3600],
+        'google_ip' => [30, 600],
         'verify_resend_ip' => [5, 3600],
         'verify_resend_email' => [3, 3600],
         'stepup_user' => [5, 600],

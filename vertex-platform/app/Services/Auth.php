@@ -116,6 +116,33 @@ final class Auth
         return self::OK;
     }
 
+    /**
+     * Signs in a person Google has already identified (GoogleAuth + UserService::googleSignIn decided they may). Same rules as a password sign-in: an account with
+     * two-factor login still owes its code; the throttle and the sign-in alert apply.
+     *
+     * @param array<string,mixed> $user @return self::OK|self::TWO_FACTOR|self::INACTIVE
+     */
+    public static function loginVerified(array $user, Request $request, string $method): string
+    {
+        if ($user['status'] !== 'active') {
+            return self::INACTIVE;
+        }
+        $ip = $request->ip();
+        if (TwoFactorService::isEnabled($user)) {
+            Session::regenerate();
+            Session::put('twofa_pending', ['uid' => (int) $user['id'], 'exp' => time() + 300]);
+            Audit::record('auth.login.password_ok_2fa_pending', 'user', (int) $user['id'], [], [], ['method' => $method], (int) $user['id'], $ip, $request->userAgent());
+
+            return self::TWO_FACTOR;
+        }
+        self::login($user);
+        (new UserRepository())->touchLogin((int) $user['id'], $ip);
+        Audit::record('auth.login.success', 'user', (int) $user['id'], [], [], ['method' => $method], (int) $user['id'], $ip, $request->userAgent());
+        self::signInAlert($user, $request, $method);
+
+        return self::OK;
+    }
+
     /** The user whose password was accepted and who still owes the second factor, or null (none, or the 5 minutes ran out). */
     public static function pendingTwoFactorUser(): ?array
     {

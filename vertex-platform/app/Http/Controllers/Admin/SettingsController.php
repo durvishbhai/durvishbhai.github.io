@@ -24,7 +24,7 @@ final class SettingsController extends Controller
     public function index(Request $request, array $params = []): Response
     {
         $r = $this->page('admin/settings/index', ['title' => 'Integrations & settings', 'groups' => Settings::groups(), 'screen' => Settings::forScreen(),
-            'razorpay' => RazorpayGateway::status(), 'ai' => AiService::status(), 'webhookUrl' => rtrim((string) \Vertex\Core\Config::get('app.url'), '/') . '/webhooks/razorpay']);
+            'razorpay' => RazorpayGateway::status(), 'ai' => AiService::status(), 'google' => \Vertex\Services\GoogleAuth::status(), 'googleRedirect' => \Vertex\Services\GoogleAuth::redirectUri(), 'webhookUrl' => rtrim((string) \Vertex\Core\Config::get('app.url'), '/') . '/webhooks/razorpay']);
         Session::forget('_old');
 
         return $r;

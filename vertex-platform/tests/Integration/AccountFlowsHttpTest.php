@@ -36,7 +36,7 @@ final class AccountFlowsHttpTest extends HttpTestCase
         $owner->post('/admin/settings/features', ['features__cms' => '1', 'features__public_forms' => '1', 'features__ai' => '1', 'auth__registration_mode' => 'approval', 'confirm_password' => self::PASSWORD], '/admin/settings');
 
         $c = $this->client();
-        $this->assertStringContainsString('Create a client account', $c->get('/login')['body']);
+        $this->assertStringContainsString('New here? Sign up', $c->get('/login')['body']);
         $this->assertStringContainsString('approves each new account', $c->get('/register')['body']);
         $r = $this->register($c, ['email' => 'approval@x.test', 'name' => 'Aisha Approval']);
         $this->assertSame('/login', $r['location']);
@@ -60,8 +60,26 @@ final class AccountFlowsHttpTest extends HttpTestCase
 
         // switching it Off removes the link and the page
         $owner->post('/admin/settings/features', ['features__cms' => '1', 'features__public_forms' => '1', 'features__ai' => '1', 'auth__registration_mode' => 'off', 'confirm_password' => self::PASSWORD], '/admin/settings');
-        $this->assertStringNotContainsString('Create a client account', $this->client()->get('/login')['body']);
+        $this->assertStringNotContainsString('New here? Sign up', $this->client()->get('/login')['body']);
+        $this->assertStringNotContainsString('href="/register"', $this->client()->get('/')['body'], 'with sign-up off the tab disappears too');
         $this->assertSame(404, $this->client()->get('/register')['status']);
+    }
+
+    public function testTheSignUpTabIsOnTheWebsiteAndTheLoginPageAndThePhoneNumberIsCompulsory(): void
+    {
+        $c = $this->client();
+        $home = $c->get('/')['body'];
+        $this->assertStringContainsString('href="/register">Sign up</a>', $home, 'a visible Sign up tab beside Login');
+        $this->assertStringContainsString('href="/login">Login</a>', $home);
+        $this->assertStringContainsString('New here? Sign up', $c->get('/login')['body']);
+        $form = $c->get('/register')['body'];
+        $this->assertMatchesRegularExpression('/<input id="phone"[^>]*\brequired\b/', $form);
+        $this->assertStringContainsString('Phone number', $form);
+        $r = $this->register($c, ['phone' => '', 'email' => 'nophone@x.test']);
+        $this->assertStringContainsString('A phone number is required', $c->get('/register')['body'] . $r['body']);
+        $this->assertSame([], $this->roles('nophone@x.test'), 'no account without a phone number');
+        $this->assertSame(404, $c->get('/auth/google')['status'], 'Google sign-in is off until it is configured');
+        $this->assertStringNotContainsString('Continue with Google', $c->get('/login')['body']);
     }
 
     public function testRegistrationVerificationThenLogin(): void

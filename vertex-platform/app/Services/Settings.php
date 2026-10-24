@@ -65,6 +65,9 @@ final class Settings
             'ai.model' => ['group' => 'ai', 'label' => 'Model name', 'type' => 'text'],
             'ai.api_key' => ['group' => 'ai', 'label' => 'API key', 'type' => 'secret'],
             'ai.monthly_cap' => ['group' => 'ai', 'label' => 'Most AI requests per month (whole company)', 'type' => 'int'],
+            'google.enabled' => ['group' => 'google', 'label' => 'Let clients sign in and sign up with Google', 'type' => 'bool'],
+            'google.client_id' => ['group' => 'google', 'label' => 'Google client ID', 'type' => 'text', 'help' => 'From the Google Cloud Console → APIs & Services → Credentials → OAuth client ID (type: Web application). Ends with .apps.googleusercontent.com.'],
+            'google.client_secret' => ['group' => 'google', 'label' => 'Google client secret', 'type' => 'secret'],
             'razorpay.enabled' => ['group' => 'razorpay', 'label' => 'Accept online payments through Razorpay', 'type' => 'bool'],
             'razorpay.key_id' => ['group' => 'razorpay', 'label' => 'Key ID', 'type' => 'text', 'help' => 'From the Razorpay Dashboard → Account & Settings → API Keys. Starts with rzp_test_ (test mode, no real money) or rzp_live_ (live).'],
             'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
@@ -73,14 +76,14 @@ final class Settings
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],
-            'auth.registration_mode' => ['group' => 'features', 'label' => 'Client self-registration', 'type' => 'select', 'options' => Registration::MODES, 'help' => 'Adds a "Create a client account" link on the sign-in page. With approval, new accounts appear under Users as pending and you approve them there.'],
+            'auth.registration_mode' => ['group' => 'features', 'label' => 'Client self-registration', 'type' => 'select', 'options' => Registration::MODES, 'help' => 'Adds a "Sign up" tab to the website and sign-in page. Until you choose, new accounts wait for your approval. With approval, new accounts appear under Users as pending and you approve them there.'],
         ];
     }
 
     /** @return array<string,string> */
     public static function groups(): array
     {
-        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'features' => 'Feature switches'];
+        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'google' => 'Google sign-in', 'features' => 'Feature switches'];
     }
 
     private static function isSecret(string $key): bool
@@ -153,7 +156,7 @@ final class Settings
         $out = [];
         foreach (self::definitions() as $key => $d) {
             $secret = $d['type'] === 'secret';
-            $v = $key === 'uploads.max_mb' ? (Config::get('uploads.max_mb') ?? intdiv((int) Config::get('uploads.max_bytes.deliverable', 52428800), 1048576)) : Config::get($key);
+            $v = $key === 'uploads.max_mb' ? (Config::get('uploads.max_mb') ?? intdiv((int) Config::get('uploads.max_bytes.deliverable', 52428800), 1048576)) : ($key === 'auth.registration_mode' ? Registration::configured() : Config::get($key));
             $out[$d['group']][] = ['key' => $key, 'label' => $d['label'], 'type' => $d['type'], 'options' => $d['options'] ?? [], 'help' => $d['help'] ?? '',
                 'value' => $secret ? null : $v, 'secret_set' => $secret && (string) $v !== '', 'source' => isset($saved[$key]) ? 'saved here' : 'default / .env'];
         }
