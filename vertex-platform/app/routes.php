@@ -16,6 +16,7 @@ use Vertex\Http\Controllers\Admin\CrmStageController;
 use Vertex\Http\Controllers\AttachmentController;
 use Vertex\Http\Controllers\AuthController;
 use Vertex\Http\Controllers\GoogleAuthController;
+use Vertex\Http\Controllers\OfflineController;
 use Vertex\Http\Controllers\ClientController;
 use Vertex\Http\Controllers\Crm\DashboardController as CrmDashboardController;
 use Vertex\Http\Controllers\Crm\EnquiryController;
@@ -88,6 +89,8 @@ use Vertex\Http\Controllers\Renewals\RenewalPriceController;
 return static function (Router $router): void {
     // Public
     $router->get('/', [HomeController::class, 'index'], ['nosession']);
+    $router->get('/offline', [OfflineController::class, 'show'], ['nosession']);
+    $router->get('/sw.js', [OfflineController::class, 'worker'], ['nosession']);
     $router->get('/health', [HealthController::class, 'show'], ['nosession']);
     // The corporate website (all content is editable in Administration -> Website). Pages with a form start a session for the CSRF token; the rest do not.
     $router->get('/about', [SitePageController::class, 'about'], ['nosession']);

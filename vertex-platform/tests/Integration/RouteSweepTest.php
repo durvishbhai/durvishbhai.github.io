@@ -18,7 +18,7 @@ final class RouteSweepTest extends HttpTestCase
 {
     /** Routes that are intentionally reachable without signing in. Anything else without `auth` or `can:` fails the test. */
     private const PUBLIC = [
-        '/', '/health', '/login', '/login/two-factor', '/register', '/auth/google', '/auth/google/callback', '/auth/google/complete', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
+        '/', '/health', '/offline', '/sw.js', '/login', '/login/two-factor', '/register', '/auth/google', '/auth/google/callback', '/auth/google/complete', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
         '/verify', '/verify/{code}', '/pay/{order}', '/pay/{order}/status', '/pay/{order}/checkout', '/pay/{order}/verify', '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received', '/f/{slug}', '/f/{slug}/thanks',
         '/sitemap.xml', '/robots.txt', '/webhooks/razorpay', '/{slug}', '/{section}/{slug}',
         '/about', '/services', '/services/{slug}', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/portfolio/{slug}', '/careers', '/careers/received', '/careers/{slug}', '/careers/apply', '/hiring', '/hiring/received', '/hiring/apply', '/faq', '/sitemap', '/project-requirements',

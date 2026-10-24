@@ -73,6 +73,8 @@ final class Settings
             'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
             'razorpay.webhook_secret' => ['group' => 'razorpay', 'label' => 'Webhook secret', 'type' => 'secret', 'help' => 'The secret you type when you add the webhook in the Razorpay Dashboard.'],
             'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How payment requests are paid', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only', 'checkout' => 'Razorpay checkout window on the client\'s page (card, UPI, net banking, wallets)'], 'help' => 'Whichever you pick, the amount is exactly what the team entered. The team can also choose per request.'],
+            'maintenance.enabled' => ['group' => 'features', 'label' => 'Maintenance mode: show visitors and clients a "back soon" page', 'type' => 'bool', 'help' => 'Signed-in team members keep full access, and sign-in pages, payment webhooks and the health check keep working. Remember to switch it off afterwards.'],
+            'maintenance.message' => ['group' => 'features', 'label' => 'Maintenance message (optional)', 'type' => 'textarea', 'help' => 'Shown on the maintenance page. Leave empty for the standard wording.'],
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
             'features.public_forms' => ['group' => 'features', 'label' => 'Public form builder pages', 'type' => 'bool'],
             'features.ai' => ['group' => 'features', 'label' => 'AI assistance menu', 'type' => 'bool'],

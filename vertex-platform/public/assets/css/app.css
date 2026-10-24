@@ -1030,3 +1030,12 @@ html { accent-color: var(--violet); }
 .auth-or { display: flex; align-items: center; gap: 10px; margin: 14px 0; color: var(--text-dim); font-size: 0.85rem; }
 .auth-or::before, .auth-or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .btn-google { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+
+/* Maintenance page */
+.maintenance { min-height: 100vh; display: grid; place-items: center; text-align: center; }
+.maintenance-logo { display: block; margin: 0 auto 18px; height: auto; }
+
+/* Error and offline pages */
+.error-page { text-align: center; }
+.error-code { margin: 0 0 4px; font-family: var(--font-display); font-size: clamp(3.5rem, 12vw, 5.5rem); font-weight: 800; line-height: 1; background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.error-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 18px 0; }

@@ -11,6 +11,7 @@ use Vertex\Core\Response;
 use Vertex\Core\Router;
 use Vertex\Core\SecurityHeadersPolicy;
 use Vertex\Http\Middleware\AddSecurityHeaders;
+use Vertex\Http\Middleware\Maintenance;
 use Vertex\Http\Middleware\NoSession;
 use Vertex\Http\Middleware\RedirectIfAuthenticated;
 use Vertex\Http\Middleware\RequireProjectAccess;
@@ -20,7 +21,7 @@ use Vertex\Http\Middleware\StartSession;
 use Vertex\Http\Middleware\VerifyCsrfToken;
 
 /**
- * Global pipeline (outermost first): security headers -> session -> CSRF -> route middleware -> controller.
+ * Global pipeline (outermost first): security headers -> session -> maintenance -> CSRF -> route middleware -> controller.
  * Route middleware aliases: auth, guest, can:<permission>[,<permission>], project, nosession.
  */
 final class Kernel
@@ -35,7 +36,7 @@ final class Kernel
                 'project' => RequireProjectAccess::class,
                 'nosession' => NoSession::class,
             ],
-            [AddSecurityHeaders::class, StartSession::class, VerifyCsrfToken::class],
+            [AddSecurityHeaders::class, StartSession::class, Maintenance::class, VerifyCsrfToken::class],
         );
         (require VERTEX_ROOT . '/app/routes.php')($router);
 

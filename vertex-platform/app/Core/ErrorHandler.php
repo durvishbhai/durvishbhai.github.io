@@ -70,7 +70,8 @@ final class ErrorHandler
                 'reference' => $reference,
                 'trace' => $debug ? $e::class . ': ' . $e->getMessage() . "\n" . $e->getTraceAsString() : null,
                 'title' => "Error {$status}",
-            ], 'layouts/public');
+                'noindex' => true,
+            ], $status >= 500 ? 'layouts/bare' : 'layouts/public'); // server errors never depend on the database-driven site header
         } catch (Throwable) {
             $html = '<!doctype html><meta charset="utf-8"><title>Error ' . $status . '</title><p>Error ' . $status . '. Reference: ' . htmlspecialchars($reference, ENT_QUOTES) . '</p>';
         }
