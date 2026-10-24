@@ -1,0 +1,6 @@
+<?php /** @var list<array<string,mixed>> $templates */ /** @var array<string,string> $services */ /** @var bool $canManage */ ?>
+<div class="page-head"><div><p class="eyebrow">Projects</p><h1>Project templates</h1></div><?php if ($canManage) : ?><div class="actions"><a class="btn btn-primary" href="/project-templates/new">New template</a></div><?php endif; ?></div>
+<p class="muted">A template is a ready-made list of milestones, tasks and checklist points. Apply one from a project's Checklist tab.</p>
+<div class="table-wrap"><table class="table"><thead><tr><th>Template</th><th>Service</th><th>Lines</th><th>Status</th></tr></thead><tbody>
+<?php foreach ($templates as $t) : ?><tr><td><?= $canManage ? '<a href="/project-templates/' . e($t['public_id']) . '"><strong>' . e($t['name']) . '</strong></a>' : '<strong>' . e($t['name']) . '</strong>' ?><br><span class="muted"><?= e($t['description']) ?></span></td><td><?= e($services[$t['service_category']] ?? '-') ?></td><td><?= (int) $t['items'] ?></td><td><?= $t['status'] === 'active' ? 'Active' : 'Retired' ?></td></tr><?php endforeach; ?>
+<?php if ($templates === []) : ?><tr><td colspan="4" class="muted">No templates yet.</td></tr><?php endif; ?></tbody></table></div>

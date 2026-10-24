@@ -1,0 +1,7 @@
+<?php /** @var list<array<string,mixed>> $rows */ /** @var bool $canIssue */ ?>
+<div class="page-head"><div><p class="eyebrow">Money</p><h1>Receipts</h1></div><?php if ($canIssue) : ?><a class="btn btn-primary" href="/receipts/new">Issue a receipt</a><?php endif; ?></div>
+<p class="muted">A receipt is made automatically when a payment is confirmed (online, or verified by the team). Use <strong>Issue a receipt</strong> for a payment that was made outside the system. Anyone can check a receipt at <a href="/verify">the verification page</a> with the code printed on it.</p>
+<?php if ($rows === []) : ?><p class="empty-state">No receipts yet.</p><?php else : ?>
+<div class="table-wrap"><table class="table"><thead><tr><th>Receipt</th><th>Issued</th><th>Client</th><th>Amount</th><th>Method</th><th>Status</th><th></th></tr></thead><tbody>
+<?php foreach ($rows as $r) : ?><tr><td><a href="/receipts/<?= e($r['id']) ?>"><?= e($r['number']) ?></a><?= $r['manual'] ? ' <span class="muted">(by hand)</span>' : '' ?></td><td><?= e($r['issuedDate']) ?></td><td><?= e($r['client']['name'] ?? '') ?></td><td class="num"><?= e(money($r['paidMinor'])) ?></td><td><?= e($r['methodLabel']) ?></td>
+    <td><span class="badge badge-<?= $r['effective'] === 'valid' ? 'active' : 'archived' ?>"><?= e($r['effective'] === 'valid' ? 'valid' : $r['effective']) ?></span></td><td><a href="/receipts/<?= e($r['id']) ?>/pdf">PDF</a></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>

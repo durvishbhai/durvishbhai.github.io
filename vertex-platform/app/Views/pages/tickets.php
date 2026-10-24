@@ -1,0 +1,27 @@
+<?php /** @var list<array<string,mixed>> $rows */ /** @var int $total */ /** @var int $page */ /** @var int $perPage */ /** @var array<string,mixed> $filters */ /** @var array<string,mixed> $qs */ /** @var list<array<string,mixed>> $projects */
+use Vertex\Core\View;
+$sel = static fn (string $a, string $b): string => $a === $b ? ' selected' : '';
+$groups = ['' => 'All', 'open' => 'Open', 'unassigned' => 'Unassigned', 'high_critical' => 'High / critical', 'awaiting_client' => 'Awaiting client', 'awaiting_internal' => 'Awaiting internal', 'fixed_verification' => 'Fixed, awaiting verification', 'resolved' => 'Resolved / closed', 'overdue' => 'Past target'];
+?>
+<div class="page-head"><div><p class="eyebrow">Support</p><h1>Tickets and bug reports</h1></div><div class="action-row"><?php if (can('support.dashboard')) : ?><a class="btn btn-ghost" href="/support/dashboard">Dashboard</a><?php endif; ?><?php if (can('warranty.view')) : ?><a class="btn btn-ghost" href="/warranties">Warranties</a><?php endif; ?></div></div>
+<form method="get" action="/tickets" class="toolbar" role="search">
+    <div class="field"><label for="q">Search</label><input id="q" name="q" type="search" maxlength="100" placeholder="Reference, subject, project, client" value="<?= e($filters['q']) ?>"></div>
+    <div class="field"><label for="g">Queue</label><select id="g" name="group"><?php foreach ($groups as $c => $l) : if ($c === 'overdue' && (int) config('support.sla.first_response_hours', 0) < 1) { continue; } ?><option value="<?= e($c) ?>"<?= $sel($filters['group'], $c) ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="k">Type</label><select id="k" name="kind"><option value="">All</option><option value="bug"<?= $sel($filters['kind'], 'bug') ?>>Bug reports</option><option value="support"<?= $sel($filters['kind'], 'support') ?>>Support tickets</option></select></div>
+    <div class="field"><label for="c">Category</label><select id="c" name="category"><option value="">All</option><?php foreach (config('workflow.ticket_categories') as $c => $l) : ?><option value="<?= e($c) ?>"<?= $sel($filters['category'], $c) ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="sv">Severity</label><select id="sv" name="severity"><option value="">All</option><?php foreach (config('workflow.bug_severity_short') as $c => $l) : ?><option value="<?= e($c) ?>"<?= $sel($filters['severity'], $c) ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="pr">Priority</label><select id="pr" name="priority"><option value="">All</option><?php foreach (config('workflow.priorities') as $c => $l) : ?><option value="<?= e($c) ?>"<?= $sel((string) ($filters['priority'] ?? ''), $c) ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="as">Assignee</label><select id="as" name="assignee"><option value="">Anyone</option><option value="me"<?= $sel((string) ($filters['assignee'] ?? ''), 'me') ?>>Assigned to me</option><option value="none"<?= $sel((string) ($filters['assignee'] ?? ''), 'none') ?>>Unassigned</option></select></div>
+    <div class="field"><label for="p">Project</label><select id="p" name="project"><option value="">All</option><?php foreach ($projects as $p) : ?><option value="<?= e($p['public_id']) ?>"<?= $sel($filters['project'], $p['public_id']) ?>><?= e($p['code'] . ' · ' . $p['title']) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="df">Created from</label><input id="df" name="from" type="date" value="<?= e($filters['from']) ?>"></div>
+    <div class="field"><label for="dt">Created to</label><input id="dt" name="to" type="date" value="<?= e($filters['to']) ?>"></div>
+    <div class="field"><label class="check"><input type="checkbox" name="escalated" value="1"<?= !empty($filters['escalated']) ? ' checked' : '' ?>> Escalated only</label></div>
+    <div class="field"><button class="btn btn-ghost" type="submit">Filter</button></div></form>
+<div class="table-wrap"><table class="table"><thead><tr><th>Ticket</th><th>Client / project</th><th>Status</th><th>Severity</th><th>Priority</th><th>Assignee</th><th>Updated</th></tr></thead><tbody>
+    <?php foreach ($rows as $r) : ?><tr><td><a href="/tickets/<?= e($r['public_id']) ?>"><strong><?= e($r['reference']) ?></strong></a> <span class="muted"><?= $r['kind'] === 'bug' ? 'Bug' : e(config("workflow.ticket_categories.{$r['category']}", $r['category'])) ?></span><br><?= e($r['subject']) ?><?= $r['unread'] > 0 ? ' <span class="badge badge-pending">Client replied</span>' : '' ?><?= $r['escalated_at'] ? ' <span class="badge badge-prio-urgent">Escalated</span>' : '' ?></td>
+        <td><?= e($r['company_name'] ?: $r['client_name']) ?><br><span class="muted"><?= e($r['project_code'] ?? '—') ?></span></td>
+        <td><?= View::partial('ticket-status', ['s' => $r['status'], 'kind' => $r['kind']]) ?></td><td><?= $r['severity'] ? e(config("workflow.bug_severity_short.{$r['severity']}", $r['severity'])) : '—' ?></td>
+        <td><?= e(config("workflow.priorities.{$r['priority']}", $r['priority'])) ?></td><td><?= e($r['assignee_name'] ?? 'Unassigned') ?></td><td><?= e(local_time($r['updated_at'], 'd M Y')) ?></td></tr><?php endforeach; ?>
+    <?php if ($rows === []) : ?><tr><td colspan="7" class="muted">No tickets match.</td></tr><?php endif; ?>
+</tbody></table></div>
+<?= View::partial('pagination', ['page' => $page, 'perPage' => $perPage, 'total' => $total, 'filters' => $qs]) ?>
