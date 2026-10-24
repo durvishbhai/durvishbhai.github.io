@@ -500,4 +500,88 @@
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
         window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js').catch(function () {}); });
     }
+
+    // Step-by-step requirements form. Without this script every step is shown one under another and the form still works.
+    document.querySelectorAll('form[data-wizard]').forEach(function (form) {
+        var steps = Array.prototype.slice.call(form.querySelectorAll('.wiz-step'));
+        var dots = Array.prototype.slice.call(form.querySelectorAll('[data-step-dot]'));
+        var prev = form.querySelector('[data-prev]'), next = form.querySelector('[data-next]'), submit = form.querySelector('[data-submit]');
+        var review = form.querySelector('[data-review]');
+        var cur = 0, reached = 0;
+        form.classList.add('wiz-on');
+
+        function stepValid(i) {
+            var ok = true, first = null;
+            steps[i].querySelectorAll('input, select, textarea').forEach(function (el) {
+                if (el.type !== 'checkbox' && el.name !== 'website_url' && !el.checkValidity()) { ok = false; first = first || el; el.setAttribute('aria-invalid', 'true'); } else { el.removeAttribute('aria-invalid'); }
+            });
+            steps[i].querySelectorAll('[data-require-one]').forEach(function (g) {
+                var any = g.querySelector('input:checked') !== null, msg = g.querySelector('.wiz-err');
+                if (msg) { msg.hidden = any; }
+                if (!any) { ok = false; first = first || g.querySelector('input'); }
+            });
+            if (!ok && first) { if (first.reportValidity && first.type !== 'checkbox') { first.reportValidity(); } first.focus(); }
+            return ok;
+        }
+        function values(el) {
+            if (el.type === 'checkbox') { return null; }
+            if (el.tagName === 'SELECT') { return el.value === '' ? '' : el.options[el.selectedIndex].text; }
+            return el.value.trim();
+        }
+        function buildReview() {
+            if (!review) { return; }
+            review.textContent = '';
+            function row(label, text) {
+                if (!text) { return; }
+                var dt = document.createElement('dt'), dd = document.createElement('dd');
+                dt.textContent = label; dd.textContent = text; review.appendChild(dt); review.appendChild(dd);
+            }
+            steps.slice(0, steps.length - 1).forEach(function (st) {
+                st.querySelectorAll('[data-label]').forEach(function (el) {
+                    if (el.tagName === 'FIELDSET') {
+                        var picked = Array.prototype.map.call(el.querySelectorAll('input:checked'), function (c) { return c.getAttribute('data-text') || c.value; });
+                        row(el.getAttribute('data-label'), picked.join(', '));
+                    } else { row(el.getAttribute('data-label'), values(el)); }
+                });
+            });
+        }
+        function show(i) {
+            cur = Math.max(0, Math.min(steps.length - 1, i));
+            reached = Math.max(reached, cur);
+            steps.forEach(function (st, n) { st.hidden = n !== cur; });
+            dots.forEach(function (d, n) { d.classList.toggle('is-current', n === cur); d.classList.toggle('is-done', n < cur); });
+            if (prev) { prev.hidden = cur === 0; }
+            if (next) { next.hidden = cur === steps.length - 1; }
+            if (submit) { submit.hidden = cur !== steps.length - 1; }
+            if (cur === steps.length - 1) { buildReview(); }
+            var top = form.getBoundingClientRect().top + window.pageYOffset - 90;
+            if (window.pageYOffset > top) { window.scrollTo({ top: top, behavior: 'smooth' }); }
+        }
+        function go(n) {
+            if (n > cur) { for (var i = cur; i < n; i++) { if (!stepValid(i)) { show(i); return; } } }
+            show(n);
+        }
+        if (next) { next.addEventListener('click', function () { go(cur + 1); }); }
+        if (prev) { prev.addEventListener('click', function () { show(cur - 1); }); }
+        form.querySelectorAll('[data-step-go]').forEach(function (b) { b.addEventListener('click', function () { go(parseInt(b.getAttribute('data-step-go'), 10)); }); });
+        form.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit' && cur < steps.length - 1) { e.preventDefault(); go(cur + 1); }
+        });
+        form.addEventListener('submit', function (e) {
+            for (var i = 0; i < steps.length - 1; i++) { if (!stepValid(i)) { e.preventDefault(); show(i); return; } }
+        });
+        show(0);
+    });
+
+    // Status chips and search above a list of rows (rows carry data-state and data-text).
+    document.querySelectorAll('[data-filter]').forEach(function (bar) {
+        var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-state]'));
+        var chips = bar.querySelectorAll('[data-filter-state]'), q = bar.querySelector('[data-filter-q]'), state = '';
+        function apply() {
+            var t = q ? q.value.trim().toLowerCase() : '';
+            rows.forEach(function (r) { r.hidden = !((state === '' || r.getAttribute('data-state') === state) && (t === '' || (r.getAttribute('data-text') || '').indexOf(t) !== -1)); });
+        }
+        chips.forEach(function (c) { c.addEventListener('click', function () { state = c.getAttribute('data-filter-state'); chips.forEach(function (x) { x.classList.toggle('is-active', x === c); }); apply(); }); });
+        if (q) { q.addEventListener('input', apply); }
+    });
 })();

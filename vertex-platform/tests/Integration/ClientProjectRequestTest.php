@@ -161,4 +161,38 @@ final class ClientProjectRequestTest extends HttpTestCase
         InvoiceService::issue($this->admin, InvoiceService::find($d2['public_id']));
         $this->assertStringNotContainsString('The ADVANCE payment', $fin->get('/invoices/' . $d2['public_id'] . '/pay-request')['body']);
     }
+
+    public function testTheFormIsTheFiveStepWizardAndTheStepAnswersAreStored(): void
+    {
+        $site = $this->client()->get('/request-quote')['body'];
+        $this->assertStringContainsString('data-wizard', $site);
+        foreach (['Project type &amp; basic info', 'Project details', 'Features', 'Who will use it?', 'Review &amp; send'] as $heading) {
+            $this->assertStringContainsString($heading, $site);
+        }
+        $this->assertSame(5, substr_count($site, 'data-step-dot='), 'five steps in the progress bar');
+        $this->assertStringContainsString('name="feature_list[]"', $site);
+        $this->assertStringContainsString('name="roles[]"', $site);
+
+        $alpha = $this->loggedIn('alpha@client.test');
+        $page = $alpha->get('/my/project-requests/new')['body'];
+        $this->assertStringContainsString('data-wizard', $page);
+        $this->assertStringNotContainsString('name="email"', $page);
+
+        $r = $alpha->post('/my/project-requests', $this->form([
+            'expected_outcome' => 'Save time on manual work', 'outcome_note' => 'Mostly invoicing', 'preferred_tech' => 'Custom PHP and MySQL web application',
+            'feature_list' => ['Online payments', 'Reports and analytics', 'Not a real feature'], 'features' => 'Dark mode', 'roles' => ['Owner or admin', 'Customers or clients', 'Hacker'], 'user_count' => '6 to 20', 'role_notes' => 'Customers only see their own orders.',
+        ]), '/my/project-requests/new');
+        $this->assertSame(303, $r['status']);
+        $e = Database::one("SELECT id, description FROM enquiries WHERE source = 'client_portal'");
+        $d = json_decode((string) Database::one('SELECT details_json FROM enquiry_details WHERE enquiry_id = ?', [$e['id']])['details_json'], true);
+        $this->assertSame("Online payments; Reports and analytics\nOther: Dark mode", $d['Feature requirements'], 'only listed features are accepted');
+        $this->assertSame('Owner or admin, Customers or clients', $d['Who will use it']);
+        $this->assertSame('6 to 20', $d['Expected number of users']);
+        $this->assertSame('Customers only see their own orders.', $d['Notes about who uses it']);
+        $this->assertStringContainsString('Save time on manual work (Mostly invoicing)', $e['description']);
+
+        $list = $alpha->get('/my/project-requests')['body'];
+        $this->assertStringContainsString('data-filter-state="confirmed"', $list, 'status chips');
+        $this->assertStringContainsString('data-filter-q', $list, 'search box');
+    }
 }

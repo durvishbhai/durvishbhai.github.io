@@ -1039,3 +1039,41 @@ html { accent-color: var(--violet); }
 .error-page { text-align: center; }
 .error-code { margin: 0 0 4px; font-family: var(--font-display); font-size: clamp(3.5rem, 12vw, 5.5rem); font-weight: 800; line-height: 1; background: var(--brand-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .error-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 18px 0; }
+
+/* Step-by-step requirements form */
+.wizard-panel { padding: clamp(18px, 3vw, 34px); }
+.req { color: var(--danger); }
+.wiz-steps { display: flex; justify-content: space-between; gap: 6px; list-style: none; margin: 0 0 26px; padding: 0; position: relative; }
+.wiz-steps::before { content: ""; position: absolute; left: 6%; right: 6%; top: 21px; height: 2px; background: var(--line); z-index: 0; }
+.wiz-dot { position: relative; z-index: 1; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.wiz-dot-btn { all: unset; cursor: pointer; display: block; border-radius: 14px; }
+.wiz-dot-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.wiz-num { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--bg-card); border: 1px solid var(--line-strong); color: var(--text-dim); font-weight: 700; transition: background 0.2s, color 0.2s, transform 0.2s; }
+.wiz-label { font-size: 0.78rem; color: var(--text-dim); font-weight: 600; }
+.wiz-dot.is-current .wiz-num { background: var(--brand-grad); color: #fff; border-color: transparent; transform: translateY(-2px); box-shadow: 0 8px 22px var(--blue-glow); }
+.wiz-dot.is-current .wiz-label { color: var(--text); }
+.wiz-dot.is-done .wiz-num { background: var(--blue); color: #fff; border-color: transparent; font-size: 0; }
+.wiz-dot.is-done .wiz-num::after { content: "\2713"; font-size: 1.05rem; }
+.wizard.wiz-on .wiz-step[hidden] { display: none; }
+.wiz-step h2 { font-size: 1.25rem; margin: 0 0 4px; }
+.wiz-step > .muted { margin: 0 0 18px; }
+.wiz-err { color: var(--danger); }
+.wiz-nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
+.wiz-nav [data-next], .wiz-nav [data-submit] { margin-left: auto; }
+.wizard [hidden] { display: none !important; }
+.wizard:not(.wiz-on) .wiz-steps, .wizard:not(.wiz-on) [data-prev], .wizard:not(.wiz-on) [data-next] { display: none; }
+.wizard:not(.wiz-on) .wiz-step { margin-bottom: 26px; }
+.wiz-review dt { font-weight: 600; }
+.field select[aria-invalid="true"], .field input[aria-invalid="true"], .field textarea[aria-invalid="true"] { border-color: var(--danger); }
+@media (max-width: 600px) {
+    .wiz-label { display: none; }
+    .wiz-num { width: 38px; height: 38px; border-radius: 12px; }
+    .wiz-steps::before { top: 18px; }
+    .wiz-dot.is-current .wiz-label { display: block; }
+}
+
+.filter-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin: 16px 0; }
+.filter-bar .field { margin: 0; min-width: 240px; flex: 1; max-width: 360px; }
+.pub-chip.is-active { background: var(--brand-grad); color: #fff; border-color: transparent; }
+.pub-chip .count { opacity: 0.75; font-size: 0.8em; margin-left: 4px; }
+tr[hidden] { display: none; }
