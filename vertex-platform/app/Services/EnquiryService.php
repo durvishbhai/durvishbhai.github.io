@@ -111,7 +111,7 @@ final class EnquiryService
             throw new ValidationException(['Please confirm that we may contact you about this request.']);
         }
 
-        return Database::transaction(function () use ($actorId, $source, $d, $meta): array {
+        $made = Database::transaction(function () use ($actorId, $source, $d, $meta): array {
             $stage = CrmStageService::initial();
             // a client sending another request is not a duplicate of their own earlier ones
             $dups = $source === 'client_portal' ? ['strong' => [], 'weak' => []] : self::findDuplicates($d['email'], $d['phone_digits'], $d['company_norm']);
@@ -145,6 +145,11 @@ final class EnquiryService
 
             return ['id' => $id, 'public_id' => $pub, 'reference' => $ref, 'duplicate_of' => $dupOf === null ? null : (int) $dupOf];
         });
+        if (in_array($source, ['website_requirements', 'contact_form', 'appointment_request', 'client_portal'], true) && (string) ($d['email'] ?? '') !== '') {
+            IntakeMail::enquiry((string) $d['email'], (string) $d['contact_name'], $made['reference'], $source, (string) ($d['service'] ?? ''));
+        }
+
+        return $made;
     }
 
     /**

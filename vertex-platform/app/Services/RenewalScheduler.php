@@ -70,6 +70,7 @@ final class RenewalScheduler
                 'automation' => static fn () => AutomationService::run($today),
                 'cms_published' => static fn () => CmsService::publishDue(),
                 'gateway_reconciled' => static fn () => RazorpayGateway::reconcilePending(),
+                'notification_emails' => static fn () => EmailChannel::flush() + EmailChannel::retryFailed(),
             ] as $job => $fn) {
                 try {
                     $summary[$job] = $fn();
@@ -198,7 +199,12 @@ final class RenewalScheduler
         }
         $result = 'not_configured';
         if (Mailer::enabled()) {
-            $result = Mailer::send((string) $user['email'], "Your {$type} {$s['identifier']} {$text}", "Hello {$user['name']},\n\nYour {$type} {$s['identifier']} {$text} (expiry date {$s['expires_on']}).\nOur team will contact you about renewing it. You can follow its status after signing in to the client portal.\n\nKrazy Integrated Solutions\n") ? 'sent' : 'failed';
+            $result = Mailer::sendTemplate((string) $user['email'], [
+                'subject' => "Your {$type} {$s['identifier']} {$text}", 'category' => 'Renewal reminder', 'tone' => 'warning', 'heading' => "Your {$type} {$text}", 'name' => (string) $user['name'],
+                'paragraphs' => ['Our team will contact you about renewing it. You can follow its status after signing in to the client portal.'],
+                'details' => [ucfirst($type) => (string) $s['identifier'], 'Expiry date' => (string) $s['expires_on']],
+                'button' => ['label' => 'Open client portal', 'url' => AccountMail::link('/login')],
+            ]) ? 'sent' : 'failed';
         }
         if ($row === null) {
             self::claim($s, 'expiry', $offset, 'client', 'email', $result);

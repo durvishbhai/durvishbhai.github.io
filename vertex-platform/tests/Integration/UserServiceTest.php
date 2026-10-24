@@ -272,7 +272,7 @@ final class UserServiceTest extends DatabaseTestCase
         UserService::register($in, '203.0.113.9'); // same email again: no exception, no second account, "already registered" mail
         $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM users WHERE email = 'rita@x.test'")['c']);
         $this->assertCount(1, Mailer::$sent);
-        $this->assertSame('You already have an account', Mailer::$sent[0]['subject']);
+        $this->assertSame('You already have a Krazy Integrated Solutions account', Mailer::$sent[0]['subject']);
         $this->assertSame('rita@x.test', Mailer::$sent[0]['to']);
         Config::set('auth.registration_enabled', false);
     }

@@ -76,6 +76,7 @@ $nav = [
     ['/admin/system', 'System status', can('settings.view')],
     ['/notifications', 'Notifications' . ($unread > 0 ? ' (' . $unread . ')' : ''), true],
     ['/account', 'My account', true],
+    ['/account#change-password', 'Change password', true],
 ];
 
 // Sidebar groups: every link keeps its own permission test above; a group with no visible link disappears.
@@ -89,7 +90,7 @@ $groupOf = [
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
     'Website' => ['/admin/site', '/admin/cms', '/admin/careers'],
     'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
-    'Account' => ['/account'],
+    'Account' => ['/account', '/account#change-password'],
 ];
 $byHref = [];
 foreach ($nav as [$href, $label, $show]) {

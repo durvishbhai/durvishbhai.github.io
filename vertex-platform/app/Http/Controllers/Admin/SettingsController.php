@@ -78,7 +78,11 @@ final class SettingsController extends Controller
         if (!Mailer::enabled()) {
             return $this->back('/admin/settings#email', ['Email is switched off or incomplete: choose "SMTP", and fill the host, From address and (for most hosts) the username and password, then save and try again.']);
         }
-        if (Mailer::send($to, 'Test email from ' . (string) \Vertex\Core\Config::get('app.name'), "This is a test email.\n\nIf you can read it, your email settings work: password resets, invitations and reminders will be delivered.\n")) {
+        if (Mailer::sendTemplate($to, [
+            'subject' => 'Test email from ' . (string) \Vertex\Core\Config::get('app.name'), 'category' => 'Email settings', 'tone' => 'success', 'heading' => 'Your email settings work', 'name' => (string) $user['name'],
+            'paragraphs' => ['If you can read this, password resets, invitations, payment confirmations and reminders will be delivered.'],
+            'details' => ['Sent to' => $to, 'Sent at' => gmdate('d M Y, H:i') . ' UTC'],
+        ])) {
             return $this->ok('/admin/settings#email', 'A test email was sent to ' . $to . '. Check that inbox (and the spam folder).');
         }
 

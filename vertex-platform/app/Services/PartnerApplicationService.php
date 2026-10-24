@@ -104,7 +104,7 @@ final class PartnerApplicationService
         }
         $meta = $file !== null && (int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE ? FileStore::accept($file, 'partner', $requireHttpUpload) : null;
         try {
-            return Database::transaction(function () use ($account, $name, $email, $phone, $org, $info, $source, $terms, $meta, $ip): array {
+            $made = Database::transaction(function () use ($account, $name, $email, $phone, $org, $info, $source, $terms, $meta, $ip): array {
                 $fileId = $meta === null ? null : FileStore::insert($meta, $account['id'] ?? null);
                 $ref = CrmReference::next('partner_app');
                 $ipHash = hash_hmac('sha256', $ip, (string) Config::get('app.key', 'unset'));
@@ -127,6 +127,9 @@ final class PartnerApplicationService
 
                 return ['reference' => $ref, 'duplicate' => false];
             });
+            IntakeMail::partner((string) $email, (string) $name, (string) $made['reference']);
+
+            return $made;
         } catch (\RuntimeException $e) {
             if ($meta !== null) {
                 FileStore::discard($meta);

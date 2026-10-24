@@ -30,7 +30,7 @@ $tz = old('timezone', (string) ($user['timezone'] ?? ''));
     <p class="muted">Protect your account with a code from an authenticator app. <a href="/account/two-factor">Manage two-factor login</a></p>
 </div>
 
-<div class="panel">
+<div class="panel" id="change-password">
     <h2>Change password</h2>
     <form method="post" action="/account/password" class="form-grid" novalidate>
         <?= csrf_field() ?>

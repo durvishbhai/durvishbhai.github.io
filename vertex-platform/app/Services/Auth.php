@@ -6,6 +6,7 @@ namespace Vertex\Services;
 
 use Vertex\Core\Config;
 use Vertex\Core\Csrf;
+use Vertex\Core\Logger;
 use Vertex\Core\Request;
 use Vertex\Core\Session;
 use Vertex\Repositories\UserRepository;
@@ -110,6 +111,7 @@ final class Auth
         self::login($user);
         $repo->touchLogin((int) $user['id'], $ip);
         Audit::record('auth.login.success', 'user', (int) $user['id'], [], [], [], (int) $user['id'], $ip, $request->userAgent());
+        self::signInAlert($user, $request, 'Email and password');
 
         return self::OK;
     }
@@ -146,8 +148,37 @@ final class Auth
         self::login($user);
         (new UserRepository())->touchLogin((int) $user['id'], $request->ip());
         Audit::record('auth.login.success', 'user', (int) $user['id'], [], [], ['two_factor' => true], (int) $user['id'], $request->ip(), $request->userAgent());
+        self::signInAlert($user, $request, 'Email, password and a verification code');
 
         return self::OK;
+    }
+
+    /**
+     * Emails the person "you signed in" so they can spot a sign-in they did not make. Not sent twice in a row from the same address within ten minutes, and
+     * never allowed to delay or break the sign-in. $user is the record as it was BEFORE this sign-in was stamped.
+     *
+     * @param array<string,mixed> $user
+     */
+    public static function signInAlert(array $user, Request $request, string $method): void
+    {
+        try {
+            if (!(bool) Config::get('notifications.login_alert', true) || !Mailer::enabled()) {
+                return;
+            }
+            $ip = $request->ip();
+            if (($user['last_login_ip'] ?? null) === $ip && isset($user['last_login_at']) && strtotime((string) $user['last_login_at'] . ' UTC') > time() - 600) {
+                return;
+            }
+            $to = (string) $user['email'];
+            $name = (string) $user['name'];
+            $ua = $request->userAgent();
+            $when = gmdate('d M Y, H:i') . ' UTC';
+            EmailChannel::afterResponse(static function () use ($to, $name, $when, $ip, $ua, $method): void {
+                AccountMail::signedIn($to, $name, $when, $ip, EmailTemplate::browser($ua), $method);
+            });
+        } catch (\Throwable $e) {
+            Logger::error('Sign-in alert failed', ['error' => $e->getMessage()]);
+        }
     }
 
     /** @param array<string,mixed> $user */

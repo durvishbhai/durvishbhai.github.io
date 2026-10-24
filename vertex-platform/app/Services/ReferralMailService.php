@@ -30,11 +30,16 @@ final class ReferralMailService
         $status = (string) \Vertex\Core\Config::get("referrals.referral_statuses.{$h['to_value']}", $h['to_value']);
         $name = (string) $referral['partner_name'];
         $subject = "Update on your referral {$referral['reference']}: {$status}";
-        $body = "Hello {$name},\n\nYour referral {$referral['reference']} ({$referral['prospect_name']}) is now: {$status}.\n"
-            . ($h['note'] ? "\nMessage from our team:\n{$h['note']}\n" : '')
-            . "\nYou can see the details in the Partner portal after signing in.\n\nKrazy Integrated Solutions\n";
+        $tone = in_array((string) $h['to_value'], ['rejected', 'lost', 'closed_lost'], true) ? 'warning' : 'info';
+        $spec = [
+            'subject' => $subject, 'category' => 'Referral partner', 'tone' => $tone, 'heading' => "Your referral is now: {$status}", 'name' => $name,
+            'paragraphs' => array_values(array_filter(["There is an update on a referral you submitted.", $h['note'] ? 'Message from our team: ' . $h['note'] : ''])),
+            'details' => ['Referral' => (string) $referral['reference'], 'Prospect' => (string) $referral['prospect_name'], 'Status' => $status],
+            'notes' => ['You can see the details in the Partner portal after signing in.'],
+        ];
+        $body = EmailTemplate::render($spec)['text'];
 
-        return ['history_id' => (int) $h['id'], 'to' => (string) $referral['partner_email'], 'subject' => $subject, 'body' => $body, 'hash' => hash('sha256', $subject . "\n" . $body),
+        return ['history_id' => (int) $h['id'], 'to' => (string) $referral['partner_email'], 'subject' => $subject, 'body' => $body, 'spec' => $spec, 'hash' => hash('sha256', $subject . "\n" . $body),
             'already_sent' => Database::one('SELECT 1 AS x FROM referral_email_log WHERE sent_key = ?', [self::key($referral, (int) $h['id'])]) !== null, 'mail_enabled' => Mailer::enabled()];
     }
 
@@ -50,7 +55,7 @@ final class ReferralMailService
         }
         $result = 'not_configured';
         if (Mailer::enabled()) {
-            $result = Mailer::send($p['to'], $p['subject'], $p['body']) ? 'sent' : 'failed';
+            $result = Mailer::sendTemplate($p['to'], $p['spec']) ? 'sent' : 'failed';
         }
         try {
             Database::transaction(function () use ($actorId, $referral, $p, $result): void {

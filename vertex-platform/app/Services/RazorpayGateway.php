@@ -511,6 +511,9 @@ final class RazorpayGateway
         }
         try {
             $r = self::reconcile($mid);
+            if ($event === 'payment.failed' && !$dup && $r['state'] !== 'COMPLETED') {
+                self::notifyFailed($mid, (string) ($payload['payment']['entity']['id'] ?? ''), (string) ($payload['payment']['entity']['error_description'] ?? ''));
+            }
             Database::run('UPDATE gateway_webhook_events SET processed_at = UTC_TIMESTAMP(), outcome = ? WHERE event_key = ?', [mb_substr($r['state'] . ($dup ? ' (repeat)' : ''), 0, 60), $key]);
 
             return ['status' => 200, 'outcome' => strtolower($r['state'])];
@@ -521,6 +524,25 @@ final class RazorpayGateway
 
             return ['status' => 500, 'outcome' => 'retry']; // Razorpay retries on a non-2xx answer
         }
+    }
+
+    /**
+     * Tells the client that one payment attempt did not go through. It changes nothing about the order (the client may try again and the order is only ever
+     * completed by the verified path above); one email per failed attempt.
+     */
+    private static function notifyFailed(string $merchantOrderId, string $providerPaymentId, string $reason): void
+    {
+        $o = Database::one('SELECT o.id, o.public_id, o.status, o.amount_minor, i.reference AS invoice_ref, i.public_id AS invoice_public, c.user_id
+                              FROM gateway_orders o LEFT JOIN invoices i ON i.id = o.invoice_id JOIN clients c ON c.id = o.client_id WHERE o.merchant_order_id = ?', [$merchantOrderId]);
+        if ($o === null || $o['user_id'] === null) {
+            return;
+        }
+        $open = in_array((string) $o['status'], ['created', 'pending'], true);
+        $why = trim(mb_substr(preg_replace('/[^\p{L}\p{N} .,\'()-]/u', '', $reason) ?? '', 0, 140));
+        Notifier::send([(int) $o['user_id']], 'payment.failed', 'Your payment did not go through',
+            'Your payment of ₹' . FieldRules::formatMinor((int) $o['amount_minor']) . ' for ' . ($o['invoice_ref'] !== null ? 'invoice ' . $o['invoice_ref'] : 'your renewal') . ' was not completed' . ($why !== '' ? " ({$why})" : '') . '. We have not received it. '
+            . ($open ? 'You can try again from the same payment link.' : 'Please contact us if you would like to pay again.') . ' If any amount was deducted from your account, your bank normally returns it automatically; contact us if it does not arrive.',
+            $open || $o['invoice_public'] === null ? '/my/pay/' . $o['public_id'] : '/my/invoices/' . $o['invoice_public'], null, 'gateway_order', (int) $o['id'], 'pay-failed:' . $o['id'] . ':' . ($providerPaymentId !== '' ? $providerPaymentId : bin2hex(random_bytes(6))));
     }
 
     /** Orders that are still pending and old enough to be worth asking about (the scheduler calls this). @return int payments recorded */

@@ -16,7 +16,7 @@ use Vertex\Core\Logger;
  */
 final class Mailer
 {
-    /** @var list<array{to:string,subject:string,body:string}> captured by the `array` driver (tests only) */
+    /** @var list<array{to:string,subject:string,body:string,html:string}> captured by the `array` driver (tests only): body is the plain-text version */
     public static array $sent = [];
 
     public static function driver(): string
@@ -47,26 +47,53 @@ final class Mailer
         return self::driver() !== 'none';
     }
 
+    /**
+     * Sends a structured message in the standard KIS look (HTML with a plain-text alternative). $spec is described in EmailTemplate. A problem while building the
+     * message never stops the workflow that asked for it: it is logged and a plain version is sent instead.
+     *
+     * @param array<string,mixed> $spec
+     */
+    public static function sendTemplate(string $to, array $spec): bool
+    {
+        try {
+            $m = EmailTemplate::render($spec);
+        } catch (\Throwable $e) {
+            Logger::error('Email template failed, sending a plain message instead: ' . $e->getMessage());
+            $text = (string) ($spec['heading'] ?? $spec['subject'] ?? 'Notification') . "\n\n" . implode("\n\n", array_map('strval', (array) ($spec['paragraphs'] ?? []))) . "\n";
+
+            return self::sendMessage($to, (string) ($spec['subject'] ?? 'Notification'), '', $text);
+        }
+
+        return self::sendMessage($to, $m['subject'], $m['html'], $m['text']);
+    }
+
+    /** Sends a message written as plain text. It is wrapped in the standard look, so nothing leaves unbranded. */
     public static function send(string $to, string $subject, string $body): bool
+    {
+        return self::sendTemplate($to, EmailTemplate::fromPlain($subject, $body));
+    }
+
+    /** The delivery itself. $html may be empty (then the message is plain text only). */
+    public static function sendMessage(string $to, string $subject, string $html, string $text): bool
     {
         $subject = (string) preg_replace('/[\r\n]+/', ' ', $subject); // header-injection guard
         switch (self::driver()) {
             case 'array':
-                self::$sent[] = ['to' => $to, 'subject' => $subject, 'body' => $body];
+                self::$sent[] = ['to' => $to, 'subject' => $subject, 'body' => $text, 'html' => $html];
 
                 return true;
             case 'log':
-                Logger::log('mail', 'info', "TO={$to} SUBJECT={$subject}\n{$body}");
+                Logger::log('mail', 'info', "TO={$to} SUBJECT={$subject}\n{$text}");
 
                 return true;
             case 'smtp':
-                return self::smtp($to, $subject, $body);
+                return self::smtp($to, $subject, $html, $text);
             default:
                 return false;
         }
     }
 
-    private static function smtp(string $to, string $subject, string $body): bool
+    private static function smtp(string $to, string $subject, string $html, string $text): bool
     {
         $c = Config::get('mail');
         self::$lastError = '';
@@ -103,8 +130,14 @@ final class Mailer
                 }
                 $m->addAddress($to);
                 $m->Subject = $subject;
-                $m->Body = $body;
-                $m->isHTML(false);
+                if ($html !== '') {
+                    $m->isHTML(true);
+                    $m->Body = $html;
+                    $m->AltBody = $text;
+                } else {
+                    $m->isHTML(false);
+                    $m->Body = $text;
+                }
                 $m->send();
                 if ($n > 0) {
                     Logger::error('Mail was delivered only after falling back to the mailbox as the From address: the host does not allow the From alias ' . $c['from_address']);

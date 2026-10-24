@@ -382,6 +382,7 @@ final class UserService
             Database::run('UPDATE auth_tokens SET used_at = UTC_TIMESTAMP() WHERE user_id = ? AND used_at IS NULL', [$targetId]);
             Audit::record('user.deactivated', 'user', $targetId, ['status' => $target['status']], ['status' => 'deactivated'], ['reason' => $reason], $actorId);
         });
+        self::statusMail($target, false);
     }
 
     public static function reactivate(int $actorId, int $targetId): void
@@ -398,6 +399,20 @@ final class UserService
             );
             Audit::record('user.reactivated', 'user', $targetId, ['status' => 'deactivated'], ['status' => $new], [], $actorId);
         });
+        if ($new === 'active') {
+            self::statusMail($target, true);
+        }
+    }
+
+    /** @param array<string,mixed> $target */
+    private static function statusMail(array $target, bool $active): void
+    {
+        if (!Mailer::enabled()) {
+            return;
+        }
+        $to = (string) $target['email'];
+        $name = (string) $target['name'];
+        EmailChannel::afterResponse(static fn () => AccountMail::status($to, $name, $active));
     }
 
     public static function archive(int $actorId, int $targetId): void

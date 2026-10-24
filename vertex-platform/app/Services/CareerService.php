@@ -88,7 +88,7 @@ final class CareerService
             $meta = FileStore::accept((array) $file, 'career', $requireHttpUpload);
         }
         try {
-            return Database::transaction(function () use ($name, $email, $phone, $role, $skills, $intro, $url, $linkedin, $exp, $avail, $meta, $ip): array {
+            $made = Database::transaction(function () use ($name, $email, $phone, $role, $skills, $intro, $url, $linkedin, $exp, $avail, $meta, $ip): array {
                 $fileId = $meta === null ? null : FileStore::insert($meta, null);
                 $job = Database::one("SELECT id FROM site_jobs WHERE title = ? AND status = 'published'", [$role]);
                 $ref = CrmReference::next('career');
@@ -102,6 +102,9 @@ final class CareerService
 
                 return ['public_id' => $pub, 'reference' => $ref];
             });
+            IntakeMail::career((string) $email, (string) $name, $made['reference'], (string) $role);
+
+            return $made;
         } catch (\Throwable $e) {
             if ($meta !== null) {
                 FileStore::discard($meta);

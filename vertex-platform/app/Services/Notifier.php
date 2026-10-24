@@ -7,9 +7,8 @@ namespace Vertex\Services;
 use Vertex\Core\Database;
 
 /**
- * In-app notification EVENTS. No email is sent by this class and no row claims one was: `email_status` stays 'not_sent'
- * (an email channel is a later integration that can read this table). The text stored here is written for its recipient and
- * contains no internal-only detail when the recipient is a client.
+ * In-app notification EVENTS. This class sends no email itself: every row it really creates is handed to EmailChannel, which emails it after the
+ * request (and records `email_status`). The text stored here is written for its recipient and contains no internal-only detail when the recipient is a client.
  *
  * Retried requests cannot notify twice: (user_id, dedupe_key) is unique and inserts are INSERT IGNORE. Call inside the
  * transaction that makes the change so a rolled-back change leaves no notification either.
@@ -34,6 +33,9 @@ final class Notifier
                 [$uid, $event, $projectId, $subjectType, $subjectId, mb_substr($title, 0, 160), $body === null ? null : mb_substr($body, 0, 255), $link, hash('sha256', $dedupe)],
             )->rowCount();
             $created += $n;
+            if ($n === 1) {
+                EmailChannel::enqueue(Database::insertId());
+            }
         }
 
         return $created;
