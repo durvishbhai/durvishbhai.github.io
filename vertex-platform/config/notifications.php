@@ -15,6 +15,7 @@ $on = static fn (string $key, bool $default): bool => filter_var(Env::get($key, 
 return [
     'email_clients' => $on('NOTIFY_EMAIL_CLIENTS', true),   // clients and referral partners
     'email_staff' => $on('NOTIFY_EMAIL_STAFF', true),       // KIS team members
+    'push' => $on('NOTIFY_PUSH', true),                      // phone and browser notifications for devices that allowed them
     'login_alert' => $on('NOTIFY_LOGIN_ALERT', true),       // "a new sign-in to your account" email
     'max_attempts' => 3,
 

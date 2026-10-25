@@ -34,7 +34,9 @@ final class Notifier
             )->rowCount();
             $created += $n;
             if ($n === 1) {
-                EmailChannel::enqueue(Database::insertId());
+                $newId = Database::insertId();
+                EmailChannel::enqueue($newId);
+                PushChannel::enqueue($newId);
             }
         }
 

@@ -22,6 +22,8 @@ return [
         'register_ip' => [5, 3600],
         'google_ip' => [30, 600],
         'requirements_pdf_ip' => [20, 3600],
+        'push_subscribe_user' => [30, 3600],
+        'push_test_user' => [10, 3600],
         'verify_resend_ip' => [5, 3600],
         'verify_resend_email' => [3, 3600],
         'stepup_user' => [5, 600],

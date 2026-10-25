@@ -637,4 +637,94 @@
         chips.forEach(function (c) { c.addEventListener('click', function () { state = c.getAttribute('data-filter-state'); chips.forEach(function (x) { x.classList.toggle('is-active', x === c); }); apply(); }); });
         if (q) { q.addEventListener('input', apply); }
     });
+
+    // Mobile app: install prompt and phone notifications (the service worker /sw.js shows them).
+    (function () {
+        var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+        var isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+        var deferred = null;
+        function all(s) { return Array.prototype.slice.call(document.querySelectorAll(s)); }
+        function was(k) { try { return window.localStorage.getItem(k) === '1'; } catch (e) { return false; } }
+        function remember(k) { try { window.localStorage.setItem(k, '1'); } catch (e) { /* private mode */ } }
+
+        function refreshInstall() {
+            var can = !standalone && (deferred !== null || isIOS);
+            all('[data-install]').forEach(function (b) { b.hidden = !can; });
+            all('[data-install-state]').forEach(function (s) { s.textContent = standalone ? 'The app is installed on this device.' : (can ? '' : 'Open this site in Chrome (Android) or Safari (iPhone) to install it.'); });
+            all('[data-install-banner]').forEach(function (b) { b.hidden = !can || was('kis-install-dismissed'); });
+        }
+        window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; refreshInstall(); });
+        window.addEventListener('appinstalled', function () { deferred = null; standalone = true; refreshInstall(); });
+        document.addEventListener('click', function (e) {
+            var t = e.target.closest ? e.target.closest('[data-install]') : null;
+            if (t) {
+                if (deferred) { deferred.prompt(); deferred.userChoice.then(function () { deferred = null; refreshInstall(); }); }
+                else if (isIOS) { all('[data-install-ios]').forEach(function (h) { h.hidden = false; }); }
+                return;
+            }
+            var d = e.target.closest ? e.target.closest('[data-banner-dismiss]') : null;
+            if (d) { var b = d.closest('.install-banner'); if (b) { b.hidden = true; remember(b.hasAttribute('data-push-banner') ? 'kis-push-dismissed' : 'kis-install-dismissed'); } }
+        });
+        refreshInstall();
+
+        // ---- notifications
+        var supported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        var toggle = document.querySelector('[data-push-toggle]'), status = document.querySelector('[data-push-status]'), test = document.querySelector('[data-push-test]');
+        var banner = document.querySelector('[data-push-banner]');
+        if (!csrfMeta || (!toggle && !banner)) { return; }
+        function post(url, data) {
+            return window.fetch(url, { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-TOKEN': csrfMeta.content, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' }, body: new URLSearchParams(data) }).then(function (r) { return r.json(); });
+        }
+        function key(b64) {
+            var pad = '='.repeat((4 - b64.length % 4) % 4), raw = window.atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/')), out = new Uint8Array(raw.length);
+            for (var i = 0; i < raw.length; i++) { out[i] = raw.charCodeAt(i); }
+            return out;
+        }
+        function current() { return navigator.serviceWorker.ready.then(function (r) { return r.pushManager.getSubscription(); }); }
+        function register(sub) { var j = sub.toJSON(); return post('/push/subscribe', { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }); }
+        function enable() {
+            return Notification.requestPermission().then(function (p) {
+                if (p !== 'granted') { throw new Error('denied'); }
+                return window.fetch('/push/key', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (k) {
+                    if (!k.enabled) { throw new Error('off'); }
+                    return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription().then(function (s) { return s || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(k.key) }); }); });
+                }).then(register);
+            });
+        }
+        function disable() {
+            return current().then(function (s) { if (!s) { return null; } var ep = s.endpoint; return s.unsubscribe().then(function () { return post('/push/unsubscribe', { endpoint: ep }); }); });
+        }
+        function paint() {
+            if (!toggle) { return; }
+            if (!supported) { toggle.hidden = true; if (status) { status.textContent = isIOS ? 'On iPhone, first add the app to your Home Screen (Share, then Add to Home Screen), then open it from there to turn notifications on.' : 'This browser cannot show notifications.'; } return; }
+            if (Notification.permission === 'denied') { toggle.hidden = true; if (status) { status.textContent = 'Notifications are blocked for this site in your browser settings. Allow them there, then come back.'; } return; }
+            current().then(function (s) {
+                toggle.hidden = false; toggle.textContent = s ? 'Turn notifications off' : 'Turn notifications on'; toggle.setAttribute('data-on', s ? '1' : '0');
+                if (status) { status.textContent = s ? 'Notifications are on for this device.' : 'Notifications are off for this device.'; }
+                if (test) { test.hidden = !s; }
+            });
+        }
+        if (toggle) {
+            toggle.addEventListener('click', function () {
+                toggle.disabled = true;
+                (toggle.getAttribute('data-on') === '1' ? disable() : enable()).catch(function () { if (status) { status.textContent = 'Notifications could not be turned on. Check that you allowed them.'; } }).then(function () { toggle.disabled = false; paint(); });
+            });
+        }
+        if (test) {
+            test.addEventListener('click', function () {
+                test.disabled = true;
+                post('/push/test', {}).then(function (r) { if (status) { status.textContent = r.ok ? 'A test notification was sent. It should appear in a moment.' : 'Nothing could be sent to this device. Try turning notifications off and on again.'; } }).catch(function () {}).then(function () { test.disabled = false; });
+            });
+        }
+        if (supported && banner) {
+            var go = banner.querySelector('[data-push-enable]');
+            if (Notification.permission === 'default' && !was('kis-push-dismissed') && (!isIOS || standalone)) { banner.hidden = false; }
+            if (go) { go.addEventListener('click', function () { enable().then(function () { banner.hidden = true; }).catch(function () { banner.hidden = true; }).then(paint); }); }
+        }
+        if (supported && Notification.permission === 'granted') {
+            current().then(function (s) { if (s && !window.sessionStorage.getItem('kis-push-sync')) { window.sessionStorage.setItem('kis-push-sync', '1'); register(s).catch(function () {}); } });
+        }
+        paint();
+    })();
 })();

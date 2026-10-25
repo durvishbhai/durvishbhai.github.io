@@ -9,7 +9,7 @@ $pageTitle = !empty($meta['title']) ? (string) $meta['title'] : (isset($title) &
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title><?= e($pageTitle) ?></title>
     <meta name="theme-color" content="#050818">
     <meta name="robots" content="<?= isset($noindex) && $noindex ? 'noindex,nofollow' : 'index,follow' ?>">
@@ -18,8 +18,8 @@ $pageTitle = !empty($meta['title']) ? (string) $meta['title'] : (isset($title) &
     <?php if (!empty($meta['canonical'])) : ?><link rel="canonical" href="<?= e((string) $meta['canonical']) ?>"><?php endif; ?>
     <meta property="og:type" content="website"><meta property="og:site_name" content="<?= e((string) config('app.name')) ?>"><meta property="og:title" content="<?= e((string) ($meta['ogTitle'] ?? $pageTitle)) ?>">
     <?php if (!empty($meta['ogImage'])) : ?><meta property="og:image" content="<?= e((string) $meta['ogImage']) ?>"><?php endif; ?>
+    <?= \Vertex\Core\View::partial('pwa-head') ?>
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
-    <link rel="apple-touch-icon" href="<?= e(asset('img/apple-touch-icon.png')) ?>">
     <script src="<?= e(asset('js/theme.js')) ?>"></script>
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
     <?php if (!empty($jsonld)) : ?><script type="application/ld+json"><?= $jsonld ?></script><?php endif; ?>

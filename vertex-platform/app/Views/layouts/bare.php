@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title><?= e((string) ($title ?? config('app.name'))) ?> · <?= e((string) config('app.name')) ?></title>
     <meta name="robots" content="noindex,nofollow">
     <meta name="theme-color" content="#050818">
+    <?= \Vertex\Core\View::partial('pwa-head') ?>
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
     <script src="<?= e(asset('js/theme.js')) ?>"></script>
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">

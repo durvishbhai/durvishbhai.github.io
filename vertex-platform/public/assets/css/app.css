@@ -1106,3 +1106,15 @@ tr[hidden] { display: none; }
 .wiz-nav { flex-wrap: wrap; }
 .wiz-nav .btn { white-space: nowrap; }
 .wiz-extra { order: 3; width: 100%; justify-content: center; margin-top: 4px; }
+
+/* Mobile app (installed web app) */
+.install-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; margin: 0 0 14px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--info-bg); }
+.install-banner[hidden] { display: none; }
+.install-actions { display: inline-flex; gap: 8px; align-items: center; }
+.install-banner .small { flex-basis: 100%; margin: 0; }
+.site-header, .portal-bar { padding-top: env(safe-area-inset-top); }
+body { padding-bottom: env(safe-area-inset-bottom); }
+@media (display-mode: standalone) {
+    .install-banner[data-install-banner] { display: none; }
+    html { -webkit-tap-highlight-color: transparent; }
+}

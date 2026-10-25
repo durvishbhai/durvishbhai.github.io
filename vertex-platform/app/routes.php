@@ -18,6 +18,7 @@ use Vertex\Http\Controllers\AttachmentController;
 use Vertex\Http\Controllers\AuthController;
 use Vertex\Http\Controllers\GoogleAuthController;
 use Vertex\Http\Controllers\OfflineController;
+use Vertex\Http\Controllers\PwaController;
 use Vertex\Http\Controllers\ClientController;
 use Vertex\Http\Controllers\Crm\DashboardController as CrmDashboardController;
 use Vertex\Http\Controllers\Crm\EnquiryController;
@@ -90,6 +91,11 @@ use Vertex\Http\Controllers\Renewals\RenewalPriceController;
 return static function (Router $router): void {
     // Public
     $router->get('/', [HomeController::class, 'index'], ['nosession']);
+    $router->get('/manifest.webmanifest', [PwaController::class, 'manifest'], ['nosession']);
+    $router->get('/push/key', [PwaController::class, 'key'], ['auth']);
+    $router->post('/push/subscribe', [PwaController::class, 'subscribe'], ['auth']);
+    $router->post('/push/unsubscribe', [PwaController::class, 'unsubscribe'], ['auth']);
+    $router->post('/push/test', [PwaController::class, 'test'], ['auth']);
     $router->get('/offline', [OfflineController::class, 'show'], ['nosession']);
     $router->get('/sw.js', [OfflineController::class, 'worker'], ['nosession']);
     $router->get('/health', [HealthController::class, 'show'], ['nosession']);

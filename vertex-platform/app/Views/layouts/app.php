@@ -120,11 +120,12 @@ foreach ($groups as $gname => $items) {
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title><?= e($pageTitle) ?></title>
     <meta name="theme-color" content="#050818">
     <meta name="robots" content="noindex,nofollow">
     <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
+    <?= \Vertex\Core\View::partial('pwa-head') ?>
     <link rel="icon" type="image/png" href="<?= e(asset('img/favicon.png')) ?>">
     <script src="<?= e(asset('js/theme.js')) ?>"></script>
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
@@ -164,6 +165,8 @@ foreach ($groups as $gname => $items) {
     </aside>
     <main id="main" class="portal-main">
         <div class="container-wide">
+            <div class="install-banner" data-install-banner hidden><span><strong>Get the app.</strong> Install <?= e((string) config('app.name')) ?> on your phone for quick access.</span><span class="install-actions"><button type="button" class="btn btn-primary btn-sm" data-install>Install</button><button type="button" class="btn btn-ghost btn-sm" data-banner-dismiss aria-label="Dismiss">&times;</button></span><p class="muted small" data-install-ios hidden>On iPhone: tap the Share button, then <strong>Add to Home Screen</strong>.</p></div>
+            <?php if (\Vertex\Services\PushChannel::enabled()) : ?><div class="install-banner" data-push-banner hidden><span><strong>Stay up to date.</strong> Get payment, project and request updates as notifications on this device.</span><span class="install-actions"><button type="button" class="btn btn-primary btn-sm" data-push-enable>Turn on notifications</button><button type="button" class="btn btn-ghost btn-sm" data-banner-dismiss aria-label="Dismiss">&times;</button></span></div><?php endif; ?>
             <?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?>
             <?= $content ?>
         </div>

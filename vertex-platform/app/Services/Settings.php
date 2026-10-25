@@ -38,6 +38,7 @@ final class Settings
             'renewals.client_email' => ['group' => 'notifications', 'label' => 'Email clients their domain/hosting expiry reminders', 'type' => 'bool'],
             'notifications.email_clients' => ['group' => 'notifications', 'label' => 'Email clients and referral partners a copy of their portal notifications (payments, receipts, invoices, project updates)', 'type' => 'bool'],
             'notifications.email_staff' => ['group' => 'notifications', 'label' => 'Email team members a copy of the notices addressed to them (approvals, new enquiries, replies)', 'type' => 'bool'],
+            'notifications.push' => ['group' => 'notifications', 'label' => 'Send phone and browser notifications to devices that allowed them (mobile app)', 'type' => 'bool'],
             'notifications.login_alert' => ['group' => 'notifications', 'label' => 'Email a person when their account signs in ("was this you?")', 'type' => 'bool'],
             'uploads.max_mb' => ['group' => 'storage', 'label' => 'Largest deliverable upload (MB)', 'type' => 'int', 'help' => 'PHP\'s own upload limit (hPanel -> PHP settings) must be at least this large.'],
             'site.company_name' => ['group' => 'website', 'label' => 'Company name (website)', 'type' => 'text'],

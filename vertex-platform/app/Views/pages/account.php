@@ -25,6 +25,15 @@ $tz = old('timezone', (string) ($user['timezone'] ?? ''));
     </form>
 </div>
 
+<div class="panel" id="mobile-app">
+    <h2>Mobile app &amp; notifications</h2>
+    <p class="muted">Install <?= e((string) config('app.name')) ?> on your phone so it opens like an app, and get payment, project and request updates as notifications.</p>
+    <p><button type="button" class="btn btn-primary btn-sm" data-install hidden>Install the app</button> <span class="muted" data-install-state></span></p>
+    <p class="muted small" data-install-ios hidden>On iPhone: tap the Share button, then <strong>Add to Home Screen</strong>. Open the app from your Home Screen to turn notifications on.</p>
+    <?php if (\Vertex\Services\PushChannel::enabled()) : ?><p><button type="button" class="btn btn-ghost btn-sm" data-push-toggle hidden>Turn notifications on</button> <button type="button" class="btn btn-ghost btn-sm" data-push-test hidden>Send me a test notification</button></p>
+    <p class="muted" data-push-status></p><?php endif; ?>
+</div>
+
 <div class="panel">
     <h2>Account activity</h2>
     <p class="muted">See your recent sign-ins and what happened on your account. <a href="/account/activity">Open my activity</a></p>

@@ -70,7 +70,7 @@ final class RenewalScheduler
                 'automation' => static fn () => AutomationService::run($today),
                 'cms_published' => static fn () => CmsService::publishDue(),
                 'gateway_reconciled' => static fn () => RazorpayGateway::reconcilePending(),
-                'notification_emails' => static fn () => EmailChannel::flush() + EmailChannel::retryFailed(),
+                'notification_emails' => static fn () => EmailChannel::flush() + EmailChannel::retryFailed() + PushChannel::flush(),
             ] as $job => $fn) {
                 try {
                     $summary[$job] = $fn();

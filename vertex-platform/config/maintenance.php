@@ -14,5 +14,5 @@ return [
     'message' => (string) Env::get('MAINTENANCE_MESSAGE', ''),
     'retry_after_seconds' => 3600,
     // Still answered while maintenance is on (exact paths, or prefixes ending in /)
-    'open_paths' => ['/health', '/offline', '/sw.js', '/login', '/login/two-factor', '/logout', '/forgot-password', '/auth/google', '/auth/google/callback', '/webhooks/', '/reset-password/', '/assets/'],
+    'open_paths' => ['/health', '/offline', '/sw.js', '/manifest.webmanifest', '/login', '/login/two-factor', '/logout', '/forgot-password', '/auth/google', '/auth/google/callback', '/webhooks/', '/reset-password/', '/assets/'],
 ];
