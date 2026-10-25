@@ -107,7 +107,9 @@ $images = [];
 foreach (glob($root . '/public/assets/img/*.png') ?: [] as $png) {
     $images[basename($png)] = base64_encode((string) file_get_contents($png));
 }
-count($images) === 4 || stop('expected 4 brand images, found ' . count($images));
+foreach (['krazy-mark.png', 'krazy-logo.png', 'favicon.png', 'apple-touch-icon.png', 'pwa-192.png', 'pwa-512.png', 'pwa-maskable-512.png', 'pwa-badge.png'] as $need) {
+    isset($images[$need]) || stop('brand image missing: ' . $need);
+}
 $php = "<?php\n\ndeclare(strict_types=1);\n\n/*\n * Serves the brand images. They are stored here as text so the upload package contains only .php, .js, .css and .sql files.\n * Usage: /assets/img.php?f=krazy-mark.png\n */\n\nconst IMAGES = [\n";
 foreach ($images as $name => $b64) {
     $php .= "    '" . $name . "' => '" . $b64 . "',\n";
