@@ -54,7 +54,15 @@ final class PwaController extends Controller
             return Response::json(['enabled' => false]);
         }
 
-        return Response::json(['enabled' => true, 'key' => WebPush::keys()['public'], 'devices' => PushChannel::deviceCount($this->actorId())]);
+        try {
+            $key = WebPush::keys()['public'];
+        } catch (\Throwable $e) {
+            \Vertex\Core\Logger::error('Push key unavailable', ['error' => $e->getMessage()]);
+
+            return Response::json(['enabled' => false]); // e.g. APP_KEY missing: notifications are simply unavailable, the site keeps working
+        }
+
+        return Response::json(['enabled' => true, 'key' => $key, 'devices' => PushChannel::deviceCount($this->actorId())]);
     }
 
     /** @param array<string,string> $params */

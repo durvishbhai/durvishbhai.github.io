@@ -210,4 +210,13 @@ final class PwaTest extends HttpTestCase
         $this->assertSame(1, PushChannel::deviceCount($b));
         $this->assertSame(0, PushChannel::deviceCount($a));
     }
+
+    public function testWithoutAUsableServerKeyTheKeyAddressAnswersPolitelyInsteadOfFailing(): void
+    {
+        Database::run('DELETE FROM push_vapid');
+        $c = $this->loggedIn('owner@x.test');
+        $r = $c->get('/push/key');
+        $this->assertSame(200, $r['status']);
+        $this->assertArrayHasKey('enabled', json_decode($r['body'], true));
+    }
 }
