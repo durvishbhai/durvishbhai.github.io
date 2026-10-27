@@ -1118,3 +1118,13 @@ body { padding-bottom: env(safe-area-inset-bottom); }
     .install-banner[data-install-banner] { display: none; }
     html { -webkit-tap-highlight-color: transparent; }
 }
+
+/* Appointments */
+.field[hidden] { display: none; }
+.slot-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.slot-row .field { margin: 0; }
+.slot-row input[type="number"] { width: 90px; }
+.slot-row .days { border: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.slot-row .days legend { font-size: 0.85rem; color: var(--text-dim); padding: 0; margin-bottom: 4px; }
+.slot-row .row-actions { display: flex; gap: 6px; }
+.slot-row.permanent input { min-width: 260px; }

@@ -43,7 +43,7 @@ final class ClientProjectRequestTest extends HttpTestCase
     /** @return array<string,mixed> */
     private function form(array $over = []): array
     {
-        return $over + ['project_name' => 'Studio catalogue website', 'project_category' => 'website', 'services' => ['website_development'], 'problem_statement' => 'We sell furniture and customers cannot see our catalogue online.',
+        return $over + ['project_name' => 'Studio catalogue website', 'project_category' => 'customer_portal', 'services' => ['website_development'], 'problem_statement' => 'We sell furniture and customers cannot see our catalogue online.',
             'expected_outcome' => 'A fast catalogue site with an enquiry form.', 'features' => 'Catalogue, search, enquiry form', 'preferred_tech' => '', 'budget_range' => '', 'timeline' => 'one_month', 'notes' => ''];
     }
 
@@ -211,7 +211,7 @@ final class ClientProjectRequestTest extends HttpTestCase
     public function testTheAnswersSoFarCanBeDownloadedAsARequirementsPdfWithoutSavingAnything(): void
     {
         $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
-        $form = ['contact_name' => 'Visitor Fictional', 'email' => 'v@example.test', 'project_name' => 'Draft shop', 'project_category' => 'website', 'services' => ['website_development'], 'feature_list' => ['Online payments'],
+        $form = ['contact_name' => 'Visitor Fictional', 'email' => 'v@example.test', 'project_name' => 'Draft shop', 'project_category' => 'customer_portal', 'services' => ['website_development'], 'feature_list' => ['Online payments'],
             'custom_features' => ['Wishlist'], 'role_name' => ['Admin'], 'role_access' => ['full'], 'role_permissions' => ['Full system access'], 'problem_statement' => 'A draft that is not finished yet'];
         $c = $this->client();
         $r = $c->post('/request-quote/pdf', $form, '/request-quote');

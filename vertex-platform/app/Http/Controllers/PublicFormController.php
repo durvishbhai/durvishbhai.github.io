@@ -30,7 +30,7 @@ final class PublicFormController extends Controller
     private const FORMS = [
         'website_requirements' => ['view' => 'public/request-quote', 'title' => 'Tell us about your project', 'fields' => ['contact_name', 'email', 'phone', 'company_name', 'service', 'description', 'budget_range', 'expected_deadline']],
         'contact_form' => ['view' => 'public/contact', 'title' => 'Contact us', 'fields' => ['contact_name', 'email', 'phone', 'company_name', 'service', 'description']],
-        'appointment_request' => ['view' => 'public/appointment', 'title' => 'Request an appointment', 'fields' => ['contact_name', 'email', 'phone', 'company_name', 'preferred_slot', 'description']],
+        'appointment_request' => ['view' => 'public/appointment', 'title' => 'Request an appointment', 'fields' => ['contact_name', 'email', 'phone', 'company_name', 'description']],
     ];
 
     /** @param array<string,string> $params */
@@ -86,8 +86,9 @@ final class PublicFormController extends Controller
     public function received(Request $request, array $params = []): Response
     {
         $ref = Session::pull('enquiry_ref');
+        $kind = Session::pull('enquiry_kind');
 
-        return Response::html(View::render('public/received', ['title' => 'Request received', 'ref' => is_string($ref) ? $ref : null, 'noindex' => true]));
+        return Response::html(View::render('public/received', ['title' => $kind === 'appointment_request' ? 'Appointment request received' : 'Request received', 'ref' => is_string($ref) ? $ref : null, 'kind' => is_string($kind) ? $kind : '', 'noindex' => true]));
     }
 
     /** @return array<string,string> */
@@ -101,6 +102,15 @@ final class PublicFormController extends Controller
         return ['description' => mb_strlen($desc) > 160 ? rtrim(mb_substr($desc, 0, 159)) . '…' : $desc, 'canonical' => $base !== '' ? $base . (['contact_form' => '/contact', 'appointment_request' => '/book-appointment'][$source] ?? '/request-quote') : '', 'ogImage' => '', 'ogTitle' => $title . ' · ' . (string) Config::get('app.name')];
     }
 
+    /** What we already know about a signed-in client, so they do not retype it. @return array<string,string> */
+    private function prefill(): array
+    {
+        $uid = \Vertex\Services\Auth::id();
+        $c = $uid === null ? null : Database::one("SELECT contact_name, email, phone, company_name FROM clients WHERE user_id = ? AND status = 'active'", [$uid]);
+
+        return $c === null ? [] : ['contact_name' => (string) $c['contact_name'], 'email' => (string) $c['email'], 'phone' => (string) ($c['phone'] ?? ''), 'company_name' => (string) ($c['company_name'] ?? '')];
+    }
+
     private function show(string $source, Request $request): Response
     {
         $form = self::FORMS[$source];
@@ -111,7 +121,9 @@ final class PublicFormController extends Controller
             'inquiryTypes' => EnquiryExtras::INQUIRY_TYPES, 'categories' => EnquiryExtras::CATEGORIES, 'timelines' => EnquiryExtras::TIMELINES, 'serviceChoices' => EnquiryExtras::serviceChoices(),
             'preselect' => preg_match('/^[a-z0-9-]{1,80}$/', (string) ($request->query['service'] ?? '')) ? (string) $request->query['service'] : '',
             'limit' => FileStore::humanSize(FileStore::effectiveLimit('enquiry')), 'extensions' => implode(', ', FileStore::allowedExtensions()),
-            'meta' => $this->meta($source, $page),
+            'meta' => $this->meta($source, $page), 'prefill' => $source === 'appointment_request' ? $this->prefill() : [],
+            'slots' => $source === 'appointment_request' ? \Vertex\Services\AppointmentConfig::slots(true) : [], 'places' => $source === 'appointment_request' ? \Vertex\Services\AppointmentConfig::places(true) : [],
+            'minDate' => \Vertex\Services\AppTime::todayPlus((int) Config::get('appointments.min_days_ahead', 1)), 'maxDate' => \Vertex\Services\AppTime::todayPlus((int) Config::get('appointments.max_days_ahead', 60)),
         ]);
         Session::forget('_old');
 
@@ -140,6 +152,7 @@ final class PublicFormController extends Controller
             $x = match ($source) {
                 'contact_form' => EnquiryExtras::contact($request->body),
                 'website_requirements' => EnquiryExtras::requirements($request->body),
+                'appointment_request' => EnquiryExtras::appointment($request->body),
                 default => null,
             };
             $in = array_merge($in, $x['base'] ?? []);
@@ -153,6 +166,12 @@ final class PublicFormController extends Controller
             $consent = $request->string('consent') === '1';
             $r = Database::transaction(function () use ($source, $in, $consent, $ip, $x, $metas): array {
                 $r = EnquiryService::create(null, $source, $in, ['consent' => $consent, 'ip' => $ip]);
+                if ($source === 'appointment_request' && ($uid = \Vertex\Services\Auth::id()) !== null) { // a signed-in client's request is already linked to their file
+                    $cl = Database::one("SELECT id FROM clients WHERE user_id = ? AND status = 'active' AND archived_at IS NULL", [$uid]);
+                    if ($cl !== null) {
+                        Database::run('UPDATE enquiries SET client_id = ? WHERE id = ?', [$cl['id'], $r['id']]);
+                    }
+                }
                 if ($x !== null) {
                     EnquiryExtras::save((int) $r['id'], $x['details'], $metas);
                 }
@@ -162,12 +181,13 @@ final class PublicFormController extends Controller
         } catch (ValidationException $e) {
             array_map([FileStore::class, 'discard'], $metas);
 
-            return $this->back($back, $e->errors, array_diff_key($in, ['description' => 1]) + ['description' => $request->string('description')] + array_intersect_key($request->body, array_flip(['subject', 'inquiry_type', 'project_name', 'project_category', 'problem_statement', 'expected_outcome', 'features', 'preferred_tech', 'timeline', 'notes'])));
+            return $this->back($back, $e->errors, array_diff_key($in, ['description' => 1]) + ['description' => $request->string('description')] + array_intersect_key($request->body, array_flip(['subject', 'inquiry_type', 'project_name', 'project_category', 'problem_statement', 'expected_outcome', 'features', 'preferred_tech', 'timeline', 'notes', 'occupation', 'whatsapp', 'whatsapp_same', 'slot', 'meeting_date', 'meeting_type', 'place'])));
         } catch (\Throwable $e) {
             array_map([FileStore::class, 'discard'], $metas);
             throw $e;
         }
         Session::put('enquiry_ref', $r['reference']);
+        Session::put('enquiry_kind', $source);
 
         return Response::redirect('/enquiry/received');
     }

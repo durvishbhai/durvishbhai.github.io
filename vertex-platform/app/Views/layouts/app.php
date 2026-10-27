@@ -18,6 +18,7 @@ $nav = [
     ['/clients', 'Clients', can('clients.view_all') || can('clients.view_assigned')],
     ['/my/company', 'My company', can('clients.view_own') && $isClient],
     ['/my/project-requests', 'Request a project', can('requirements.submit') && $isClient],
+    ['/book-appointment', 'Book an appointment', $isClient],
     ['/partner', 'Partner portal', can('referrals.view_own') && $isPartner],
     ['/partner/referrals', 'Earlier referrals', can('enquiries.view_own') && !can('referrals.view_own') && $isPartner],
     ['/referrals/dashboard', 'Referral partners', can('referrals.review') || can('commissions.view_all') || can('payouts.view_all') || can('payments.view_all')],
@@ -71,6 +72,7 @@ $nav = [
     ['/admin/manual-upi', 'Manual UPI payments', can('billing.configure')],
     ['/admin/site', 'Website', can('cms.view')],
     ['/admin/cms', 'Pages & media', can('cms.view')],
+    ['/admin/appointments', 'Appointments', can('appointments.configure')],
     ['/admin/careers', 'Job applications', can('careers.view') || can('careers.manage')],
     ['/ai', 'AI assistant', can('ai.use') && \Vertex\Services\Settings::feature('ai')],
     ['/admin/settings', 'Integrations & settings', can('settings.view')],
@@ -83,13 +85,13 @@ $nav = [
 // Sidebar groups: every link keeps its own permission test above; a group with no visible link disappears.
 $groupOf = [
     'Overview' => ['/dashboard', '/notifications', '/approvals', '/ai', '/reports'],
-    'Sales & clients' => ['/crm', '/clients', '/my/company', '/my/project-requests', '/quotations', '/my/quotes', '/admin/pricing', '/coupons'],
+    'Sales & clients' => ['/crm', '/clients', '/my/company', '/my/project-requests', '/book-appointment', '/quotations', '/my/quotes', '/admin/pricing', '/coupons'],
     'Projects & delivery' => ['/projects', '/tasks', '/board', '/deadlines', '/team', '/deliverables', '/qa', '/my/deliverables', '/revisions', '/scope-requests', '/my/scope-requests', '/project-templates', '/admin/revision-policies', '/warranties'],
     'Money' => ['/invoices', '/my/invoices', '/receipts', '/my/receipts', '/client-payments', '/commissions', '/payouts', '/renewals', '/my/services'],
     'Partners' => ['/partner', '/partner/referrals', '/referrals/dashboard', '/referrals'],
     'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
-    'Website' => ['/admin/site', '/admin/cms', '/admin/careers'],
+    'Website' => ['/admin/site', '/admin/cms', '/admin/appointments', '/admin/careers'],
     'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/activity', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
     'Account' => ['/account', '/account#change-password'],
 ];

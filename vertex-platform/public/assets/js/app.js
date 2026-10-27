@@ -727,4 +727,20 @@
         }
         paint();
     })();
+
+    // Appointment form: hide the WhatsApp field when it is the same as the phone, and show the place list only for in-person meetings.
+    (function () {
+        var same = document.querySelector('[data-whatsapp-same]'), wa = document.querySelector('[data-whatsapp-field]');
+        var types = document.querySelectorAll('[data-meeting-type]'), place = document.querySelector('[data-place-field]');
+        function paint() {
+            if (same && wa) { wa.hidden = same.checked; var i = wa.querySelector('input'); if (i) { i.required = !same.checked; } }
+            if (place && types.length) {
+                var inPerson = Array.prototype.some.call(types, function (t) { return t.checked && t.value === 'in_person'; });
+                place.hidden = !inPerson; var s = place.querySelector('select'); if (s) { s.required = inPerson; }
+            }
+        }
+        if (same) { same.addEventListener('change', paint); }
+        types.forEach(function (t) { t.addEventListener('change', paint); });
+        paint();
+    })();
 })();

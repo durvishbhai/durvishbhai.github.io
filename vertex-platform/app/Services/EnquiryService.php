@@ -146,7 +146,7 @@ final class EnquiryService
             return ['id' => $id, 'public_id' => $pub, 'reference' => $ref, 'duplicate_of' => $dupOf === null ? null : (int) $dupOf];
         });
         if (in_array($source, ['website_requirements', 'contact_form', 'appointment_request', 'client_portal'], true) && (string) ($d['email'] ?? '') !== '') {
-            IntakeMail::enquiry((string) $d['email'], (string) $d['contact_name'], $made['reference'], $source, (string) ($d['service'] ?? ''));
+            IntakeMail::enquiry((string) $d['email'], (string) $d['contact_name'], $made['reference'], $source, (string) ($d['service'] ?? ''), (string) ($d['preferred_slot'] ?? ''));
         }
 
         return $made;

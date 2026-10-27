@@ -13,13 +13,25 @@ use Vertex\Core\Config;
  */
 final class IntakeMail
 {
-    public static function enquiry(string $to, string $name, string $reference, string $source, string $service): void
+    public static function enquiry(string $to, string $name, string $reference, string $source, string $service, string $requestedTime = ''): void
     {
         if (!Mailer::enabled() || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return;
         }
         $portal = $source === 'client_portal';
         $what = $portal ? 'project request' : ($source === 'appointment_request' ? 'appointment request' : ($source === 'contact_form' ? 'message' : 'requirement'));
+        if ($source === 'appointment_request') {
+            $spec = [
+                'subject' => 'We received your appointment request (' . $reference . ')', 'category' => 'Appointment request', 'tone' => 'warning', 'heading' => 'Your appointment is not booked yet', 'name' => $name,
+                'paragraphs' => ['Thank you for asking to meet ' . AppointmentConfig::host() . '. This is a request, not a confirmed appointment.',
+                    'Our team will contact you to check that the request is genuine and to confirm the date, time and place. Please treat the time below as not yet booked until you hear from us.'],
+                'details' => ['Reference' => $reference, 'Requested' => $requestedTime, 'Received' => EmailTemplate::date(gmdate('Y-m-d H:i:s'), true)],
+                'notes' => ['If you did not ask for this appointment, you can ignore this email.'],
+            ];
+            EmailChannel::afterResponse(static fn () => Mailer::sendTemplate($to, $spec));
+
+            return;
+        }
         $spec = [
             'subject' => 'We received your ' . $what . ' (' . $reference . ')', 'category' => 'Request received', 'tone' => 'info', 'heading' => 'We received your ' . $what, 'name' => $name,
             'paragraphs' => [

@@ -41,6 +41,7 @@ $p = [
     ],
     'platform' => [
         'audit.view' => 'View audit logs',
+        'appointments.configure' => 'Edit the appointment times and meeting places offered on the website',
         'activity.view_all' => 'See what every account on the platform has done (Owner)',
         'settings.view' => 'View system settings',
         'settings.manage' => 'Change system settings',

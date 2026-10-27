@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Vertex\Core\Router;
 use Vertex\Http\Controllers\AccountController;
 use Vertex\Http\Controllers\Admin\ActivityController;
+use Vertex\Http\Controllers\Admin\AppointmentController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\AutomationController;
@@ -638,6 +639,13 @@ return static function (Router $router): void {
         $r->get('/revision-policies', [RevisionTermsController::class, 'index'], ['can:revisions.policy,revisions.classify,revisions.override']);
         $r->post('/revision-policies', [RevisionTermsController::class, 'save'], ['can:revisions.policy']);
 
+        $r->get('/appointments', [AppointmentController::class, 'index'], ['can:appointments.configure']);
+        $r->post('/appointments/slots', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
+        $r->post('/appointments/slots/{slot}', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
+        $r->post('/appointments/slots/{slot}/delete', [AppointmentController::class, 'deleteSlot'], ['can:appointments.configure']);
+        $r->post('/appointments/places', [AppointmentController::class, 'savePlace'], ['can:appointments.configure']);
+        $r->post('/appointments/places/{place}', [AppointmentController::class, 'savePlace'], ['can:appointments.configure']);
+        $r->post('/appointments/places/{place}/delete', [AppointmentController::class, 'deletePlace'], ['can:appointments.configure']);
         $r->get('/activity', [ActivityController::class, 'index'], ['can:activity.view_all']);
         $r->get('/activity/{user}', [ActivityController::class, 'show'], ['can:activity.view_all']);
         $r->get('/audit', [AuditController::class, 'index'], ['can:audit.view']);

@@ -71,7 +71,7 @@ final class CrmHttpTest extends HttpTestCase
     private function publicForm(): array
     {
         return ['contact_name' => 'Web Visitor', 'email' => 'visitor@web.test', 'phone' => '+91 94000 00004', 'company_name' => 'Visitor Ltd',
-            'project_name' => 'Brochure website', 'project_category' => 'website', 'services' => ['website_development'],
+            'project_name' => 'Brochure website', 'project_category' => 'customer_portal', 'services' => ['website_development'],
             'problem_statement' => 'I would like a simple brochure website for my small business, please.', 'expected_outcome' => 'A clear site that brings in enquiries.',
             'budget_range' => 'under_25k', 'consent' => '1', 'website_url' => ''];
     }
@@ -101,11 +101,15 @@ final class CrmHttpTest extends HttpTestCase
         $c = $this->client();
         $c->post('/contact', ['contact_name' => 'Asha', 'email' => 'asha@web.test', 'inquiry_type' => 'general', 'subject' => 'A website for my shop', 'description' => 'Hello, can you help me with a website?', 'consent' => '1', 'website_url' => ''], '/contact');
         $this->assertSame('contact_form', Database::one("SELECT source FROM enquiries WHERE email = 'asha@web.test'")['source']);
-        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'preferred_slot' => 'Friday 11am', 'description' => 'Discuss a video project', 'consent' => '1', 'website_url' => ''], '/book-appointment');
+        Database::run("INSERT INTO appointment_slots (start_time, end_time, weekdays, active, sort_order, created_at, updated_at) VALUES ('10:00:00', '11:00:00', 127, 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
+        $slot = Database::insertId();
+        $date = \Vertex\Services\AppTime::todayPlus(2);
+        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'whatsapp_same' => '1', 'occupation' => 'Designer', 'slot' => (string) $slot, 'meeting_date' => $date, 'meeting_type' => 'online', 'description' => 'Discuss a video project', 'consent' => '1', 'website_url' => ''], '/book-appointment');
         $e = Database::one("SELECT source, preferred_slot FROM enquiries WHERE email = 'ben@web.test'");
         $this->assertSame('appointment_request', $e['source']);
-        $this->assertSame('Friday 11am', $e['preferred_slot']);
-        $this->assertStringContainsString('does not book a slot', $c->get('/book-appointment')['body'], 'the page says it is a request, not a booking');
+        $this->assertStringContainsString('10:00 AM - 11:00 AM', $e['preferred_slot']);
+        $this->assertStringContainsString('Online', $e['preferred_slot']);
+        $this->assertStringContainsString('not booked until our team', $c->get('/book-appointment')['body'], 'the page says it is a request, not a booking');
     }
 
     public function testPublicFormsRejectInvalidInputWithMessagesAndStoreNothing(): void

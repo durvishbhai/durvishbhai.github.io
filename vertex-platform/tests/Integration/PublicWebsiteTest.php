@@ -311,7 +311,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $file = $this->png('brief.png');
         $c = $this->client();
         $r = $c->upload('/request-quote', [
-            'contact_name' => 'Rita Requirements', 'email' => 'rita@web.test', 'project_name' => 'Shop relaunch', 'project_category' => 'website', 'services' => ['website_development'],
+            'contact_name' => 'Rita Requirements', 'email' => 'rita@web.test', 'project_name' => 'Shop relaunch', 'project_category' => 'customer_portal', 'services' => ['website_development'],
             'problem_statement' => 'Our current shop is slow and hard to update by ourselves.', 'expected_outcome' => 'A fast shop we can edit.', 'timeline' => 'one_month', 'consent' => '1', 'website_url' => '',
         ], ['attachments[0]' => [$file['tmp_name'], 'brief.png', 'image/png']], '/request-quote');
         $this->assertSame(303, $r['status'], $r['body']);
@@ -334,7 +334,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
         $c = $this->client();
         $c->upload('/request-quote', [
-            'contact_name' => 'Evil Eve', 'email' => 'eve@web.test', 'project_name' => 'Anything', 'project_category' => 'website', 'services' => ['website_development'],
+            'contact_name' => 'Evil Eve', 'email' => 'eve@web.test', 'project_name' => 'Anything', 'project_category' => 'customer_portal', 'services' => ['website_development'],
             'problem_statement' => 'Some perfectly long problem statement here.', 'expected_outcome' => 'Some outcome', 'consent' => '1', 'website_url' => '',
         ], ['attachments[0]' => [$bad['tmp_name'], 'payload.php', 'application/x-php']], '/request-quote');
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c']);

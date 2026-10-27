@@ -94,7 +94,7 @@ $steps = ['Type &amp; Basics' => 'M3 6h18M3 12h18M3 18h18', 'Project Details' =>
         <h2 id="ws4">Review &amp; send</h2><p class="muted">Check your answers. Use the numbers above to go back and change anything.</p>
         <div class="wiz-review" data-review></div>
         <div class="field"><label for="attachments">Attachments <span class="muted">(optional, up to 3 files, <?= e($limit) ?> each)</span></label><input id="attachments" name="attachments[]" type="file" multiple><p class="hint">Allowed: <?= e($extensions) ?>. Stored privately; only the team handling your request can open them.</p></div>
-        <div class="field"><label for="notes">Additional notes <span class="muted">(optional)</span></label><textarea id="notes" name="notes" rows="3" maxlength="2000"><?= e($f('notes')) ?></textarea></div>
+        <div class="field"><label for="notes">Special notes <span class="muted">(optional)</span></label><textarea id="notes" name="notes" rows="3" maxlength="2000"><?= e($f('notes')) ?></textarea></div>
         <?php if (!empty($public)) : ?><?= \Vertex\Core\View::partial('public-form-consent') ?><?php endif; ?>
     </section>
 

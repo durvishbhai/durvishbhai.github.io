@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Vertex\Services;
 
+use Vertex\Core\Config;
 use Vertex\Core\Database;
 use Vertex\Core\ValidationException;
 
@@ -15,11 +16,11 @@ use Vertex\Core\ValidationException;
 final class EnquiryExtras
 {
     public const INQUIRY_TYPES = ['general' => 'General Inquiry', 'service' => 'Service Inquiry', 'project' => 'Project Discussion', 'partnership' => 'Partnership', 'careers' => 'Careers', 'support' => 'Support', 'other' => 'Other'];
-    public const CATEGORIES = ['website' => 'Website or web application', 'video' => 'Video', 'design' => 'Graphic design', 'content' => 'Content or social media', 'ai' => 'AI or automation', 'mixed' => 'More than one of these', 'other' => 'Something else'];
+    public const CATEGORIES = ['internal_tool' => 'Internal business management tool', 'customer_portal' => 'Customer-facing website / portal', 'ecommerce' => 'E-commerce / Online store', 'inventory' => 'Inventory / Stock management', 'crm' => 'CRM / Customer management', 'hrm' => 'HRM / Employee management', 'accounting' => 'Accounting / Finance dashboard', 'education' => 'School / Education management', 'clinic' => 'Hospital / Clinic management', 'booking' => 'Booking / Appointment system', 'analytics' => 'Reporting / Analytics dashboard', 'documents' => 'Document / File management', 'restaurant_pos' => 'Restaurant / POS system', 'real_estate' => 'Real estate / Property management', 'logistics' => 'Logistics / Delivery tracking', 'other' => 'Other (mention in special notes)'];
     public const TIMELINES = ['asap' => 'As soon as possible', 'one_month' => 'Within a month', 'one_three' => 'In 1–3 months', 'three_six' => 'In 3–6 months', 'flexible' => 'Flexible'];
     /** Choices offered by the step-by-step requirements form (wording only; the client may always add their own details). */
-    public const OUTCOMES = ['Save time on manual work', 'Centralize data in one place', 'Improve team collaboration', 'Track sales and revenue', 'Manage customers better', 'Generate reports and insights', 'Reduce errors and duplication', 'Automate repetitive tasks', 'Provide self-service to clients', 'Keep a compliance and audit trail', 'Replace an existing manual or paper system', 'Grow online presence and get more enquiries', 'Other (mention in the notes)'];
-    public const TECHNOLOGIES = ['Not sure: recommend the best fit', 'Website or CMS (for example WordPress)', 'Custom PHP and MySQL web application', 'JavaScript web application (React, Node.js)', 'Mobile app (Android or iOS)', 'No-code or low-code tool', 'Other (mention in the notes)'];
+    public const OUTCOMES = ['Save time on manual work', 'Centralize data in one place', 'Improve team collaboration', 'Track sales and revenue', 'Manage customers better', 'Generate reports and insights', 'Reduce errors and duplication', 'Automate repetitive tasks', 'Provide self-service to clients', 'Compliance and audit trail', 'Replace existing manual / paper system', 'Other (mention in special notes)'];
+    public const TECHNOLOGIES = ['Not sure: recommend the best fit', 'Website or CMS (for example WordPress)', 'Custom PHP and MySQL web application', 'JavaScript web application (React, Node.js)', 'Mobile app (Android or iOS)', 'No-code or low-code tool', 'Other (mention in special notes)'];
     public const FEATURES = ['Login and user accounts', 'Admin dashboard', 'Online payments', 'Invoices and receipts', 'Email, SMS or WhatsApp notifications', 'Reports and analytics', 'File uploads and documents', 'Search and filters', 'Multiple languages', 'Mobile-friendly design', 'Integrations with other tools (API)', 'Chat or support tickets', 'Booking or appointments', 'Content management (edit pages yourself)'];
     public const ROLES = ['Owner or admin', 'Staff or employees', 'Customers or clients', 'Vendors or partners', 'Public visitors (no login)'];
     public const PRIORITIES = ['All listed features are must-have', 'Core features first, extras later', 'MVP version first, then improve', 'Focus on the must-haves only'];
@@ -64,6 +65,70 @@ final class EnquiryExtras
         }
 
         return ['base' => [], 'details' => ['form' => 'contact', 'Inquiry type' => self::INQUIRY_TYPES[$type], 'Subject' => $subject]];
+    }
+
+    /**
+     * The extra answers of the appointment form: occupation, WhatsApp number, the chosen time and date, and where to meet. The time must be one the team offers,
+     * on a weekday it runs, within the booking window; an in-person place must be one the team offers or the permanent "We will discuss it later".
+     *
+     * @param array<string,mixed> $in
+     * @return array{base:array<string,string>,details:array<string,mixed>}
+     */
+    public static function appointment(array $in): array
+    {
+        $errors = [];
+        $try = static function (callable $fn) use (&$errors): mixed {
+            try {
+                return $fn();
+            } catch (ValidationException $e) {
+                array_push($errors, ...$e->errors);
+
+                return null;
+            }
+        };
+        $occupation = $try(fn () => FieldRules::line($in['occupation'] ?? '', 'Your occupation', 2, 120));
+        $phone = trim((string) ($in['phone'] ?? ''));
+        $same = !empty($in['whatsapp_same']);
+        $whatsapp = $same ? $phone : $try(fn () => FieldRules::phone($in['whatsapp'] ?? '', true));
+        $slot = AppointmentConfig::slot((int) ($in['slot'] ?? 0), true);
+        if ($slot === null) {
+            $errors[] = 'Please choose one of the available times.';
+        }
+        $date = $try(fn () => FieldRules::date($in['meeting_date'] ?? '', 'Date for the meeting', true));
+        if ($date !== null) {
+            $min = AppTime::todayPlus((int) Config::get('appointments.min_days_ahead', 1));
+            $max = AppTime::todayPlus((int) Config::get('appointments.max_days_ahead', 60));
+            if ($date < $min || $date > $max) {
+                $errors[] = 'Choose a date between ' . local_date($min) . ' and ' . local_date($max) . '.';
+            } elseif ($slot !== null && !AppointmentConfig::runsOn($slot, $date)) {
+                $errors[] = 'That time is not available on ' . gmdate('l', (int) strtotime($date . ' 12:00:00 UTC')) . 's. It runs on: ' . $slot['days'] . '.';
+            }
+        }
+        $type = (string) ($in['meeting_type'] ?? '');
+        $placeName = '';
+        if (!in_array($type, ['online', 'in_person'], true)) {
+            $errors[] = 'Choose Online or In-person.';
+        } elseif ($type === 'in_person') {
+            $choice = (string) ($in['place'] ?? '');
+            if ($choice === AppointmentConfig::LATER) {
+                $placeName = AppointmentConfig::LATER_LABEL;
+            } elseif (ctype_digit($choice) && ($pl = AppointmentConfig::place((int) $choice, true)) !== null) {
+                $placeName = (string) $pl['name'];
+            } else {
+                $errors[] = 'Choose a place for the in-person meeting.';
+            }
+        }
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
+        $when = gmdate('D d M Y', (int) strtotime($date . ' 12:00:00 UTC'));
+        $kind = $type === 'online' ? 'Online' : 'In person: ' . $placeName;
+        $summary = mb_substr($when . ', ' . $slot['text'] . ', ' . $kind, 0, 120);
+
+        $details = ['form' => 'appointment', 'Meeting with' => AppointmentConfig::host(), 'Meeting date' => $when, 'Meeting time' => $slot['text'],
+            'Meeting type' => $type === 'online' ? 'Online' : 'In person', 'Meeting place' => $type === 'online' ? null : $placeName, 'Occupation' => $occupation, 'WhatsApp number' => $whatsapp . ($same ? ' (same as phone)' : '')];
+
+        return ['base' => ['preferred_slot' => $summary], 'details' => array_filter($details, static fn ($v): bool => $v !== null && $v !== '')];
     }
 
     /**
