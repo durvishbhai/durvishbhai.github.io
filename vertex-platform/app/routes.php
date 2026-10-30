@@ -489,6 +489,7 @@ return static function (Router $router): void {
     $router->get('/contact', [PublicFormController::class, 'contact']);
     $router->post('/contact', [PublicFormController::class, 'submitContact']);
     $router->get('/book-appointment', [PublicFormController::class, 'appointment']);
+    $router->get('/book-appointment/availability', [PublicFormController::class, 'availability'], ['nosession']);
     $router->post('/book-appointment', [PublicFormController::class, 'submitAppointment']);
     $router->get('/enquiry/received', [PublicFormController::class, 'received']);
 
@@ -499,6 +500,7 @@ return static function (Router $router): void {
     $router->get('/crm/enquiries/create', [EnquiryController::class, 'create'], ['auth', 'can:enquiries.create']);
     $router->post('/crm/enquiries', [EnquiryController::class, 'store'], ['auth', 'can:enquiries.create']);
     $router->get('/crm/enquiries/{enquiry}/files/{file}', [EnquiryFileController::class, 'download'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned']);
+    $router->post('/crm/enquiries/{enquiry}/release-time', [EnquiryController::class, 'releaseTime'], ['auth', 'can:appointments.configure,appointments.manage']);
     $router->get('/crm/enquiries/{enquiry}/requirements.pdf', [EnquiryController::class, 'requirementsPdf'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned']);
     $router->get('/crm/enquiries/{enquiry}', [EnquiryController::class, 'show'], ['auth', 'can:enquiries.view_all,enquiries.view_assigned,enquiries.view_own']);
     $router->post('/crm/enquiries/{enquiry}', [EnquiryController::class, 'update'], ['auth', 'can:enquiries.edit']);
@@ -643,6 +645,7 @@ return static function (Router $router): void {
         $r->post('/appointments/slots', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
         $r->post('/appointments/slots/{slot}', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
         $r->post('/appointments/slots/{slot}/delete', [AppointmentController::class, 'deleteSlot'], ['can:appointments.configure']);
+        $r->post('/appointments/bookings/{booking}/release', [AppointmentController::class, 'release'], ['can:appointments.configure,appointments.manage']);
         $r->post('/appointments/places', [AppointmentController::class, 'savePlace'], ['can:appointments.configure']);
         $r->post('/appointments/places/{place}', [AppointmentController::class, 'savePlace'], ['can:appointments.configure']);
         $r->post('/appointments/places/{place}/delete', [AppointmentController::class, 'deletePlace'], ['can:appointments.configure']);

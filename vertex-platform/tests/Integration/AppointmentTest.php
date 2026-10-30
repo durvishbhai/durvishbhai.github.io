@@ -54,7 +54,7 @@ final class AppointmentTest extends HttpTestCase
     private function form(int $slot, array $over = []): array
     {
         return $over + ['contact_name' => 'Asha Fictional', 'email' => 'asha@web.test', 'phone' => '+91 90000 11111', 'whatsapp_same' => '1', 'occupation' => 'Shop owner', 'description' => 'I want to discuss a website for my shop.',
-            'slot' => (string) $slot, 'meeting_date' => $this->date(3), 'meeting_type' => 'online', 'consent' => '1', 'website_url' => ''];
+            'slot' => (string) $slot, 'meeting_date' => $this->date(3), 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'consent' => '1', 'website_url' => ''];
     }
 
     public function testTheOwnerAddsEditsHidesAndDeletesTimesAndPlaces(): void
@@ -162,7 +162,7 @@ final class AppointmentTest extends HttpTestCase
 
     public function testInPersonNeedsAPlaceAndTheDiscussLaterOptionIsAlwaysValid(): void
     {
-        $slot = $this->slot();
+        $slot = $this->slot('08:00', '20:00');
         $pid = AppointmentConfig::savePlace($this->owner, null, ['name' => 'KIS office, Pune', 'active' => '1']);
         $hidden = AppointmentConfig::savePlace($this->owner, null, ['name' => 'Old office', 'active' => '']);
         $c = $this->client();
@@ -172,9 +172,9 @@ final class AppointmentTest extends HttpTestCase
         $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => (string) $hidden]));
         $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => '999999']));
         $this->assertSame($b, $n(), 'no place, a hidden place or an unknown place is refused');
-        $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => (string) $pid, 'email' => 'p1@web.test']));
-        $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => AppointmentConfig::LATER, 'email' => 'p2@web.test']));
-        $this->send($c, $this->form($slot, ['meeting_type' => 'online', 'place' => '999999', 'email' => 'p3@web.test']));
+        $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => (string) $pid, 'email' => 'p1@web.test', 'start_time' => '10:00', 'end_time' => '11:00']));
+        $this->send($c, $this->form($slot, ['meeting_type' => 'in_person', 'place' => AppointmentConfig::LATER, 'email' => 'p2@web.test', 'start_time' => '11:00', 'end_time' => '12:00']));
+        $this->send($c, $this->form($slot, ['meeting_type' => 'online', 'place' => '999999', 'email' => 'p3@web.test', 'start_time' => '12:00', 'end_time' => '13:00']));
         $this->assertSame($b + 3, $n());
         $get = static fn (string $email): array => EnquiryExtras::details((int) Database::one('SELECT id FROM enquiries WHERE email = ?', [$email])['id']);
         $this->assertSame('KIS office, Pune', $get('p1@web.test')['Meeting place']);
@@ -222,6 +222,155 @@ final class AppointmentTest extends HttpTestCase
         $this->send($c, $this->form($slot, ['email' => 'alpha@client.test', 'contact_name' => 'Alpha Client']));
         $e = Database::one("SELECT client_id FROM enquiries WHERE source = 'appointment_request' AND email = 'alpha@client.test'");
         $this->assertSame((int) Database::one('SELECT id FROM clients WHERE user_id = ?', [$this->client])['id'], (int) $e['client_id']);
+    }
+
+    // ------------------------------------------------------------------------------------------------ the visitor picks the range; booked ranges are locked
+
+    private function window(string $from = '11:00', string $to = '23:00', array $extra = []): int
+    {
+        return AppointmentConfig::saveSlot($this->owner, null, $extra + ['start_time' => $from, 'end_time' => $to, 'days' => range(1, 7), 'active' => '1', 'step_minutes' => '30', 'min_minutes' => '30', 'max_minutes' => '0']);
+    }
+
+    private function book(\Vertex\Tests\Support\HttpClient $c, int $slot, string $from, string $to, string $email, ?string $date = null): int
+    {
+        $before = (int) Database::one('SELECT COUNT(*) c FROM appointment_bookings')['c'];
+        $this->send($c, $this->form($slot, ['start_time' => $from, 'end_time' => $to, 'email' => $email, 'meeting_date' => $date ?? $this->date(3)]));
+
+        return (int) Database::one('SELECT COUNT(*) c FROM appointment_bookings')['c'] - $before;
+    }
+
+    public function testTheVisitorChoosesTheirOwnRangeInsideTheWindowAndItIsLockedForThatDate(): void
+    {
+        $w = $this->window('11:00', '23:00');
+        $c = $this->client();
+        $this->assertSame(1, $this->book($c, $w, '11:00', '12:00', 'a1@web.test'), '11 AM - 12 PM');
+        $this->assertSame(1, $this->book($c, $w, '17:00', '23:00', 'a2@web.test'), '5 PM - 11 PM on the same date');
+        $this->assertSame('11:00 AM - 12:00 PM', EnquiryExtras::details((int) Database::one("SELECT id FROM enquiries WHERE email = 'a1@web.test'")['id'])['Meeting time']);
+        $this->assertSame(0, $this->book($c, $w, '11:00', '12:00', 'a3@web.test'), 'the same range is taken');
+        $this->assertSame(0, $this->book($c, $w, '11:30', '12:30', 'a3@web.test'), 'an overlapping start is taken');
+        $this->assertSame(0, $this->book($c, $w, '10:30', '11:30', 'a3@web.test'), 'outside the window');
+        $this->assertSame(0, $this->book($c, $w, '16:00', '17:30', 'a3@web.test'), 'running into 5 PM is taken');
+        $this->assertSame(0, $this->book($c, $w, '12:00', '18:00', 'a3@web.test'), 'covering a booked range is taken');
+        $this->assertSame(1, $this->book($c, $w, '12:00', '13:00', 'a3@web.test'), 'back to back with a booked range is fine');
+        $this->assertSame(1, $this->book($c, $w, '13:00', '16:00', 'a4@web.test'), 'the gap that is left can be chosen');
+        $this->assertSame(1, $this->book($c, $w, '11:00', '12:00', 'a5@web.test', $this->date(4)), 'the same range on another date is free');
+        $this->assertSame(2, (int) Database::one("SELECT COUNT(*) c FROM appointment_bookings WHERE meeting_date = ? AND start_time IN ('11:00:00','17:00:00')", [$this->date(3)])['c']);
+    }
+
+    public function testStepsAndLengthLimitsOfAWindowAreEnforced(): void
+    {
+        $w = $this->window('10:00', '14:00', ['step_minutes' => '30', 'min_minutes' => '60', 'max_minutes' => '120']);
+        $c = $this->client();
+        $this->assertSame(0, $this->book($c, $w, '10:15', '11:15', 'b@web.test'), 'off the 30 minute grid');
+        $this->assertSame(0, $this->book($c, $w, '10:00', '10:30', 'b@web.test'), 'shorter than the shortest meeting');
+        $this->assertSame(0, $this->book($c, $w, '10:00', '12:30', 'b@web.test'), 'longer than the longest meeting');
+        $this->assertSame(0, $this->book($c, $w, '12:00', '11:00', 'b@web.test'), 'end before start');
+        $this->assertSame(0, $this->book($c, $w, '', '', 'b@web.test'), 'no times');
+        $this->assertSame(1, $this->book($c, $w, '10:30', '12:30', 'b@web.test'));
+    }
+
+    public function testAWindowsStepAndLengthsAreValidatedWhenTheTeamSavesIt(): void
+    {
+        foreach ([['step_minutes' => '7'], ['step_minutes' => '60', 'start_time' => '10:00', 'end_time' => '10:30'], ['min_minutes' => '600'], ['min_minutes' => '60', 'max_minutes' => '30']] as $bad) {
+            try {
+                $this->window('10:00', '12:00', $bad);
+                $this->fail('should have been refused');
+            } catch (\Vertex\Core\ValidationException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+        $id = $this->window('10:00', '12:00', ['step_minutes' => '15', 'min_minutes' => '15', 'max_minutes' => '60']);
+        $s = AppointmentConfig::slot($id);
+        $this->assertSame([15, 15, 60], [(int) $s['step_minutes'], (int) $s['min_minutes'], (int) $s['max_minutes']]);
+    }
+
+    public function testADeclinedArchivedOrReleasedRequestFreesItsTime(): void
+    {
+        $w = $this->window('11:00', '23:00');
+        $c = $this->client();
+        $this->book($c, $w, '11:00', '12:00', 'r1@web.test');
+        $this->book($c, $w, '12:00', '13:00', 'r2@web.test');
+        $this->book($c, $w, '13:00', '14:00', 'r3@web.test');
+        $this->assertSame(0, $this->book($c, $w, '11:00', '14:00', 'r4@web.test'));
+        $lost = (int) Database::one("SELECT id FROM crm_stages WHERE kind = 'lost' LIMIT 1")['id'];
+        Database::run("UPDATE enquiries SET stage_id = ? WHERE email = 'r1@web.test'", [$lost]);
+        Database::run("UPDATE enquiries SET archived_at = UTC_TIMESTAMP() WHERE email = 'r2@web.test'");
+        Database::run("UPDATE appointment_bookings SET released_at = UTC_TIMESTAMP() WHERE start_time = '13:00:00'");
+        $this->assertSame(1, $this->book($c, $w, '11:00', '14:00', 'r4@web.test'), 'declined, archived and released requests no longer hold a time');
+    }
+
+    public function testTheTeamCanReleaseATimeAndOthersCannot(): void
+    {
+        $w = $this->window('11:00', '23:00');
+        $c = $this->client();
+        $this->book($c, $w, '11:00', '12:00', 'z@web.test');
+        $b = Database::one('SELECT * FROM appointment_bookings');
+        $this->assertSame(403, $this->loggedIn('alpha@client.test')->post('/admin/appointments/bookings/' . $b['id'] . '/release', [], '/account')['status']);
+        $this->assertNull(Database::one('SELECT released_at FROM appointment_bookings')['released_at']);
+        $this->loggedIn('mgr@x.test')->post('/admin/appointments/bookings/' . $b['id'] . '/release', [], '/crm/enquiries');
+        $this->assertNotNull(Database::one('SELECT released_at FROM appointment_bookings')['released_at']);
+        $this->assertSame(1, $this->book($c, $w, '11:00', '12:00', 'y@web.test'), 'the time is free again');
+        $pid = Database::one("SELECT public_id FROM enquiries WHERE email = 'y@web.test'")['public_id'];
+        $o = $this->loggedIn('owner@x.test');
+        $this->assertStringContainsString('Release the time now', $o->get('/crm/enquiries/' . $pid)['body']);
+        $o->post('/crm/enquiries/' . $pid . '/release-time', [], '/crm/enquiries/' . $pid);
+        $this->assertSame(2, (int) Database::one('SELECT COUNT(*) c FROM appointment_bookings WHERE released_at IS NOT NULL')['c']);
+        $this->assertGreaterThan(0, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'appointment.released'")['c']);
+    }
+
+    public function testLockingRechecksUnderTheMutexSoOverlapsCannotBothWin(): void
+    {
+        $w = $this->window('11:00', '23:00');
+        $date = $this->date(5);
+        $mk = static function (string $email): int {
+            Database::run("INSERT INTO enquiries (public_id, reference, contact_name, email, source, service, description, stage_id, stage_changed_at, created_at, updated_at) SELECT ?, ?, 'X', ?, 'appointment_request', 'other', 'x', (SELECT id FROM crm_stages ORDER BY id LIMIT 1), UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP()", [bin2hex(random_bytes(8)), 'ENQ-' . bin2hex(random_bytes(4)), $email]);
+
+            return Database::insertId();
+        };
+        AppointmentConfig::lock($mk('l1@web.test'), $w, $date, '11:00', '12:00');
+        $this->expectException(\Vertex\Core\ValidationException::class);
+        AppointmentConfig::lock($mk('l2@web.test'), $w, $date, '11:30', '12:30');
+    }
+
+    public function testAtMostThreeOpenRequestsPerEmail(): void
+    {
+        $w = $this->window('08:00', '20:00');
+        $c = $this->client();
+        foreach (['08:00', '09:00', '10:00'] as $t) {
+            $this->assertSame(1, $this->book($c, $w, $t, sprintf('%02d:00', (int) $t + 1), 'many@web.test'));
+        }
+        $this->assertSame(0, $this->book($c, $w, '12:00', '13:00', 'many@web.test'), 'a fourth open request is refused');
+        $this->assertSame(1, $this->book($c, $w, '12:00', '13:00', 'other@web.test'));
+    }
+
+    public function testTheAvailabilityEndpointShowsWindowsAndHeldRanges(): void
+    {
+        $mon = $this->window('11:00', '23:00', ['days' => [1]]);
+        $this->window('09:00', '10:00', ['days' => [2]]);
+        $date = $this->date(2);
+        while ((int) gmdate('N', strtotime($date)) !== 1) {
+            $date = gmdate('Y-m-d', strtotime($date . ' +1 day'));
+        }
+        $c = $this->client();
+        $this->book($c, $mon, '11:00', '12:00', 'v@web.test', $date);
+        $r = $c->get('/book-appointment/availability?date=' . $date);
+        $this->assertSame(200, $r['status']);
+        $j = json_decode($r['body'], true);
+        $this->assertCount(1, $j['windows'], 'only the window that runs on a Monday');
+        $this->assertSame(['start' => '11:00', 'end' => '12:00'], $j['booked'][0]);
+        $this->assertSame(30, $j['windows'][0]['step']);
+        $this->assertStringContainsString('no-store', ($c->lastHeaders['cache-control'] ?? ''));
+        $this->assertSame([], json_decode($c->get('/book-appointment/availability?date=' . $this->date(-2))['body'], true)['windows'], 'a past date offers nothing');
+        $this->assertSame([], json_decode($c->get('/book-appointment/availability?date=junk')['body'], true)['windows']);
+    }
+
+    public function testTheFormShowsTheTimePickers(): void
+    {
+        $this->window('11:00', '23:00');
+        $page = $this->client()->get('/book-appointment')['body'];
+        foreach (['data-appt', 'name="start_time"', 'name="end_time"', '11:00 AM - 11:00 PM'] as $needle) {
+            $this->assertStringContainsString($needle, $page);
+        }
     }
 
     public function testTheRequirementsFormOffersExactlyTheRequestedProjectTypesAndOutcomes(): void

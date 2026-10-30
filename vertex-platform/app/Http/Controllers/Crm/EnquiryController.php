@@ -74,6 +74,18 @@ final class EnquiryController extends Controller
         }, '/crm/enquiries/create', $in);
     }
 
+    /** Frees the time an appointment request is holding. @param array<string,string> $params */
+    public function releaseTime(Request $request, array $params = []): Response
+    {
+        $enq = EnquiryPolicy::requireView($this->actorId(), $params['enquiry'] ?? '');
+        $b = \Vertex\Core\Database::one('SELECT id FROM appointment_bookings WHERE enquiry_id = ? AND released_at IS NULL', [$enq['id']]);
+        if ($b !== null) {
+            \Vertex\Services\AppointmentConfig::release($this->actorId(), (int) $b['id']);
+        }
+
+        return $this->ok('/crm/enquiries/' . $enq['public_id'], 'The time was released: it can be booked again.');
+    }
+
     /** The stored requirements as a document, for staff who may open the enquiry. @param array<string,string> $params */
     public function requirementsPdf(Request $request, array $params = []): Response
     {

@@ -19,8 +19,8 @@ final class AppointmentController extends Controller
     public function index(Request $request, array $params = []): Response
     {
         $requests = Database::all(
-            "SELECT e.public_id, e.reference, e.contact_name, e.email, e.phone, e.created_at, s.name AS stage, d.details_json
-               FROM enquiries e JOIN crm_stages s ON s.id = e.stage_id LEFT JOIN enquiry_details d ON d.enquiry_id = e.id
+            "SELECT e.public_id, e.reference, e.contact_name, e.email, e.phone, e.created_at, s.name AS stage, s.kind AS stage_kind, d.details_json, b.id AS booking_id, b.released_at
+               FROM enquiries e JOIN crm_stages s ON s.id = e.stage_id LEFT JOIN enquiry_details d ON d.enquiry_id = e.id LEFT JOIN appointment_bookings b ON b.enquiry_id = e.id
               WHERE e.source = 'appointment_request' AND e.archived_at IS NULL ORDER BY e.id DESC LIMIT 30",
         );
         foreach ($requests as &$r) {
@@ -51,6 +51,14 @@ final class AppointmentController extends Controller
         AppointmentConfig::deleteSlot($this->actorId(), (int) $params['slot']);
 
         return $this->ok('/admin/appointments#times', 'The time was deleted.');
+    }
+
+    /** @param array<string,string> $params */
+    public function release(Request $request, array $params = []): Response
+    {
+        AppointmentConfig::release($this->actorId(), (int) ($params['booking'] ?? 0));
+
+        return $this->ok('/admin/appointments', 'The time was released: it can be booked again.');
     }
 
     /** @param array<string,string> $params */

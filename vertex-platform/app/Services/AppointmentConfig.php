@@ -99,6 +99,165 @@ final class AppointmentConfig
         return self::DAYS;
     }
 
+    // ------------------------------------------------------------------------------------------------ ranges inside a window
+
+    public const MAX_OPEN_REQUESTS = 3;
+
+    /** "HH:MM" or "HH:MM:SS" => minutes since midnight. */
+    public static function mins(string $t): int
+    {
+        return (int) substr($t, 0, 2) * 60 + (int) substr($t, 3, 2);
+    }
+
+    /** minutes since midnight => "11:30" */
+    public static function hhmm(int $m): string
+    {
+        return sprintf('%02d:%02d', intdiv($m, 60), $m % 60);
+    }
+
+    /** "11:30" => "11:30 AM" */
+    public static function clock(string $t): string
+    {
+        return date('g:i A', (int) strtotime('1970-01-01 ' . substr($t, 0, 5)));
+    }
+
+    /** @return list<array<string,mixed>> the active windows that run on the weekday of $ymd */
+    public static function windowsFor(string $ymd): array
+    {
+        return array_values(array_filter(self::slots(true), static fn (array $s): bool => self::runsOn($s, $ymd)));
+    }
+
+    /**
+     * Ranges already held on a date (a request that is still alive: not released, not declined, not archived).
+     *
+     * @return list<array{id:int,start:string,end:string}> times as HH:MM
+     */
+    public static function booked(string $ymd): array
+    {
+        $rows = Database::all(
+            "SELECT b.id, b.start_time, b.end_time FROM appointment_bookings b LEFT JOIN enquiries e ON e.id = b.enquiry_id LEFT JOIN crm_stages s ON s.id = e.stage_id
+              WHERE b.meeting_date = ? AND b.released_at IS NULL AND (e.id IS NULL OR (e.archived_at IS NULL AND s.kind <> 'lost')) ORDER BY b.start_time",
+            [$ymd],
+        );
+
+        return array_map(static fn (array $r): array => ['id' => (int) $r['id'], 'start' => substr((string) $r['start_time'], 0, 5), 'end' => substr((string) $r['end_time'], 0, 5)], $rows);
+    }
+
+    /** Free stretches of a window on a date. @param array<string,mixed> $slot @return list<array{start:string,end:string}> */
+    public static function free(array $slot, string $ymd): array
+    {
+        $cursor = self::mins((string) $slot['start_time']);
+        $end = self::mins((string) $slot['end_time']);
+        $out = [];
+        foreach (self::booked($ymd) as $b) {
+            $bs = max(self::mins($b['start']), $cursor);
+            $be = min(self::mins($b['end']), $end);
+            if ($bs > $cursor) {
+                $out[] = ['start' => self::hhmm($cursor), 'end' => self::hhmm(min($bs, $end))];
+            }
+            $cursor = max($cursor, $be);
+        }
+        if ($cursor < $end) {
+            $out[] = ['start' => self::hhmm($cursor), 'end' => self::hhmm($end)];
+        }
+
+        return $out;
+    }
+
+    /** "11:00 AM - 12:00 PM, 2:00 PM - 11:00 PM" or "" */
+    public static function freeText(array $slot, string $ymd): string
+    {
+        return implode(', ', array_map(static fn (array $r): string => self::clock($r['start']) . ' - ' . self::clock($r['end']), self::free($slot, $ymd)));
+    }
+
+    /**
+     * Checks the range a visitor chose: inside the window, on its steps, long enough and not too long, and not overlapping a range that is already held.
+     *
+     * @param array<string,mixed> $slot @return array{0:string,1:string} start and end as HH:MM:SS
+     * @throws ValidationException
+     */
+    public static function checkRange(array $slot, string $ymd, string $start, string $end): array
+    {
+        $ok = static fn (string $t): bool => (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $t);
+        if (!$ok($start) || !$ok($end)) {
+            throw new ValidationException(['Choose a start time and an end time.']);
+        }
+        $s = self::mins($start);
+        $e = self::mins($end);
+        $ws = self::mins((string) $slot['start_time']);
+        $we = self::mins((string) $slot['end_time']);
+        $step = max(1, (int) $slot['step_minutes']);
+        if ($e <= $s) {
+            throw new ValidationException(['The end time must be after the start time.']);
+        }
+        if ($s < $ws || $e > $we) {
+            throw new ValidationException(['Choose a time between ' . self::clock((string) $slot['start_time']) . ' and ' . self::clock((string) $slot['end_time']) . '.']);
+        }
+        if (($s - $ws) % $step !== 0 || ($e - $ws) % $step !== 0) {
+            throw new ValidationException(['Times must be in steps of ' . $step . ' minutes.']);
+        }
+        if ($e - $s < (int) $slot['min_minutes']) {
+            throw new ValidationException(['The meeting must be at least ' . (int) $slot['min_minutes'] . ' minutes long.']);
+        }
+        if ((int) $slot['max_minutes'] > 0 && $e - $s > (int) $slot['max_minutes']) {
+            throw new ValidationException(['The meeting can be at most ' . (int) $slot['max_minutes'] . ' minutes long.']);
+        }
+        foreach (self::booked($ymd) as $b) {
+            if ($s < self::mins($b['end']) && $e > self::mins($b['start'])) {
+                $free = self::freeText($slot, $ymd);
+                throw new ValidationException(['That time is already taken on ' . local_date($ymd) . '.' . ($free !== '' ? ' Times still free that day: ' . $free . '.' : ' Nothing is free that day: please choose another date.')]);
+            }
+        }
+
+        return [$start . ':00', $end . ':00'];
+    }
+
+    /** How many unfinished requests this email address already holds. */
+    public static function openRequests(string $email): int
+    {
+        return (int) Database::one(
+            "SELECT COUNT(*) AS c FROM appointment_bookings b JOIN enquiries e ON e.id = b.enquiry_id JOIN crm_stages s ON s.id = e.stage_id
+              WHERE e.email = ? AND b.released_at IS NULL AND b.meeting_date >= ? AND e.archived_at IS NULL AND s.kind <> 'lost'",
+            [mb_strtolower($email), AppTime::today()],
+        )['c'];
+    }
+
+    /**
+     * Locks the range for a request. Call inside the transaction that creates the enquiry: it re-checks under a lock on the window, so two people sending
+     * overlapping ranges at the same moment cannot both succeed (the second is refused and its enquiry is rolled back).
+     */
+    public static function lock(int $enquiryId, int $slotId, string $ymd, string $start, string $end): void
+    {
+        Database::all('SELECT id FROM appointment_slots ORDER BY id FOR UPDATE'); // one mutex for every window, so overlapping windows cannot be double booked either
+        $slot = Database::one('SELECT * FROM appointment_slots WHERE id = ?', [$slotId]) ?? throw new ValidationException(['Please choose one of the available times.']);
+        $slot['text'] = self::slotText($slot);
+        $slot['days'] = self::daysText((int) $slot['weekdays']);
+        [$s, $e] = self::checkRange($slot, $ymd, $start, $end);
+        Database::run('INSERT INTO appointment_bookings (enquiry_id, slot_id, meeting_date, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())', [$enquiryId, $slotId, $ymd, $s, $e]);
+    }
+
+    /** Frees a held range (a request that was declined or never real). */
+    public static function release(int $actorId, int $bookingId): void
+    {
+        if (!Gate::can('appointments.configure', $actorId) && !Gate::can('appointments.manage', $actorId)) {
+            throw new \Vertex\Core\HttpException(403);
+        }
+        Database::run('UPDATE appointment_bookings SET released_at = UTC_TIMESTAMP() WHERE id = ? AND released_at IS NULL', [$bookingId]);
+        Audit::record('appointment.released', 'appointment_booking', $bookingId, [], [], [], $actorId);
+    }
+
+    /** What the form needs for one date: the windows that run that weekday and the ranges already held. @return array<string,mixed> */
+    public static function availability(string $ymd): array
+    {
+        $windows = [];
+        foreach (self::windowsFor($ymd) as $w) {
+            $windows[] = ['id' => (int) $w['id'], 'text' => self::slotText($w), 'start' => substr((string) $w['start_time'], 0, 5), 'end' => substr((string) $w['end_time'], 0, 5),
+                'step' => (int) $w['step_minutes'], 'min' => (int) $w['min_minutes'], 'max' => (int) $w['max_minutes']];
+        }
+
+        return ['date' => $ymd, 'windows' => $windows, 'booked' => array_map(static fn (array $b): array => ['start' => $b['start'], 'end' => $b['end']], self::booked($ymd))];
+    }
+
     // ------------------------------------------------------------------------------------------------ editing (Administration → Appointments)
 
     /** @param array<string,mixed> $in @return int the slot id */
@@ -143,13 +302,31 @@ final class AppointmentConfig
         }
         $active = !empty($in['active']) ? 1 : 0;
         $sort = max(0, min(9999, (int) ($in['sort_order'] ?? 0)));
+        $step = (int) ($in['step_minutes'] ?? 30);
+        $min = (int) ($in['min_minutes'] ?? 30);
+        $max = (int) ($in['max_minutes'] ?? 0);
+        $window = (self::mins($end) - self::mins($start));
+        if (!in_array($step, [5, 10, 15, 20, 30, 60], true)) {
+            $errors[] = 'Choose a step of 5, 10, 15, 20, 30 or 60 minutes.';
+        } elseif ($window % $step !== 0) {
+            $errors[] = 'The window (' . $window . ' minutes) must be a whole number of steps of ' . $step . ' minutes.';
+        }
+        if ($min < 5 || $min > $window) {
+            $errors[] = 'The shortest meeting must be at least 5 minutes and no longer than the window.';
+        }
+        if ($max !== 0 && ($max < $min || $max > $window)) {
+            $errors[] = 'The longest meeting must be 0 (no limit) or between the shortest meeting and the window.';
+        }
+        if ($errors !== []) {
+            throw new ValidationException($errors);
+        }
         if ($id === null) {
-            Database::run('INSERT INTO appointment_slots (label, start_time, end_time, weekdays, active, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())', [$label === '' ? null : $label, $start, $end, $mask, $active, $sort]);
+            Database::run('INSERT INTO appointment_slots (label, start_time, end_time, weekdays, step_minutes, min_minutes, max_minutes, active, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())', [$label === '' ? null : $label, $start, $end, $mask, $step, $min, $max, $active, $sort]);
             $id = Database::insertId();
             Audit::record('appointment_slot.created', 'appointment_slot', $id, [], ['start' => $start, 'end' => $end, 'weekdays' => $mask], [], $actorId);
         } else {
             self::slot($id) ?? throw new ValidationException(['That time no longer exists.']);
-            Database::run('UPDATE appointment_slots SET label = ?, start_time = ?, end_time = ?, weekdays = ?, active = ?, sort_order = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$label === '' ? null : $label, $start, $end, $mask, $active, $sort, $id]);
+            Database::run('UPDATE appointment_slots SET label = ?, start_time = ?, end_time = ?, weekdays = ?, step_minutes = ?, min_minutes = ?, max_minutes = ?, active = ?, sort_order = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$label === '' ? null : $label, $start, $end, $mask, $step, $min, $max, $active, $sort, $id]);
             Audit::record('appointment_slot.updated', 'appointment_slot', $id, [], ['start' => $start, 'end' => $end, 'weekdays' => $mask, 'active' => $active], [], $actorId);
         }
 

@@ -102,6 +102,24 @@ final class PublicFormController extends Controller
         return ['description' => mb_strlen($desc) > 160 ? rtrim(mb_substr($desc, 0, 159)) . '…' : $desc, 'canonical' => $base !== '' ? $base . (['contact_form' => '/contact', 'appointment_request' => '/book-appointment'][$source] ?? '/request-quote') : '', 'ogImage' => '', 'ogTitle' => $title . ' · ' . (string) Config::get('app.name')];
     }
 
+    /** Which windows run on a date and which ranges are already held (no personal data). @param array<string,string> $params */
+    public function availability(Request $request, array $params = []): Response
+    {
+        if (!RateLimiter::hit('availability_ip', $request->ip())) {
+            throw new HttpException(429);
+        }
+        $d = (string) ($request->query['date'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || \DateTimeImmutable::createFromFormat('!Y-m-d', $d) === false || \DateTimeImmutable::createFromFormat('!Y-m-d', $d)->format('Y-m-d') !== $d) {
+            return Response::json(['date' => $d, 'windows' => [], 'booked' => []]);
+        }
+        $min = \Vertex\Services\AppTime::todayPlus((int) Config::get('appointments.min_days_ahead', 1));
+        $max = \Vertex\Services\AppTime::todayPlus((int) Config::get('appointments.max_days_ahead', 60));
+        $r = Response::json($d < $min || $d > $max ? ['date' => $d, 'windows' => [], 'booked' => []] : \Vertex\Services\AppointmentConfig::availability($d));
+        $r->headers['Cache-Control'] = 'no-store';
+
+        return $r;
+    }
+
     /** What we already know about a signed-in client, so they do not retype it. @return array<string,string> */
     private function prefill(): array
     {
@@ -172,6 +190,10 @@ final class PublicFormController extends Controller
                         Database::run('UPDATE enquiries SET client_id = ? WHERE id = ?', [$cl['id'], $r['id']]);
                     }
                 }
+                if ($source === 'appointment_request' && isset($x['details']['_booking'])) { // hold the range for this person; refused (and rolled back) if someone else took it a moment ago
+                    $bk = $x['details']['_booking'];
+                    \Vertex\Services\AppointmentConfig::lock((int) $r['id'], (int) $bk['slot'], (string) $bk['date'], (string) $bk['start'], (string) $bk['end']);
+                }
                 if ($x !== null) {
                     EnquiryExtras::save((int) $r['id'], $x['details'], $metas);
                 }
@@ -181,7 +203,7 @@ final class PublicFormController extends Controller
         } catch (ValidationException $e) {
             array_map([FileStore::class, 'discard'], $metas);
 
-            return $this->back($back, $e->errors, array_diff_key($in, ['description' => 1]) + ['description' => $request->string('description')] + array_intersect_key($request->body, array_flip(['subject', 'inquiry_type', 'project_name', 'project_category', 'problem_statement', 'expected_outcome', 'features', 'preferred_tech', 'timeline', 'notes', 'occupation', 'whatsapp', 'whatsapp_same', 'slot', 'meeting_date', 'meeting_type', 'place'])));
+            return $this->back($back, $e->errors, array_diff_key($in, ['description' => 1]) + ['description' => $request->string('description')] + array_intersect_key($request->body, array_flip(['subject', 'inquiry_type', 'project_name', 'project_category', 'problem_statement', 'expected_outcome', 'features', 'preferred_tech', 'timeline', 'notes', 'occupation', 'whatsapp', 'whatsapp_same', 'slot', 'start_time', 'end_time', 'meeting_date', 'meeting_type', 'place'])));
         } catch (\Throwable $e) {
             array_map([FileStore::class, 'discard'], $metas);
             throw $e;

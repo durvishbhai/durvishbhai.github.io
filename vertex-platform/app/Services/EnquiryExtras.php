@@ -94,6 +94,8 @@ final class EnquiryExtras
         if ($slot === null) {
             $errors[] = 'Please choose one of the available times.';
         }
+        $start = trim((string) ($in['start_time'] ?? ''));
+        $end = trim((string) ($in['end_time'] ?? ''));
         $date = $try(fn () => FieldRules::date($in['meeting_date'] ?? '', 'Date for the meeting', true));
         if ($date !== null) {
             $min = AppTime::todayPlus((int) Config::get('appointments.min_days_ahead', 1));
@@ -102,6 +104,10 @@ final class EnquiryExtras
                 $errors[] = 'Choose a date between ' . local_date($min) . ' and ' . local_date($max) . '.';
             } elseif ($slot !== null && !AppointmentConfig::runsOn($slot, $date)) {
                 $errors[] = 'That time is not available on ' . gmdate('l', (int) strtotime($date . ' 12:00:00 UTC')) . 's. It runs on: ' . $slot['days'] . '.';
+            } elseif ($slot !== null) {
+                $try(function () use ($slot, $date, $start, $end): void {
+                    AppointmentConfig::checkRange($slot, $date, $start, $end);
+                });
             }
         }
         $type = (string) ($in['meeting_type'] ?? '');
@@ -118,17 +124,22 @@ final class EnquiryExtras
                 $errors[] = 'Choose a place for the in-person meeting.';
             }
         }
+        $email = mb_strtolower(trim((string) ($in['email'] ?? '')));
+        if ($errors === [] && $email !== '' && AppointmentConfig::openRequests($email) >= AppointmentConfig::MAX_OPEN_REQUESTS) {
+            $errors[] = 'This email address already has ' . AppointmentConfig::MAX_OPEN_REQUESTS . ' appointment requests waiting for our team. Please wait for us to contact you.';
+        }
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
         $when = gmdate('D d M Y', (int) strtotime($date . ' 12:00:00 UTC'));
+        $range = AppointmentConfig::clock($start) . ' - ' . AppointmentConfig::clock($end);
         $kind = $type === 'online' ? 'Online' : 'In person: ' . $placeName;
-        $summary = mb_substr($when . ', ' . $slot['text'] . ', ' . $kind, 0, 120);
+        $summary = mb_substr($when . ', ' . $range . ', ' . $kind, 0, 120);
 
-        $details = ['form' => 'appointment', 'Meeting with' => AppointmentConfig::host(), 'Meeting date' => $when, 'Meeting time' => $slot['text'],
+        $details = ['form' => 'appointment', 'Meeting with' => AppointmentConfig::host(), 'Meeting date' => $when, 'Meeting time' => $range,
             'Meeting type' => $type === 'online' ? 'Online' : 'In person', 'Meeting place' => $type === 'online' ? null : $placeName, 'Occupation' => $occupation, 'WhatsApp number' => $whatsapp . ($same ? ' (same as phone)' : '')];
 
-        return ['base' => ['preferred_slot' => $summary], 'details' => array_filter($details, static fn ($v): bool => $v !== null && $v !== '')];
+        return ['base' => ['preferred_slot' => $summary], 'details' => array_filter($details, static fn ($v): bool => $v !== null && $v !== '') + ['_booking' => ['slot' => (int) $slot['id'], 'date' => $date, 'start' => $start, 'end' => $end]]];
     }
 
     /**

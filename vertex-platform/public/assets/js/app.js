@@ -743,4 +743,55 @@
         types.forEach(function (t) { t.addEventListener('change', paint); });
         paint();
     })();
+
+    // Appointment form: the visitor picks their own start and end inside a window; ranges already booked on that date are not offered.
+    (function () {
+        var box = document.querySelector('[data-appt]');
+        if (!box) { return; }
+        var date = box.querySelector('[name="meeting_date"]'), win = box.querySelector('[name="slot"]'), from = box.querySelector('[name="start_time"]'), to = box.querySelector('[name="end_time"]'), info = box.querySelector('[data-appt-info]');
+        var data = null, hint = info.textContent;
+        function m(t) { return parseInt(t.slice(0, 2), 10) * 60 + parseInt(t.slice(3, 5), 10); }
+        function hh(x) { return ('0' + Math.floor(x / 60)).slice(-2) + ':' + ('0' + (x % 60)).slice(-2); }
+        function clock(x) { var h = Math.floor(x / 60), mm = x % 60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + ('0' + mm).slice(-2) + ' ' + ap; }
+        function add(sel, value, text, disabled) { var o = document.createElement('option'); o.value = value; o.textContent = text; o.disabled = !!disabled; sel.appendChild(o); }
+        function reset(sel, placeholder) { sel.textContent = ''; add(sel, '', placeholder, false); }
+        function overlaps(s, e) { return data.booked.some(function (b) { return s < m(b.end) && e > m(b.start); }); }
+        function current() { return data ? data.windows.filter(function (w) { return String(w.id) === win.value; })[0] : null; }
+        function fillTo() {
+            var w = current(), keep = to.value; reset(to, 'Select end time');
+            if (!w || !from.value) { return; }
+            var s = m(from.value), first = s + Math.ceil(Math.max(w.min, w.step) / w.step) * w.step;
+            for (var t = first; t <= m(w.end); t += w.step) {
+                if (w.max && t - s > w.max) { break; }
+                if (overlaps(s, t)) { break; }
+                add(to, hh(t), clock(t), false);
+            }
+            if (keep && Array.prototype.some.call(to.options, function (o) { return o.value === keep; })) { to.value = keep; }
+        }
+        function fillFrom() {
+            var w = current(), keep = from.value; reset(from, 'Select start time');
+            if (!w) { reset(to, 'Select end time'); return; }
+            for (var t = m(w.start); t + w.step <= m(w.end); t += w.step) {
+                var free = !overlaps(t, t + w.step);
+                add(from, hh(t), clock(t) + (free ? '' : ' (booked)'), !free);
+            }
+            if (keep && Array.prototype.some.call(from.options, function (o) { return o.value === keep && !o.disabled; })) { from.value = keep; }
+            fillTo();
+        }
+        function load() {
+            if (!date.value) { return; }
+            window.fetch('/book-appointment/availability?date=' + encodeURIComponent(date.value), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+                data = d; var keep = win.value; win.textContent = '';
+                if (!d.windows.length) { info.textContent = 'No times are open on that day. Please choose another date.'; reset(from, 'Select start time'); reset(to, 'Select end time'); return; }
+                d.windows.forEach(function (w) { add(win, w.id, w.text, false); });
+                if (keep && Array.prototype.some.call(win.options, function (o) { return o.value === keep; })) { win.value = keep; }
+                info.textContent = d.booked.length ? 'Already booked that day: ' + d.booked.map(function (b) { return clock(m(b.start)) + ' - ' + clock(m(b.end)); }).join(', ') + '. Other times are free.' : hint;
+                fillFrom();
+            }).catch(function () { /* the form still works: the server checks everything */ });
+        }
+        date.addEventListener('change', load);
+        win.addEventListener('change', fillFrom);
+        from.addEventListener('change', fillTo);
+        if (date.value) { load(); }
+    })();
 })();

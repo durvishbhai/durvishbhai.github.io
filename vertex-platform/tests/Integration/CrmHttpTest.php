@@ -104,7 +104,7 @@ final class CrmHttpTest extends HttpTestCase
         Database::run("INSERT INTO appointment_slots (start_time, end_time, weekdays, active, sort_order, created_at, updated_at) VALUES ('10:00:00', '11:00:00', 127, 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
         $slot = Database::insertId();
         $date = \Vertex\Services\AppTime::todayPlus(2);
-        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'whatsapp_same' => '1', 'occupation' => 'Designer', 'slot' => (string) $slot, 'meeting_date' => $date, 'meeting_type' => 'online', 'description' => 'Discuss a video project', 'consent' => '1', 'website_url' => ''], '/book-appointment');
+        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'whatsapp_same' => '1', 'occupation' => 'Designer', 'slot' => (string) $slot, 'meeting_date' => $date, 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'description' => 'Discuss a video project', 'consent' => '1', 'website_url' => ''], '/book-appointment');
         $e = Database::one("SELECT source, preferred_slot FROM enquiries WHERE email = 'ben@web.test'");
         $this->assertSame('appointment_request', $e['source']);
         $this->assertStringContainsString('10:00 AM - 11:00 AM', $e['preferred_slot']);

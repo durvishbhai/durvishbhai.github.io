@@ -26,9 +26,23 @@ $host = \Vertex\Services\AppointmentConfig::host();
                 <div class="field"><label for="occupation">Your occupation <span class="req">*</span></label><input id="occupation" name="occupation" required maxlength="120" value="<?= e(old('occupation')) ?>"></div>
             </div>
             <div class="field"><label for="description">Purpose of the meeting <span class="req">*</span></label><textarea id="description" name="description" rows="4" required minlength="5" maxlength="1000"><?= e(old('description')) ?></textarea></div>
-            <div class="grid-2">
-                <div class="field"><label for="meeting_date">Date for the meeting <span class="req">*</span></label><input id="meeting_date" name="meeting_date" type="date" required min="<?= e($minDate) ?>" max="<?= e($maxDate) ?>" value="<?= e(old('meeting_date')) ?>"></div>
-                <div class="field"><label for="slot">Available timings <span class="req">*</span></label><select id="slot" name="slot" required><option value="">Select an available timing</option><?php foreach ($slots as $s) : ?><option value="<?= e((string) $s['id']) ?>"<?= old('slot') === (string) $s['id'] ? ' selected' : '' ?>><?= e((string) $s['text']) ?><?= (int) $s['weekdays'] !== 127 ? ' · ' . e((string) $s['days']) : '' ?></option><?php endforeach; ?></select></div>
+            <?php
+            $w0 = $slots[0];
+            $clock = static fn (int $m): string => \Vertex\Services\AppointmentConfig::clock(\Vertex\Services\AppointmentConfig::hhmm($m));
+            $ws = \Vertex\Services\AppointmentConfig::mins((string) $w0['start_time']);
+            $we = \Vertex\Services\AppointmentConfig::mins((string) $w0['end_time']);
+            $step = max(1, (int) $w0['step_minutes']);
+            ?>
+            <div data-appt>
+                <div class="grid-2">
+                    <div class="field"><label for="meeting_date">Date for the meeting <span class="req">*</span></label><input id="meeting_date" name="meeting_date" type="date" required min="<?= e($minDate) ?>" max="<?= e($maxDate) ?>" value="<?= e(old('meeting_date')) ?>"></div>
+                    <div class="field"><label for="slot">Available timings <span class="req">*</span></label><select id="slot" name="slot" required><?php foreach ($slots as $s) : ?><option value="<?= e((string) $s['id']) ?>"<?= old('slot') === (string) $s['id'] ? ' selected' : '' ?>><?= e((string) $s['text']) ?><?= (int) $s['weekdays'] !== 127 ? ' · ' . e((string) $s['days']) : '' ?></option><?php endforeach; ?></select></div>
+                </div>
+                <div class="grid-2">
+                    <div class="field"><label for="start_time">From <span class="req">*</span></label><select id="start_time" name="start_time" required><option value="">Select start time</option><?php for ($t = $ws; $t + $step <= $we; $t += $step) : $v = \Vertex\Services\AppointmentConfig::hhmm($t); ?><option value="<?= e($v) ?>"<?= old('start_time') === $v ? ' selected' : '' ?>><?= e($clock($t)) ?></option><?php endfor; ?></select></div>
+                    <div class="field"><label for="end_time">To <span class="req">*</span></label><select id="end_time" name="end_time" required><option value="">Select end time</option><?php for ($t = $ws + $step; $t <= $we; $t += $step) : $v = \Vertex\Services\AppointmentConfig::hhmm($t); ?><option value="<?= e($v) ?>"<?= old('end_time') === $v ? ' selected' : '' ?>><?= e($clock($t)) ?></option><?php endfor; ?></select></div>
+                </div>
+                <p class="hint" data-appt-info>Choose a date, then any start and end time inside the available timing. A time someone else has already booked on that date is not offered.</p>
             </div>
             <fieldset class="field"><legend>Meeting type <span class="req">*</span></legend>
                 <div class="check-grid"><label class="check"><input type="radio" name="meeting_type" value="online" required data-meeting-type<?= $type === 'online' ? ' checked' : '' ?>> Online</label><label class="check"><input type="radio" name="meeting_type" value="in_person" required data-meeting-type<?= $type === 'in_person' ? ' checked' : '' ?>> In-person</label></div></fieldset>
