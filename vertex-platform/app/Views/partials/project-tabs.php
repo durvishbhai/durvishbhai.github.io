@@ -23,6 +23,9 @@ if (\Vertex\Services\PriceChangeService::canView($uid, $project)) {
 if (($staff && Gate::can('warranty.view', $uid)) || ($level === 'own' && Gate::can('warranty.view_own', $uid))) {
     $tabs['warranty'] = [$base . '/warranty', 'Warranty'];
 }
+if (($staff && Gate::canAny(['delivery.view', 'delivery.view_assigned', 'delivery.manage', 'delivery.configure'], $uid)) || ($level === 'own' && Gate::can('delivery.book', $uid))) {
+    $tabs['delivery'] = [$base . '/delivery', 'Delivery'];
+}
 ?>
 <nav class="tabs" aria-label="Project sections">
     <?php foreach ($tabs as $key => [$href, $label]) : ?>

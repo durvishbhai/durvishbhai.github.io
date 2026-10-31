@@ -192,6 +192,13 @@ $p = [
         'appointments.book' => 'Book an appointment (client)',
         'appointments.manage' => 'Manage appointments',
     ],
+    'delivery_appointments' => [
+        'delivery.view' => 'View every project delivery appointment',
+        'delivery.view_assigned' => 'View delivery appointments of assigned projects',
+        'delivery.manage' => 'Create manual delivery bookings, reschedule, cancel, complete and annotate delivery appointments',
+        'delivery.configure' => 'Set project preparation periods and booking links; manage daily capacity, blocked dates and reserved capacity',
+        'delivery.book' => 'Book and change own project delivery appointment (client)',
+    ],
     'crm' => [
         'enquiries.view_all' => 'View every enquiry',
         'enquiries.view_assigned' => 'View enquiries the user owns',
@@ -270,7 +277,7 @@ $sensitive = [
     'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'careers.manage', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
-    'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override',
+    'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override', 'delivery.configure',
 ];
 
 $all = [];
@@ -308,7 +315,7 @@ $roles = [
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
             'referrals.submit', 'referrals.view_own', 'renewals.view_own', 'quotes.respond',
             'deliverables.respond', 'revisions.respond_cost', 'revisions.request', 'agreements.view_own', 'agreements.sign', 'scope.request', 'feedback.add',
-            'bugs.report', 'tickets.create', 'tickets.view_own', 'tickets.reply_own', 'warranty.view_own',
+            'bugs.report', 'tickets.create', 'tickets.view_own', 'tickets.reply_own', 'warranty.view_own', 'delivery.book',
         ])),
     ],
     'manager' => [
@@ -329,6 +336,7 @@ $roles = [
             'revisions.classify',
             'pricing.view', 'estimates.create', 'quotes.view', 'quotes.create',
             'payouts.request', 'payouts.view_own', 'commissions.view_own',
+            'delivery.view_assigned', 'delivery.manage',
             'chat.use', 'revisions.manage', 'bugs.manage', 'bugs.fix', 'bugs.review_eligibility',
             'tickets.view_assigned', 'tickets.reply', 'tickets.note', 'tickets.assign', 'tickets.update_status', 'tickets.close', 'tickets.escalate', 'tickets.propose_change',
             'support.dashboard', 'warranty.view',
@@ -358,7 +366,7 @@ $roles = [
             'files.download', 'deliverables.view',
             'chat.use', 'revisions.manage', 'bugs.manage', 'warranty.view',
             'tickets.view_assigned', 'tickets.reply', 'tickets.note', 'tickets.update_status', 'tickets.close', 'tickets.escalate', 'support.dashboard',
-            'requirements.view', 'appointments.manage',
+            'requirements.view', 'appointments.manage', 'delivery.view_assigned',
         ],
     ],
     'freelancer' => [
@@ -395,7 +403,7 @@ $roles = [
             'files.download', 'files.upload', 'deliverables.view', 'deliverables.respond', 'revisions.respond_cost',
             'invoices.view_own', 'receipts.view_own', 'payments.pay', 'quotes.view',
             'chat.use', 'revisions.request', 'bugs.report', 'warranty.view_own', 'tickets.create', 'tickets.view_own', 'tickets.reply_own',
-            'requirements.submit', 'appointments.book', 'renewals.view_own', 'quotes.respond', 'agreements.view_own', 'agreements.sign', 'scope.request', 'feedback.add',
+            'requirements.submit', 'appointments.book', 'delivery.book', 'renewals.view_own', 'quotes.respond', 'agreements.view_own', 'agreements.sign', 'scope.request', 'feedback.add',
         ],
     ],
 ];

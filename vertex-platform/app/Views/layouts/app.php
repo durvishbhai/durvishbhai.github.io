@@ -57,6 +57,8 @@ $nav = [
     ['/tickets', 'Tickets', can('tickets.view_all') || can('tickets.view_assigned') || can('tickets.view_technical')],
     ['/support/dashboard', 'Support dashboard', can('support.dashboard')],
     ['/warranties', 'Warranties', can('warranty.view')],
+    ['/admin/delivery', 'Delivery appointments', can('delivery.view') || can('delivery.view_assigned')],
+    ['/my/delivery', 'Delivery appointments', can('delivery.book') && $isClient],
     ['/admin/pricing', 'Pricing', can('pricing.view')],
     ['/admin/revision-policies', 'Revision policy', can('revisions.policy') || can('revisions.classify')],
     ['/admin/users', 'Users', can('users.view')],
@@ -86,7 +88,7 @@ $nav = [
 $groupOf = [
     'Overview' => ['/dashboard', '/notifications', '/approvals', '/ai', '/reports'],
     'Sales & clients' => ['/crm', '/clients', '/my/company', '/my/project-requests', '/book-appointment', '/quotations', '/my/quotes', '/admin/pricing', '/coupons'],
-    'Projects & delivery' => ['/projects', '/tasks', '/board', '/deadlines', '/team', '/deliverables', '/qa', '/my/deliverables', '/revisions', '/scope-requests', '/my/scope-requests', '/project-templates', '/admin/revision-policies', '/warranties'],
+    'Projects & delivery' => ['/projects', '/tasks', '/board', '/deadlines', '/team', '/deliverables', '/qa', '/my/deliverables', '/revisions', '/scope-requests', '/my/scope-requests', '/project-templates', '/admin/revision-policies', '/warranties', '/admin/delivery', '/my/delivery'],
     'Money' => ['/invoices', '/my/invoices', '/receipts', '/my/receipts', '/client-payments', '/commissions', '/payouts', '/renewals', '/my/services'],
     'Partners' => ['/partner', '/partner/referrals', '/referrals/dashboard', '/referrals'],
     'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],

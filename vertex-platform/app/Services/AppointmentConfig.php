@@ -132,11 +132,12 @@ final class AppointmentConfig
      *
      * @return list<array{id:int,start:string,end:string}> times as HH:MM
      */
-    public static function booked(string $ymd): array
+    public static function booked(string $ymd, bool $latest = false): array
     {
+        // $latest: a locking read, which sees what other transactions have committed even when this transaction's snapshot is older
         $rows = Database::all(
             "SELECT b.id, b.start_time, b.end_time FROM appointment_bookings b LEFT JOIN enquiries e ON e.id = b.enquiry_id LEFT JOIN crm_stages s ON s.id = e.stage_id
-              WHERE b.meeting_date = ? AND b.released_at IS NULL AND (e.id IS NULL OR (e.archived_at IS NULL AND s.kind <> 'lost')) ORDER BY b.start_time",
+              WHERE b.meeting_date = ? AND b.released_at IS NULL AND (e.id IS NULL OR (e.archived_at IS NULL AND s.kind <> 'lost')) ORDER BY b.start_time" . ($latest ? ' FOR UPDATE' : ''),
             [$ymd],
         );
 
@@ -176,7 +177,7 @@ final class AppointmentConfig
      * @param array<string,mixed> $slot @return array{0:string,1:string} start and end as HH:MM:SS
      * @throws ValidationException
      */
-    public static function checkRange(array $slot, string $ymd, string $start, string $end): array
+    public static function checkRange(array $slot, string $ymd, string $start, string $end, bool $latest = false): array
     {
         $ok = static fn (string $t): bool => (bool) preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $t);
         if (!$ok($start) || !$ok($end)) {
@@ -202,7 +203,7 @@ final class AppointmentConfig
         if ((int) $slot['max_minutes'] > 0 && $e - $s > (int) $slot['max_minutes']) {
             throw new ValidationException(['The meeting can be at most ' . (int) $slot['max_minutes'] . ' minutes long.']);
         }
-        foreach (self::booked($ymd) as $b) {
+        foreach (self::booked($ymd, $latest) as $b) {
             if ($s < self::mins($b['end']) && $e > self::mins($b['start'])) {
                 $free = self::freeText($slot, $ymd);
                 throw new ValidationException(['That time is already taken on ' . local_date($ymd) . '.' . ($free !== '' ? ' Times still free that day: ' . $free . '.' : ' Nothing is free that day: please choose another date.')]);
@@ -232,7 +233,7 @@ final class AppointmentConfig
         $slot = Database::one('SELECT * FROM appointment_slots WHERE id = ?', [$slotId]) ?? throw new ValidationException(['Please choose one of the available times.']);
         $slot['text'] = self::slotText($slot);
         $slot['days'] = self::daysText((int) $slot['weekdays']);
-        [$s, $e] = self::checkRange($slot, $ymd, $start, $end);
+        [$s, $e] = self::checkRange($slot, $ymd, $start, $end, true);
         Database::run('INSERT INTO appointment_bookings (enquiry_id, slot_id, meeting_date, start_time, end_time, created_at) VALUES (?, ?, ?, ?, ?, UTC_TIMESTAMP())', [$enquiryId, $slotId, $ymd, $s, $e]);
     }
 

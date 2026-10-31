@@ -74,6 +74,12 @@ final class Settings
             'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
             'razorpay.webhook_secret' => ['group' => 'razorpay', 'label' => 'Webhook secret', 'type' => 'secret', 'help' => 'The secret you type when you add the webhook in the Razorpay Dashboard.'],
             'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How payment requests are paid', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only', 'checkout' => 'Razorpay checkout window on the client\'s page (card, UPI, net banking, wallets)'], 'help' => 'Whichever you pick, the amount is exactly what the team entered. The team can also choose per request.'],
+            'delivery.default_capacity' => ['group' => 'delivery', 'label' => 'Delivery appointments per day (default capacity)', 'type' => 'int', 'help' => 'Confirmed appointments plus reserved slots never exceed this. Single dates can be changed under Delivery appointments → Capacity.'],
+            'delivery.notify_email' => ['group' => 'delivery', 'label' => 'Team address for delivery appointment emails', 'type' => 'email', 'help' => 'Leave empty to use the sender address of the email settings.'],
+            'delivery.public_mode' => ['group' => 'delivery', 'label' => 'Booking without signing in', 'type' => 'select', 'options' => ['off' => 'Off', 'otp' => 'Project ID + name, then a code emailed to the client', 'token' => 'Private links created by the team only', 'both' => 'Both'], 'help' => 'A project ID and name alone never unlock a project.'],
+            'delivery.max_days_ahead' => ['group' => 'delivery', 'label' => 'How many days ahead a delivery can be booked (when a project has no last date)', 'type' => 'int'],
+            'delivery.client_cutoff_days' => ['group' => 'delivery', 'label' => 'Clients can change or cancel themselves until this many days before the date', 'type' => 'int'],
+            'delivery.max_reschedules' => ['group' => 'delivery', 'label' => 'Times a client can move their appointment themselves', 'type' => 'int'],
             'maintenance.enabled' => ['group' => 'features', 'label' => 'Maintenance mode: show visitors and clients a "back soon" page', 'type' => 'bool', 'help' => 'Signed-in team members keep full access, and sign-in pages, payment webhooks and the health check keep working. Remember to switch it off afterwards.'],
             'maintenance.message' => ['group' => 'features', 'label' => 'Maintenance message (optional)', 'type' => 'textarea', 'help' => 'Shown on the maintenance page. Leave empty for the standard wording.'],
             'features.cms' => ['group' => 'features', 'label' => 'Public website pages (CMS)', 'type' => 'bool'],
@@ -86,7 +92,7 @@ final class Settings
     /** @return array<string,string> */
     public static function groups(): array
     {
-        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'google' => 'Google sign-in', 'features' => 'Feature switches'];
+        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'google' => 'Google sign-in', 'delivery' => 'Delivery appointments', 'features' => 'Feature switches'];
     }
 
     private static function isSecret(string $key): bool

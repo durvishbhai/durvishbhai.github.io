@@ -6,6 +6,9 @@ use Vertex\Core\Router;
 use Vertex\Http\Controllers\AccountController;
 use Vertex\Http\Controllers\Admin\ActivityController;
 use Vertex\Http\Controllers\Admin\AppointmentController;
+use Vertex\Http\Controllers\Admin\DeliveryAdminController;
+use Vertex\Http\Controllers\DeliveryController;
+use Vertex\Http\Controllers\PublicDeliveryController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\AutomationController;
@@ -455,6 +458,18 @@ return static function (Router $router): void {
     $router->post('/projects/{project}/warranty', [WarrantyController::class, 'save'], ['auth', 'can:warranty.manage', 'project']);
     $router->post('/projects/{project}/warranty/suspend', [WarrantyController::class, 'suspend'], ['auth', 'can:warranty.manage', 'project']);
 
+    // Delivery appointments (per project): clients book, team configures and books for clients
+    $router->get('/my/delivery', [DeliveryController::class, 'mine'], ['auth', 'can:delivery.book']);
+    $router->get('/projects/{project}/delivery', [DeliveryController::class, 'project'], ['auth', 'project']);
+    $router->post('/projects/{project}/delivery/book', [DeliveryController::class, 'book'], ['auth', 'can:delivery.book', 'project']);
+    $router->post('/projects/{project}/delivery/reschedule', [DeliveryController::class, 'reschedule'], ['auth', 'can:delivery.book', 'project']);
+    $router->post('/projects/{project}/delivery/cancel', [DeliveryController::class, 'cancel'], ['auth', 'can:delivery.book', 'project']);
+    $router->post('/projects/{project}/delivery/request-change', [DeliveryController::class, 'requestChange'], ['auth', 'can:delivery.book', 'project']);
+    $router->post('/projects/{project}/delivery/plan', [DeliveryController::class, 'savePlan'], ['auth', 'can:delivery.configure', 'project']);
+    $router->post('/projects/{project}/delivery/link', [DeliveryController::class, 'createLink'], ['auth', 'can:delivery.configure', 'project']);
+    $router->post('/projects/{project}/delivery/link/revoke', [DeliveryController::class, 'revokeLinks'], ['auth', 'can:delivery.configure', 'project']);
+    $router->post('/projects/{project}/delivery/manual', [DeliveryController::class, 'manual'], ['auth', 'can:delivery.manage', 'project']);
+
     $router->get('/changes/{change}', [ChangeRequestController::class, 'show'], ['auth', 'can:revisions.manage,revisions.respond_cost']);
     $router->post('/changes/{change}', [ChangeRequestController::class, 'update'], ['auth', 'can:revisions.classify']);
     $router->post('/changes/{change}/send', [ChangeRequestController::class, 'send'], ['auth', 'can:revisions.classify']);
@@ -491,6 +506,15 @@ return static function (Router $router): void {
     $router->get('/book-appointment', [PublicFormController::class, 'appointment']);
     $router->get('/book-appointment/availability', [PublicFormController::class, 'availability'], ['nosession']);
     $router->post('/book-appointment', [PublicFormController::class, 'submitAppointment']);
+    // Delivery appointments without signing in: project ID + name start an emailed one-time code (or a private link from the team); see DeliveryPublic.
+    $router->get('/delivery-appointment', [PublicDeliveryController::class, 'start']);
+    $router->post('/delivery-appointment', [PublicDeliveryController::class, 'lookup']);
+    $router->get('/delivery-appointment/verify', [PublicDeliveryController::class, 'verifyForm']);
+    $router->post('/delivery-appointment/verify', [PublicDeliveryController::class, 'verify']);
+    $router->get('/delivery-appointment/link/{token}', [PublicDeliveryController::class, 'link']);
+    $router->get('/delivery-appointment/book', [PublicDeliveryController::class, 'book']);
+    $router->post('/delivery-appointment/book', [PublicDeliveryController::class, 'confirm']);
+    $router->post('/delivery-appointment/exit', [PublicDeliveryController::class, 'exit']);
     $router->get('/enquiry/received', [PublicFormController::class, 'received']);
 
     // CRM (staff). `can:` is the first gate; EnquiryPolicy + EnquiryService re-check access to the specific enquiry.
@@ -641,6 +665,21 @@ return static function (Router $router): void {
         $r->get('/revision-policies', [RevisionTermsController::class, 'index'], ['can:revisions.policy,revisions.classify,revisions.override']);
         $r->post('/revision-policies', [RevisionTermsController::class, 'save'], ['can:revisions.policy']);
 
+        $r->get('/delivery', [DeliveryAdminController::class, 'index'], ['can:delivery.view,delivery.view_assigned']);
+        $r->post('/delivery/manual', [DeliveryAdminController::class, 'manual'], ['can:delivery.manage']);
+        $r->get('/delivery/capacity', [DeliveryAdminController::class, 'capacity'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/defaults', [DeliveryAdminController::class, 'saveDefaults'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/date', [DeliveryAdminController::class, 'setCapacity'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/block', [DeliveryAdminController::class, 'block'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/unblock', [DeliveryAdminController::class, 'unblock'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/reserve', [DeliveryAdminController::class, 'reserve'], ['can:delivery.configure']);
+        $r->post('/delivery/capacity/reservations/{id}/release', [DeliveryAdminController::class, 'releaseReservation'], ['can:delivery.configure']);
+        $r->get('/delivery/appointments/{id}', [DeliveryAdminController::class, 'show'], ['can:delivery.view,delivery.view_assigned']);
+        $r->post('/delivery/appointments/{id}/reschedule', [DeliveryAdminController::class, 'reschedule'], ['can:delivery.manage']);
+        $r->post('/delivery/appointments/{id}/cancel', [DeliveryAdminController::class, 'cancel'], ['can:delivery.manage']);
+        $r->post('/delivery/appointments/{id}/complete', [DeliveryAdminController::class, 'complete'], ['can:delivery.manage']);
+        $r->post('/delivery/appointments/{id}/note', [DeliveryAdminController::class, 'note'], ['can:delivery.manage']);
+        $r->post('/delivery/appointments/{id}/dismiss', [DeliveryAdminController::class, 'dismiss'], ['can:delivery.manage']);
         $r->get('/appointments', [AppointmentController::class, 'index'], ['can:appointments.configure']);
         $r->post('/appointments/slots', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
         $r->post('/appointments/slots/{slot}', [AppointmentController::class, 'saveSlot'], ['can:appointments.configure']);
