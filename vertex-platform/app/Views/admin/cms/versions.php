@@ -1,0 +1,6 @@
+<?php /** @var array<string,mixed> $p */ /** @var list<array<string,mixed>> $versions */ /** @var bool $canEdit */ ?>
+<div class="page-head"><div><p class="eyebrow">Website</p><h1>History: <?= e($p['title']) ?></h1></div><a class="btn btn-ghost" href="/admin/cms/<?= e($p['public_id']) ?>">Back to the page</a></div>
+<p class="muted">Every save is kept. Restoring an old version creates a new version on top, so nothing is ever lost.</p>
+<div class="table-wrap"><table class="table"><thead><tr><th>Version</th><th>Title</th><th>What changed</th><th>By</th><th>When</th><th></th></tr></thead><tbody>
+<?php foreach ($versions as $v) : ?><tr><td>v<?= (int) $v['version_no'] ?><?= (int) $v['version_no'] === (int) $p['current_version'] ? ' (current)' : '' ?></td><td><?= e($v['title']) ?></td><td><?= e((string) $v['note']) ?></td><td><?= e((string) $v['by_name']) ?></td><td><?= e(local_time($v['created_at'])) ?></td>
+    <td><?php if ($canEdit && (int) $v['version_no'] !== (int) $p['current_version']) : ?><form method="post" action="/admin/cms/<?= e($p['public_id']) ?>/versions/<?= (int) $v['version_no'] ?>/restore" class="inline-form"><?= csrf_field() ?><button class="btn btn-ghost btn-sm" type="submit">Restore</button></form><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div>

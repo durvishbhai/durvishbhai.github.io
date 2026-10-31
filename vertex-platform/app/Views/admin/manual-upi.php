@@ -1,0 +1,16 @@
+<?php /** @var array<string,mixed> $s */ /** @var array{active:bool,reason:string} $status */ /** @var bool $razorpayOn */
+$v = static fn (string $k, string $d = ''): string => old($k, (string) ($s[$k] ?? $d)); ?>
+<div class="page-head"><div><p class="eyebrow">Administration</p><h1>Manual UPI payments</h1></div><span class="badge badge-sys-<?= $status['active'] ? 'ok' : 'warn' ?>"><?= $status['active'] ? 'In use' : 'Not in use' ?></span></div>
+<div class="panel"><p class="muted">Show your own bank QR code and UPI ID on clients' invoices. The client pays from their UPI app, then sends the <strong>transaction ID and a screenshot</strong>. The request reaches your team under <em>Client payments</em>; the payment is successful only after your team approves it against the bank.</p>
+    <p class="<?= $status['active'] ? 'muted' : 'alert alert-warn' ?>"><?= e($status['reason']) ?></p>
+    <?php if ($razorpayOn) : ?><p class="muted">Manual UPI and Razorpay are <strong>alternatives</strong>: while Razorpay online payments are on, this is never shown to clients.</p><?php endif; ?></div>
+<div class="panel"><form method="post" action="/admin/manual-upi" enctype="multipart/form-data" class="form-grid"><?= csrf_field() ?>
+    <div class="field"><label class="check"><input type="checkbox" name="enabled" value="1"<?= (string) $v('enabled', '0') === '1' ? ' checked' : '' ?>> Accept payments by manual UPI</label></div>
+    <div class="field"><label for="upi">Your UPI ID</label><input id="upi" name="upi_id" maxlength="100" placeholder="name@bank" autocomplete="off" value="<?= e($v('upi_id')) ?>"></div>
+    <div class="field"><label for="payee">Name shown to the client <span class="muted">(optional)</span></label><input id="payee" name="payee_name" maxlength="120" value="<?= e($v('payee_name')) ?>"><p class="hint">The name of the account holder, as the client's UPI app will show it.</p></div>
+    <div class="field"><label for="qr">Bank QR code picture</label><?php if ($s['qr_file_id'] !== null) : ?><p><img src="/admin/manual-upi/qr" alt="Your current QR code" width="180" height="180"></p><label class="check"><input type="checkbox" name="remove_qr" value="1"> Remove the saved QR</label><?php endif; ?>
+        <input id="qr" name="qr" type="file" accept="image/png,image/jpeg,image/webp"><p class="hint">PNG, JPG or WEBP, up to 5 MB. Leave empty to keep the current one. Clients can also pay with just the UPI ID.</p></div>
+    <div class="field"><label for="ins">Instructions for the client <span class="muted">(optional)</span></label><input id="ins" name="instructions" maxlength="600" value="<?= e($v('instructions')) ?>" placeholder="For example: payments are approved within one working day"></div>
+    <div class="field"><label class="check"><input type="checkbox" name="require_proof" value="1"<?= (string) $v('require_proof', '1') === '1' ? ' checked' : '' ?>> The client must attach proof of payment (a screenshot or PDF)</label></div>
+    <div class="field"><label for="pw">Your password</label><input id="pw" name="confirm_password" type="password" required autocomplete="current-password"></div>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Save</button></div></form></div>

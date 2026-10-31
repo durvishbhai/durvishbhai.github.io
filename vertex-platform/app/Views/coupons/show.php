@@ -1,0 +1,9 @@
+<?php /** @var array<string,mixed> $c */ /** @var list<array<string,mixed>> $redemptions */ /** @var bool $canManage */ /** @var list<array<string,mixed>> $campaigns */ /** @var array<string,string> $services */ ?>
+<div class="page-head"><div><p class="eyebrow"><a href="/coupons">Coupons</a></p><h1><?= e($c['code']) ?></h1><p class="muted"><?= e($c['description']) ?> &middot; <?= e(ucfirst((string) $c['status'])) ?></p></div>
+    <?php if ($canManage) : ?><form method="post" action="/coupons/<?= e($c['public_id']) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="status"><button class="btn btn-ghost" type="submit"><?= $c['status'] === 'active' ? 'Pause coupon' : 'Resume coupon' ?></button></form><?php endif; ?></div>
+<?php if ($canManage) : ?><form method="post" action="/coupons/<?= e($c['public_id']) ?>" class="panel form-grid" novalidate><?= csrf_field() ?><h2>Rules</h2>
+<?= \Vertex\Core\View::partial('coupon-fields', ['c' => $c, 'campaigns' => $campaigns, 'services' => $services]) ?>
+<div class="form-actions"><button class="btn btn-primary" type="submit">Save</button></div></form><?php endif; ?>
+<div class="panel"><h2>Redemptions</h2><div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th>Client</th><th>Discount</th><th>When</th><th>State</th></tr></thead><tbody>
+<?php foreach ($redemptions as $r) : ?><tr><td><a href="/invoices/<?= e($r['invoice_public_id']) ?>"><?= e($r['invoice_reference']) ?></a></td><td><?= e($r['client_name']) ?></td><td><?= e(money((int) $r['discount_minor'])) ?></td><td><?= e(local_time($r['redeemed_at'])) ?></td><td><?= $r['released_at'] ? 'Released (invoice voided)' : 'Counts toward the limit' ?></td></tr><?php endforeach; ?>
+<?php if ($redemptions === []) : ?><tr><td colspan="5" class="muted">Not used yet.</td></tr><?php endif; ?></tbody></table></div></div>

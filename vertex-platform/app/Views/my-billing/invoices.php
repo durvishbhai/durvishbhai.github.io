@@ -1,0 +1,5 @@
+<?php /** @var list<array<string,mixed>> $rows */ $labels = ['issued' => 'Unpaid', 'partially_paid' => 'Partly paid', 'paid' => 'Paid', 'void' => 'Void']; ?>
+<div class="page-head"><div><p class="eyebrow">My account</p><h1>My invoices</h1></div></div>
+<?php if ($rows === []) : ?><div class="panel"><p>You have no invoices yet.</p></div><?php else : ?>
+<div class="table-wrap"><table class="table"><thead><tr><th>Invoice</th><th class="num">Total</th><th class="num">Paid</th><th>Due</th><th>Status</th></tr></thead><tbody>
+    <?php foreach ($rows as $r) : ?><tr><td><a href="/my/invoices/<?= e($r['public_id']) ?>"><strong><?= e($r['reference']) ?></strong></a><br><span class="muted"><?= e($r['title']) ?></span></td><td class="num"><?= e(money($r['total_minor'])) ?></td><td class="num"><?= e(money($r['paid_minor'])) ?></td><td><?= $r['due_date'] ? e(local_date($r['due_date'])) : '—' ?></td><td><span class="badge badge-bi-<?= e($r['status']) ?>"><?= e($labels[$r['status']] ?? $r['status']) ?></span></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>

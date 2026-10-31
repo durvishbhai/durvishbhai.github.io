@@ -1,0 +1,8 @@
+<?php /** @var list<array<string,mixed>> $rows */ /** @var int $total */ /** @var int $page */ /** @var int $perPage */ /** @var array<string,mixed> $filters */ /** @var array<string,mixed> $qs */ use Vertex\Core\View;
+$lab = ['submitted' => 'New', 'assessing' => 'Being assessed', 'quoted' => 'Proposal made', 'declined' => 'Declined', 'withdrawn' => 'Withdrawn']; ?>
+<p class="eyebrow">Projects</p><h1>Scope requests</h1>
+<form method="get" class="toolbar"><div class="field"><label for="st">Status</label><select id="st" name="status"><option value="">All</option><?php foreach ($lab as $k => $l) : ?><option value="<?= e($k) ?>"<?= $filters['status'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div><div class="field"><button class="btn btn-ghost" type="submit">Filter</button></div></form>
+<div class="table-wrap"><table class="table"><thead><tr><th>Request</th><th>Project</th><th>From</th><th>Wanted by</th><th>Status</th></tr></thead><tbody>
+<?php foreach ($rows as $r) : ?><tr><td><a href="/scope-requests/<?= e($r['public_id']) ?>"><strong><?= e($r['reference']) ?></strong></a></td><td><?= e($r['project_code']) ?> · <?= e($r['project_title']) ?></td><td><?= e($r['requester_name']) ?></td><td><?= $r['wanted_by'] ? e(local_date($r['wanted_by'])) : '-' ?></td><td><?= e($lab[$r['status']] ?? $r['status']) ?></td></tr><?php endforeach; ?>
+<?php if ($rows === []) : ?><tr><td colspan="5" class="muted">No scope requests.</td></tr><?php endif; ?></tbody></table></div>
+<?= View::partial('pagination', ['page' => $page, 'perPage' => $perPage, 'total' => $total, 'filters' => $qs]) ?>
