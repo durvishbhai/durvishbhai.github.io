@@ -15,7 +15,7 @@ $sel = static fn (string $a, string $b): string => $a === $b ? ' selected' : '';
             <p class="hint">Public page: <a href="/delivery-appointment">/delivery-appointment</a>. A project ID and name never unlock a project by themselves.</p></div>
         <div class="field"><label for="co">Clients can change or cancel themselves until (days before the date)</label><input id="co" name="client_cutoff_days" inputmode="numeric" value="<?= e($v('client_cutoff_days', (string) $values['client_cutoff_days'])) ?>"></div>
         <div class="field"><label for="mr">Times a client can move the appointment themselves</label><input id="mr" name="max_reschedules" inputmode="numeric" value="<?= e($v('max_reschedules', (string) $values['max_reschedules'])) ?>"></div>
-        <div class="field"><label for="md">Booking window (days ahead, when a project has no last date)</label><input id="md" name="max_days_ahead" inputmode="numeric" value="<?= e($v('max_days_ahead', (string) $values['max_days_ahead'])) ?>"></div>
+        <div class="field"><label for="md">Furthest project start date a client can choose (days ahead)</label><input id="md" name="max_days_ahead" inputmode="numeric" value="<?= e($v('max_days_ahead', (string) $values['max_days_ahead'])) ?>"></div>
         <div class="form-actions"><button class="btn btn-primary" type="submit">Save settings</button></div></form>
 </div>
 

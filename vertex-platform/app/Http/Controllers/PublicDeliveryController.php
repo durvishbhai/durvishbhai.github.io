@@ -108,11 +108,11 @@ final class PublicDeliveryController extends Controller
         if ($project === null) {
             return Response::redirect('/delivery-appointment');
         }
-        $plan = DeliveryService::plan($project);
+        $plan = DeliveryService::plan($project, false, $request->string('start'));
         $cur = DeliveryService::currentFor((int) $project['id']);
         $appt = $cur === null ? null : DeliveryService::appointment((int) $cur['id']);
         $ym = preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $request->string('month')) ? $request->string('month') : substr(max((string) ($plan['earliest'] ?? ''), AppTime::today()), 0, 7);
-        $cal = in_array($plan['state'], ['open', 'preparing'], true) ? DeliveryService::month($ym, $plan) : null;
+        $cal = $plan['state'] === 'open' ? DeliveryService::month($ym, $plan) : null;
         $selected = $request->string('date');
         $ok = false;
         foreach ($cal['weeks'] ?? [] as $w) {
@@ -121,7 +121,7 @@ final class PublicDeliveryController extends Controller
             }
         }
 
-        return $this->render('public/delivery-book', ['title' => 'Book your project delivery', 'project' => $project, 'plan' => $plan, 'appt' => $appt, 'cal' => $cal, 'selected' => $ok ? $selected : '', 'base' => '/delivery-appointment/book', 'client' => \Vertex\Core\Database::one('SELECT contact_name FROM clients WHERE id = ?', [$project['client_id']])]);
+        return $this->render('public/delivery-book', ['title' => 'Book your project delivery', 'project' => $project, 'plan' => $plan, 'appt' => $appt, 'cal' => $cal, 'selected' => $ok ? $selected : '', 'base' => '/delivery-appointment/book', 'start' => $plan['start'], 'startFromUser' => $plan['state'] === 'open' && !$plan['start_fixed'], 'client' => \Vertex\Core\Database::one('SELECT contact_name FROM clients WHERE id = ?', [$project['client_id']])]);
     }
 
     /** @param array<string,string> $params */
@@ -136,10 +136,10 @@ final class PublicDeliveryController extends Controller
         }
 
         return $this->guarded(function () use ($request, $project): Response {
-            $a = DeliveryService::book($project, $request->string('date'), 'public_link', null, ['client_notes' => $request->string('client_notes')]);
+            $a = DeliveryService::book($project, $request->string('date'), 'public_link', null, ['client_notes' => $request->string('client_notes'), 'start_date' => $request->string('start_date')]);
 
             return $this->ok('/delivery-appointment/book', 'Your delivery appointment is confirmed for ' . DeliveryService::nice((string) $a['appointment_date']) . '. Reference ' . $a['booking_reference'] . '. We emailed you the details.');
-        }, '/delivery-appointment/book?month=' . urlencode(substr($request->string('date'), 0, 7)));
+        }, '/delivery-appointment/book?' . http_build_query(['start' => $request->string('start_date'), 'month' => substr($request->string('date'), 0, 7)]));
     }
 
     /** @param array<string,string> $params */

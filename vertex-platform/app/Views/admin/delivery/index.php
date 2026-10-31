@@ -29,10 +29,11 @@ $cards = [['today', "Today's appointments"], ['upcoming', 'Upcoming'], ['confirm
     <form method="post" action="/admin/delivery/manual" class="form-grid"><?= csrf_field() ?>
         <div class="field"><label for="mp">Client and project</label><select id="mp" name="project" required><option value="">Choose a project…</option>
             <?php foreach ($projects as $p) : ?><option value="<?= e($p['public_id']) ?>"<?= $sel($v('project'), $p['public_id']) ?>><?= e($p['code']) ?> · <?= e($p['title']) ?> · <?= e($p['company_name'] ?: $p['contact_name']) ?></option><?php endforeach; ?></select></div>
+        <div class="field"><label for="msdt">Project start date</label><input id="msdt" name="start_date" type="date" value="<?= e($v('start_date')) ?>"><p class="hint">Empty = today (or the date the team fixed). The delivery date must be after start + the project's estimated time.</p></div>
         <div class="field"><label for="mdt">Delivery date</label><input id="mdt" name="date" type="date" required value="<?= e($v('date')) ?>"></div>
         <div class="field"><label for="msr">Booking type</label><select id="msr" name="source"><option value="manual">Manual / Offline Booking</option><option value="admin_reserved"<?= $sel($v('source'), 'admin_reserved') ?>>Admin Reserved Slot (uses a reserved slot on that date)</option></select></div>
         <div class="field"><label for="mnt">Internal note</label><textarea id="mnt" name="internal_notes" rows="2" maxlength="2000"><?= e($v('internal_notes')) ?></textarea></div>
-        <?php if ($canConfigure) : ?><div class="field"><label class="check"><input type="checkbox" name="override" value="1"> Override the project's preparation time</label></div><?php endif; ?>
+        <?php if ($canConfigure) : ?><div class="field"><label class="check"><input type="checkbox" name="override" value="1"> Override the project's estimated-time rule</label></div><?php endif; ?>
         <div class="form-actions"><button class="btn btn-primary" type="submit" data-confirm="Create this booking and email the client?">Create booking</button></div></form>
 </div>
 <?php endif; ?>

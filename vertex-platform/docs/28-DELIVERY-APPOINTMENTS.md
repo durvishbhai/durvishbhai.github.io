@@ -1,13 +1,15 @@
 # Project delivery appointments
 
-A client books **the day their project is delivered**, once the project's own preparation time is over. Everything is enforced on the server (`App\Services\DeliveryService`); the calendar only shows what the server would accept.
+A client books **the day their project is delivered**, after choosing the project start date: the delivery date must be after start + the team's estimated time. Everything is enforced on the server (`App\Services\DeliveryService`); the calendar only shows what the server would accept.
 
 ## How it works
-1. The team sets, **per project**, a preparation time in days (7, 15, 30, 60 … any number up to 730) on the project's **Delivery** tab. The *eligibility date* is `preparation start + days`; the start defaults to the day the setting is first saved. Optional: a later **earliest selectable date**, a **latest selectable date**, and a switch to open/close booking. A project with no setting cannot be booked.
-   * Example: start 1 November, 60 days → eligible from 31 December. If you want 1 January, set *Earliest selectable delivery date* to 1 January (the later of the two always wins). Dates before it are refused by the server, not only greyed out.
-   * Changing the duration recalculates the eligibility date from the same start. **Confirmed appointments are never moved or deleted**: the page tells the team how many now fall before the new first date, and the client gets an email that the dates changed.
-2. The client opens the project (Delivery tab, or **Delivery appointments** in the menu), sees the first date they can choose, picks a day on the calendar, reviews it and confirms. They get a booking reference and a confirmation email.
-3. **One active appointment per project.** Only the Owner can allow more for a project.
+1. The team sets, **per project**, the **estimated time to complete** (a number of days, weeks or months) on the project's **Delivery** tab. Optional: a **fixed start date** (if the team wants to decide the start), an *earliest* and a *latest selectable delivery date*, and a switch to open/close booking. A project with no setting cannot be booked.
+2. The **client chooses the project start date** (step 1), then picks the delivery date on the calendar (step 2). The delivery date must be **after start + the estimated time**: start 1 January 2027 + 2 months → the first date they can choose is **2 March 2027**; everything up to and including 1 March is refused by the server, not only greyed out. (Start 1 Nov + 60 days → first choice 1 January.) Calendar months keep the day of the month, or the last day of a shorter month. The optional earliest date can only push the first date later.
+   * The start date can be today or up to `max_days_ahead` (default 180) ahead and is stored on the appointment. Moving the appointment later uses the same start date, so it cannot be used to dodge the rule.
+   * Changing the estimate never moves or deletes a confirmed appointment: the page tells the team how many now fall before their new first date, and the client gets an email that the dates changed.
+   * The review panel shows the project, start date and estimated time; the chosen delivery date is on the confirm button and in the confirmation.
+3. After confirming, the client gets a booking reference and a confirmation email.
+4. **One active appointment per project.** Only the Owner can allow more for a project.
 
 ## Capacity
 * Default **2 confirmed appointments a day**, set by the Owner/Administrator (Delivery appointments → Capacity & settings, or Integrations & settings → Delivery appointments).
@@ -38,13 +40,13 @@ Until `client_cutoff_days` (default 3) before the date, a client can move their 
 | `delivery.view` | Owner, Administrator | every appointment |
 | `delivery.view_assigned` | Manager, Support | appointments of assigned projects |
 | `delivery.manage` | Owner, Administrator, Manager | manual booking, reschedule, cancel, complete, notes — on projects they can access |
-| `delivery.configure` (sensitive) | Owner, Administrator | preparation times, links, capacity, blocks, reservations, settings, override of the preparation time |
+| `delivery.configure` (sensitive) | Owner, Administrator | estimated times, links, capacity, blocks, reservations, settings, override of the estimated-time rule |
 | `delivery.book` | Client | book/move/cancel/ask on own projects |
 
 ## Emails (shared KIS template)
 Client: *Your KIS Project Delivery Appointment Is Confirmed*, rescheduled, cancelled, completed, dates updated, one-time code, booking link. Team address (`delivery.notify_email`, else the mail sender address): *New Project Delivery Appointment — <Project ID>*, rescheduled, cancelled, change requested, date blocked.
 
 ## Data (migration 0034)
-`project_delivery_settings`, `delivery_appointments`, `delivery_date_capacity`, `delivery_capacity_reservations`, `delivery_appointment_logs`, `delivery_booking_tokens`, `delivery_otps`. Every admin action is also in the audit log; the appointment history shows who did what.
+`project_delivery_settings` (+ migration 0035: estimate unit, fixed start date), `delivery_appointments` (+ `project_start_date`), `delivery_date_capacity`, `delivery_capacity_reservations`, `delivery_appointment_logs`, `delivery_booking_tokens`, `delivery_otps`. Every admin action is also in the audit log; the appointment history shows who did what.
 
 Business time zone: `APP_TIMEZONE` (Asia/Kolkata); all "today"/date comparisons use it.

@@ -83,31 +83,48 @@ final class DeliveryHttpTest extends HttpTestCase
 
     // ------------------------------------------------------------------------------------------------ client dashboard
 
-    public function testAClientBooksFromTheirDashboardAndTheServerEnforcesThePreparationPeriod(): void
+    public function testAClientChoosesAStartDateThenADeliveryDateAfterTheEstimatedTime(): void
     {
-        $p = $this->proj('Alpha site', 3);
+        $p = $this->proj('Alpha site', 3); // estimated 3 days
+        $today = AppTime::today();
         $c = $this->loggedIn('alpha@client.test');
         $page = $c->get($this->page($p));
         $this->assertSame(200, $page['status']);
-        foreach (['Project delivery appointment', 'being prepared', local_date($this->day(3), 'j F Y'), 'Choose your delivery date', 'Delivery</a>'] as $needle) {
+        foreach (['Project delivery appointment', 'Step 1', 'Choose your project start date', 'Estimated time', '3 days', 'Delivery</a>'] as $needle) {
             $this->assertStringContainsString($needle, $page['body']);
         }
-        $this->assertStringContainsString('date=' . $this->day(3), str_replace('&amp;', '&', $page['body']), 'the first selectable date is a link');
-        $this->assertStringNotContainsString('date=' . $this->day(2) . '#review', str_replace('&amp;', '&', $page['body']), 'dates inside the preparation time are not links');
-        $c->post($this->page($p) . '/book', ['date' => $this->day(1)], $this->page($p));
-        $this->assertSame(0, $this->tally($this->day(1)), 'a hand-made request inside the preparation period is refused');
-        $c->post($this->page($p) . '/book', ['date' => 'garbage'], $this->page($p));
+        $this->assertStringNotContainsString('Step 2', $page['body'], 'no calendar before a start date is chosen');
+        $step2 = str_replace('&amp;', '&', $c->get($this->page($p) . '?start=' . $today)['body']);
+        $this->assertStringContainsString('Step 2', $step2);
+        $this->assertStringContainsString('date=' . $this->day(4) . '#review', $step2, 'start + 3 days + 1 is the first selectable day');
+        $this->assertStringNotContainsString('date=' . $this->day(3) . '#review', $step2, 'the end of the estimate itself is not selectable');
+        $this->assertStringNotContainsString('date=' . $this->day(2) . '#review', $step2);
+        $later = str_replace('&amp;', '&', $c->get($this->page($p) . '?start=' . $this->day(10))['body']);
+        $this->assertStringContainsString('date=' . $this->day(14) . '#review', $later, 'a later start moves the first delivery date');
+        $this->assertStringNotContainsString('date=' . $this->day(13) . '#review', $later);
+        $review = $c->get($this->page($p) . '?start=' . $today . '&date=' . $this->day(4))['body'];
+        $this->assertStringContainsString('Review your booking', $review);
+        $this->assertStringContainsString('Project start date', $review);
+        $this->assertStringNotContainsString('<dt>Delivery date</dt>', $review, 'the review no longer repeats the delivery date');
+        $this->assertStringContainsString('Confirm delivery appointment', $review);
+
+        $c->post($this->page($p) . '/book', ['date' => $this->day(3), 'start_date' => $today], $this->page($p));
+        $this->assertSame(0, $this->tally($this->day(3)), 'a hand-made request inside the estimated time is refused');
+        $c->post($this->page($p) . '/book', ['date' => $this->day(13), 'start_date' => $this->day(10)], $this->page($p));
+        $this->assertSame(0, $this->tally($this->day(13)), 'and so is one that ignores the chosen start date');
+        $c->post($this->page($p) . '/book', ['date' => 'garbage', 'start_date' => $today], $this->page($p));
+        $c->post($this->page($p) . '/book', ['date' => $this->day(14), 'start_date' => 'soon'], $this->page($p));
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM delivery_appointments')['c']);
-        $r = $c->post($this->page($p) . '/book', ['date' => $this->day(3), 'client_notes' => 'Morning please'], $this->page($p));
+        $r = $c->post($this->page($p) . '/book', ['date' => $this->day(14), 'start_date' => $this->day(10), 'client_notes' => 'Morning please'], $this->page($p));
         $this->assertSame(303, $r['status']);
         $a = Database::one('SELECT * FROM delivery_appointments');
-        $this->assertSame($this->day(3), $a['appointment_date']);
+        $this->assertSame($this->day(14), $a['appointment_date']);
+        $this->assertSame($this->day(10), $a['project_start_date']);
         $this->assertSame('client_dashboard', $a['booking_source']);
         $after = $c->get($this->page($p))['body'];
-        $this->assertStringContainsString('Your Delivery Appointment Is Confirmed!', $after);
-        $this->assertStringContainsString($a['booking_reference'], $after);
-        $this->assertStringContainsString($p['code'], $after);
-        $this->assertStringContainsString('Confirmed', $after);
+        foreach (['Your Delivery Appointment Is Confirmed!', $a['booking_reference'], $p['code'], 'Confirmed'] as $needle) {
+            $this->assertStringContainsString($needle, $after);
+        }
         $mine = $c->get('/my/delivery');
         $this->assertSame(200, $mine['status']);
         $this->assertStringContainsString($a['booking_reference'], $mine['body']);
@@ -120,13 +137,13 @@ final class DeliveryHttpTest extends HttpTestCase
         DeliveryService::book($this->proj('A2'), $date, 'client_dashboard', $this->client);
         $third = $this->proj('A3');
         $c = $this->loggedIn('alpha@client.test');
-        $body = $c->get($this->page($third) . '?month=' . substr($date, 0, 7))['body'];
+        $body = $c->get($this->page($third) . '?start=' . AppTime::today() . '&month=' . substr($date, 0, 7))['body'];
         $this->assertStringContainsString('Fully booked', $body);
         $this->assertStringNotContainsString('date=' . $date . '#review', str_replace('&amp;', '&', $body));
         $this->assertStringNotContainsString('User bravo@client.test', $body, 'no other client is named');
-        $c->post($this->page($third) . '/book', ['date' => $date], $this->page($third));
+        $c->post($this->page($third) . '/book', ['date' => $date, 'start_date' => AppTime::today()], $this->page($third));
         $this->assertSame(2, $this->tally($date));
-        $c->post($this->page($third) . '/book', ['date' => $this->day(6)], $this->page($third));
+        $c->post($this->page($third) . '/book', ['date' => $this->day(6), 'start_date' => AppTime::today()], $this->page($third));
         $this->assertSame(1, $this->tally($this->day(6)));
     }
 
@@ -251,12 +268,12 @@ final class DeliveryHttpTest extends HttpTestCase
         $p = $this->makeProject($this->client, 'Fresh');
         $o = $this->loggedIn('owner@x.test');
         $this->assertStringContainsString('Delivery settings for this project', $o->get($this->page($p))['body']);
-        $o->post($this->page($p) . '/plan', ['preparation_days' => '45', 'booking_enabled' => '1'], $this->page($p));
+        $o->post($this->page($p) . '/plan', ['preparation_days' => '2', 'preparation_unit' => 'months', 'booking_enabled' => '1'], $this->page($p));
         $s = Database::one('SELECT * FROM project_delivery_settings');
-        $this->assertSame(45, (int) $s['preparation_days']);
-        $this->assertSame($this->day(45), $s['eligibility_date']);
+        $this->assertSame([2, 'months'], [(int) $s['preparation_days'], $s['preparation_unit']]);
+        $this->assertStringContainsString('2 months', $o->get($this->page($p))['body']);
         $o->post($this->page($p) . '/plan', ['preparation_days' => 'soon'], $this->page($p));
-        $this->assertSame(45, (int) Database::one('SELECT preparation_days p FROM project_delivery_settings')['p']);
+        $this->assertSame(2, (int) Database::one('SELECT preparation_days p FROM project_delivery_settings')['p']);
         $o->post($this->page($p) . '/link', [], $this->page($p));
         $this->assertSame(1, (int) Database::one('SELECT COUNT(*) c FROM delivery_booking_tokens')['c']);
         $shown = $o->get($this->page($p))['body'];
@@ -307,12 +324,15 @@ final class DeliveryHttpTest extends HttpTestCase
         $this->assertSame(200, $page['status']);
         $this->assertStringContainsString($p['code'], $page['body']);
         $this->assertStringContainsString('Public two', $page['body']);
+        $this->assertStringContainsString('Step 1', $page['body'], 'the start date comes first');
+        $this->assertStringContainsString('Step 2', $c->get('/delivery-appointment/book?start=' . $this->day(2))['body']);
         $this->assertStringContainsString('no-store', implode(' ', (array) ($c->lastHeaders['cache-control'] ?? '')));
-        $b = $c->post('/delivery-appointment/book', ['date' => $this->day(4), 'client_notes' => 'Via link'], '/delivery-appointment/book');
+        $b = $c->post('/delivery-appointment/book', ['date' => $this->day(4), 'start_date' => $this->day(2), 'client_notes' => 'Via link'], '/delivery-appointment/book');
         $this->assertSame(303, $b['status']);
         $a = Database::one('SELECT * FROM delivery_appointments');
         $this->assertSame('public_link', $a['booking_source']);
         $this->assertSame($this->day(4), $a['appointment_date']);
+        $this->assertSame($this->day(2), $a['project_start_date']);
         $this->assertStringContainsString($a['booking_reference'], $c->get('/delivery-appointment/book')['body']);
         // the code cannot be used again from another browser
         $again = $this->client();

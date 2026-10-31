@@ -82,72 +82,169 @@ final class DeliveryService
         return Database::one("SELECT * FROM delivery_appointments WHERE project_id = ? AND status <> 'cancelled' ORDER BY (status = 'confirmed') DESC, id DESC LIMIT 1", [$projectId]);
     }
 
+    public const UNITS = ['days' => 'day(s)', 'weeks' => 'week(s)', 'months' => 'month(s)'];
+
+    /** "2 months" */
+    public static function durationText(array $row): string
+    {
+        $n = (int) $row['preparation_days'];
+        $u = (string) ($row['preparation_unit'] ?? 'days');
+
+        return $n . ' ' . match ($u) { 'weeks' => $n === 1 ? 'week' : 'weeks', 'months' => $n === 1 ? 'month' : 'months', default => $n === 1 ? 'day' : 'days' };
+    }
+
+    /** $start + the estimated time (calendar months keep the day of the month, or the last day of a shorter month). */
+    public static function endOfEstimate(array $row, string $start): string
+    {
+        $n = (int) $row['preparation_days'];
+        $d = new \DateTimeImmutable($start . ' 00:00:00', new \DateTimeZone('UTC'));
+        switch ((string) ($row['preparation_unit'] ?? 'days')) {
+            case 'months':
+                $dom = (int) $d->format('j');
+                $first = $d->modify('first day of this month')->modify('+' . $n . ' month');
+                $d = $first->setDate((int) $first->format('Y'), (int) $first->format('n'), min($dom, (int) $first->format('t')));
+                break;
+            case 'weeks':
+                $d = $d->modify('+' . ($n * 7) . ' day');
+                break;
+            default:
+                $d = $d->modify('+' . $n . ' day');
+        }
+
+        return $d->format('Y-m-d');
+    }
+
     /**
-     * Where a project stands. state: not_configured | disabled | closed | preparing | booked | open.
+     * The first delivery date for a project that starts on $start: the day AFTER the estimate has run out (start 1 Jan + 2 months = 1 Mar, so 2 Mar is the first
+     * choice), and never before the team's optional earliest date.
+     *
+     * @param array<string,mixed> $row a project_delivery_settings row
+     */
+    public static function earliestFor(array $row, string $start): string
+    {
+        return max(self::addDays(self::endOfEstimate($row, $start), 1), (string) ($row['earliest_date'] ?? ''));
+    }
+
+    /**
+     * Which start date applies. The team's fixed start wins; otherwise the client's choice (default today). Throws if the client's choice is not allowed.
+     *
+     * @param array<string,mixed> $row
+     */
+    public static function resolveStart(array $row, ?string $given): string
+    {
+        $given = trim((string) $given);
+        $fixed = (string) ($row['fixed_start_date'] ?? '');
+        if ($fixed !== '') {
+            if ($given !== '' && $given !== $fixed) {
+                throw new ValidationException(['The start date of this project is set by our team: ' . local_date($fixed, 'j F Y') . '.']);
+            }
+
+            return $fixed;
+        }
+        if ($given === '') {
+            return AppTime::today();
+        }
+        if (!self::validDate($given)) {
+            throw new ValidationException(['Choose a valid project start date.']);
+        }
+        if ($given < AppTime::today()) {
+            throw new ValidationException(['The project start date cannot be in the past.']);
+        }
+        if ($given > AppTime::todayPlus(max(1, min(self::HORIZON_DAYS, (int) Config::get('delivery.max_days_ahead', 180))))) {
+            throw new ValidationException(['That project start date is too far ahead.']);
+        }
+
+        return $given;
+    }
+
+    /**
+     * Where a project stands. state: not_configured | disabled | closed | need_start | booked | open.
+     * Delivery dates depend on the START date, so $start (the client's choice, ignored when the team fixed one or an appointment already has one) is needed for `open`.
      *
      * @param array<string,mixed> $project a projects row
-     * @return array{state:string,configured:bool,row:?array<string,mixed>,eligible_from:?string,earliest:?string,latest:?string,message:string,active:?array<string,mixed>}
+     * @return array{state:string,configured:bool,row:?array<string,mixed>,start:?string,start_fixed:bool,start_min:string,start_max:string,eligible_from:?string,earliest:?string,latest:?string,duration:string,message:string,active:?array<string,mixed>}
      */
-    public static function plan(array $project, bool $lock = false): array
+    public static function plan(array $project, bool $lock = false, ?string $start = null): array
     {
         $today = AppTime::today();
+        $start = $start === null || trim($start) === '' ? null : trim($start); // no choice yet: the client must pick one
         $row = self::settingsRow((int) $project['id'], $lock);
-        $out = ['state' => 'not_configured', 'configured' => $row !== null, 'row' => $row, 'eligible_from' => null, 'earliest' => null, 'latest' => null, 'message' => '', 'active' => self::activeFor((int) $project['id'], $lock)];
+        $out = ['state' => 'not_configured', 'configured' => $row !== null, 'row' => $row, 'start' => null, 'start_fixed' => false, 'start_min' => $today,
+            'start_max' => AppTime::todayPlus(max(1, min(self::HORIZON_DAYS, (int) Config::get('delivery.max_days_ahead', 180)))), 'eligible_from' => null, 'earliest' => null, 'latest' => null, 'duration' => '',
+            'message' => '', 'active' => self::activeFor((int) $project['id'], $lock)];
         if ($row === null) {
             $out['message'] = 'Delivery appointments are not open for this project yet. Our team will open booking when the project is ready.';
 
             return $out;
         }
-        $from = max((string) $row['eligibility_date'], (string) ($row['earliest_date'] ?? ''));
-        $notice = AppTime::todayPlus(max(0, (int) Config::get('delivery.min_notice_days', 1)));
-        $earliest = max($from, $notice);
-        $latest = (string) ($row['latest_date'] ?? '') !== '' ? (string) $row['latest_date'] : AppTime::todayPlus(max(1, (int) Config::get('delivery.max_days_ahead', 180)));
-        $latest = min($latest, AppTime::todayPlus(self::HORIZON_DAYS));
-        $out['eligible_from'] = $from;
-        $out['earliest'] = $earliest;
-        $out['latest'] = $latest;
+        $out['duration'] = self::durationText($row);
+        $fixed = (string) ($row['fixed_start_date'] ?? '');
+        $out['start_fixed'] = $fixed !== '';
+        $booked = $out['active'] !== null && (int) $row['allow_multiple'] !== 1;
+        if ($fixed !== '') {
+            $start = $fixed;
+        } elseif ($booked && ($out['active']['project_start_date'] ?? null) !== null) {
+            $start = (string) $out['active']['project_start_date'];
+        } elseif ($start !== null) {
+            try {
+                $start = self::resolveStart($row, $start);
+            } catch (ValidationException) {
+                $start = null;
+            }
+        }
+        $latest = (string) ($row['latest_date'] ?? '') !== '' ? (string) $row['latest_date'] : AppTime::todayPlus(max(1, (int) Config::get('delivery.max_days_ahead', 180)) + 730);
+        $out['latest'] = min($latest, AppTime::todayPlus(self::HORIZON_DAYS));
+        if ($start !== null) {
+            $out['start'] = $start;
+            $out['eligible_from'] = self::earliestFor($row, $start);
+            $out['earliest'] = max($out['eligible_from'], AppTime::todayPlus(max(0, (int) Config::get('delivery.min_notice_days', 1))));
+        }
         if (in_array((string) $project['status'], ['draft', 'cancelled', 'completed'], true) || $project['archived_at'] !== null) {
             $out['state'] = 'closed';
             $out['message'] = 'Delivery appointments are not available for this project in its current state.';
         } elseif ((int) $row['booking_enabled'] !== 1) {
             $out['state'] = 'disabled';
             $out['message'] = 'Delivery booking is not open for this project at the moment. Please contact our team.';
-        } elseif ($from > $today) {
-            $out['state'] = 'preparing';
-            $out['message'] = 'Your project is being prepared. Delivery appointments will become available from ' . local_date($from, 'j F Y') . '.';
-        } elseif ($earliest > $latest) {
-            $out['state'] = 'closed';
-            $out['message'] = 'The booking window for this project has ended. Please contact our team.';
-        } elseif ($out['active'] !== null && (int) $row['allow_multiple'] !== 1) {
+        } elseif ($booked) {
             $out['state'] = 'booked';
             $out['message'] = 'Your delivery appointment is booked.';
+        } elseif ($start === null) {
+            $out['state'] = 'need_start';
+            $out['message'] = 'Our team estimates this project at ' . $out['duration'] . '. Choose the day your project starts; your delivery date must be after that time has passed.';
+        } elseif ($out['earliest'] > $out['latest']) {
+            $out['state'] = 'closed';
+            $out['message'] = 'The booking window for this project has ended. Please contact our team.';
         } else {
             $out['state'] = 'open';
-            $out['message'] = 'Choose a delivery date between ' . local_date($earliest, 'j F Y') . ' and ' . local_date($latest, 'j F Y') . '.';
+            $out['message'] = 'Estimated time: ' . $out['duration'] . '. With a start date of ' . local_date($start, 'j F Y') . ', the first delivery date you can choose is ' . local_date($out['earliest'], 'j F Y') . '.';
         }
 
         return $out;
     }
 
     /**
-     * Saves the project's preparation period. The eligibility date is always recalculated from the start date and the days; appointments that are
-     * already confirmed are never touched, only counted so the team can see which of them now fall before the new earliest date.
+     * Saves the project's estimated time (a number of days, weeks or months), an optional fixed start date, and the optional earliest/latest delivery dates.
+     * Confirmed appointments are never touched; only counted, so the team can see which of them now fall before their new first date.
      *
      * @param array<string,mixed> $project
-     * @param array<string,mixed> $in preparation_days, prep_start_date?, earliest_date?, latest_date?, booking_enabled?, allow_multiple?
+     * @param array<string,mixed> $in preparation_days, preparation_unit?, fixed_start_date?, earliest_date?, latest_date?, booking_enabled?, allow_multiple?
      * @return array{earlier:int,changed:bool}
      */
     public static function savePlan(int $actorId, array $project, array $in): array
     {
         Gate::authorize('delivery.configure', $actorId);
         $errors = [];
+        $unit = (string) ($in['preparation_unit'] ?? 'days');
         $daysRaw = trim((string) ($in['preparation_days'] ?? ''));
-        if (!ctype_digit($daysRaw) || (int) $daysRaw > 730) {
-            $errors[] = 'Preparation time must be a whole number of days from 0 to 730.';
+        if (!isset(self::UNITS[$unit])) {
+            $errors[] = 'Choose days, weeks or months.';
+            $unit = 'days';
+        }
+        $max = ['days' => 730, 'weeks' => 104, 'months' => 24][$unit];
+        if (!ctype_digit($daysRaw) || (int) $daysRaw > $max) {
+            $errors[] = 'The estimated time must be a whole number from 0 to ' . $max . ' ' . self::UNITS[$unit] . '.';
         }
         $old = self::settingsRow((int) $project['id']);
-        $start = trim((string) ($in['prep_start_date'] ?? ''));
-        $start = $start !== '' ? $start : (string) ($old['prep_start_date'] ?? AppTime::today());
         $opt = static function (mixed $v) use (&$errors): ?string {
             $v = trim((string) $v);
             if ($v === '') {
@@ -161,40 +258,44 @@ final class DeliveryService
 
             return $v;
         };
+        $fixed = $opt($in['fixed_start_date'] ?? '');
         $earliest = $opt($in['earliest_date'] ?? '');
         $latest = $opt($in['latest_date'] ?? '');
-        if (!self::validDate($start)) {
-            $errors[] = 'The preparation start date is not a valid date.';
-        }
-        if ($errors === [] && $latest !== null && $latest < max($earliest ?? '', $start)) {
+        if ($errors === [] && $latest !== null && $latest < max($earliest ?? '', $fixed ?? '')) {
             $errors[] = 'The latest selectable date must be after the earliest date.';
         }
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
         $days = (int) $daysRaw;
-        $eligibility = self::addDays($start, $days);
         $enabled = !empty($in['booking_enabled']) && $in['booking_enabled'] !== '0' ? 1 : 0;
         $multiple = Gate::hasRole('super_admin', $actorId) ? (!empty($in['allow_multiple']) && $in['allow_multiple'] !== '0' ? 1 : 0) : (int) ($old['allow_multiple'] ?? 0);
+        $new = ['preparation_days' => $days, 'preparation_unit' => $unit, 'earliest_date' => $earliest, 'fixed_start_date' => $fixed];
+        $shown = self::earliestFor($new, $fixed ?? AppTime::today()); // what a project starting on the fixed date (or today) could first choose: for the team's overview
 
-        $earlier = Database::transaction(function () use ($actorId, $project, $old, $days, $start, $eligibility, $earliest, $latest, $enabled, $multiple): int {
+        $earlier = Database::transaction(function () use ($actorId, $project, $old, $days, $unit, $fixed, $shown, $earliest, $latest, $enabled, $multiple, $new): int {
             Database::run('SELECT id FROM projects WHERE id = ? FOR UPDATE', [$project['id']]);
             Database::run(
-                'INSERT INTO project_delivery_settings (project_id, preparation_days, prep_start_date, eligibility_date, earliest_date, latest_date, booking_enabled, allow_multiple, updated_by, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
-                 ON DUPLICATE KEY UPDATE preparation_days = VALUES(preparation_days), prep_start_date = VALUES(prep_start_date), eligibility_date = VALUES(eligibility_date), earliest_date = VALUES(earliest_date),
-                    latest_date = VALUES(latest_date), booking_enabled = VALUES(booking_enabled), allow_multiple = VALUES(allow_multiple), updated_by = VALUES(updated_by), updated_at = UTC_TIMESTAMP()',
-                [$project['id'], $days, $start, $eligibility, $earliest, $latest, $enabled, $multiple, $actorId],
+                'INSERT INTO project_delivery_settings (project_id, preparation_days, preparation_unit, fixed_start_date, prep_start_date, eligibility_date, earliest_date, latest_date, booking_enabled, allow_multiple, updated_by, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())
+                 ON DUPLICATE KEY UPDATE preparation_days = VALUES(preparation_days), preparation_unit = VALUES(preparation_unit), fixed_start_date = VALUES(fixed_start_date), prep_start_date = VALUES(prep_start_date),
+                    eligibility_date = VALUES(eligibility_date), earliest_date = VALUES(earliest_date), latest_date = VALUES(latest_date), booking_enabled = VALUES(booking_enabled),
+                    allow_multiple = VALUES(allow_multiple), updated_by = VALUES(updated_by), updated_at = UTC_TIMESTAMP()',
+                [$project['id'], $days, $unit, $fixed, $fixed ?? AppTime::today(), $shown, $earliest, $latest, $enabled, $multiple, $actorId],
             );
-            $newFrom = max($eligibility, $earliest ?? '');
-            $n = (int) Database::one("SELECT COUNT(*) AS c FROM delivery_appointments WHERE project_id = ? AND status = 'confirmed' AND appointment_date < ?", [$project['id'], $newFrom])['c'];
-            $before = $old === null ? 'not set up' : ($old['preparation_days'] . ' days, from ' . max((string) $old['eligibility_date'], (string) ($old['earliest_date'] ?? '')));
-            self::log(null, (int) $project['id'], null, 'plan_saved', $before, $days . ' days, from ' . $newFrom . ($enabled ? '' : ', booking off'), $actorId, null);
-            Audit::record('delivery.plan_saved', 'project', (int) $project['id'], $old ?? [], ['preparation_days' => $days, 'eligibility_date' => $eligibility, 'earliest_date' => $earliest, 'latest_date' => $latest, 'booking_enabled' => $enabled, 'allow_multiple' => $multiple], [], $actorId);
+            $n = 0;
+            foreach (Database::all("SELECT appointment_date, project_start_date, created_at FROM delivery_appointments WHERE project_id = ? AND status = 'confirmed'", [$project['id']]) as $a) {
+                $start = (string) ($a['project_start_date'] ?? $fixed ?? substr((string) $a['created_at'], 0, 10));
+                $n += (string) $a['appointment_date'] < self::earliestFor($new, $start) ? 1 : 0;
+            }
+            $before = $old === null ? 'not set up' : self::durationText($old);
+            self::log(null, (int) $project['id'], null, 'plan_saved', $before, self::durationText($new) . ($fixed ? ', start ' . $fixed : '') . ($enabled ? '' : ', booking off'), $actorId, null);
+            Audit::record('delivery.plan_saved', 'project', (int) $project['id'], $old ?? [], ['preparation_days' => $days, 'preparation_unit' => $unit, 'fixed_start_date' => $fixed, 'earliest_date' => $earliest, 'latest_date' => $latest, 'booking_enabled' => $enabled, 'allow_multiple' => $multiple], [], $actorId);
 
             return $n;
         });
-        $changed = $old === null || (string) $old['eligibility_date'] !== $eligibility || (string) ($old['earliest_date'] ?? '') !== (string) $earliest || (int) $old['booking_enabled'] !== $enabled || (string) ($old['latest_date'] ?? '') !== (string) $latest;
+        $changed = $old === null || (int) $old['preparation_days'] !== $days || (string) $old['preparation_unit'] !== $unit || (string) ($old['fixed_start_date'] ?? '') !== (string) $fixed
+            || (string) ($old['earliest_date'] ?? '') !== (string) $earliest || (int) $old['booking_enabled'] !== $enabled || (string) ($old['latest_date'] ?? '') !== (string) $latest;
         if ($changed) {
             DeliveryMail::availabilityChanged($project);
         }
@@ -354,7 +455,7 @@ final class DeliveryService
             throw new ValidationException([$plan['message'] ?? 'Delivery booking is not open for this project.']);
         }
         if ($plan['eligible_from'] !== null && $ymd < $plan['eligible_from']) {
-            throw new ValidationException(['Your project is still being prepared: the first date you can choose is ' . local_date((string) ($plan['eligible_from'] ?? $plan['earliest']), 'j F Y') . '.']);
+            throw new ValidationException(['The delivery date must be after the estimated time of ' . $plan['duration'] . ' from the project start date (' . local_date((string) $plan['start'], 'j F Y') . '): the first date you can choose is ' . local_date($plan['eligible_from'], 'j F Y') . '.']);
         }
         if ($plan['earliest'] !== null && $ymd < $plan['earliest']) {
             throw new ValidationException(['The first date you can choose is ' . local_date($plan['earliest'], 'j F Y') . '.']);
@@ -381,7 +482,7 @@ final class DeliveryService
      * slot of that date (total capacity is unchanged). A staff member holding delivery.configure may pass 'override_eligibility' to book inside the preparation period.
      *
      * @param array<string,mixed> $project a projects row
-     * @param array{client_notes?:string,internal_notes?:string,override_eligibility?:bool} $opts
+     * @param array{client_notes?:string,internal_notes?:string,override_eligibility?:bool,start_date?:string} $opts
      * @return array<string,mixed> the appointment row
      */
     public static function book(array $project, string $ymd, string $source, ?int $actorId, array $opts = []): array
@@ -402,10 +503,13 @@ final class DeliveryService
         }
 
         self::ensureDay($ymd);
-        $id = self::retrying(fn (): int => Database::transaction(function () use ($project, $ymd, $source, $actorId, $override, $clientNotes, $internal): int {
+        $startGiven = (string) ($opts['start_date'] ?? '');
+        $id = self::retrying(fn (): int => Database::transaction(function () use ($project, $ymd, $source, $actorId, $override, $clientNotes, $internal, $startGiven): int {
             Database::run('SELECT id FROM projects WHERE id = ? FOR UPDATE', [$project['id']]);
             $fresh = Database::one('SELECT * FROM projects WHERE id = ?', [$project['id']]) ?? throw new ValidationException(['Project not found.']);
-            $plan = self::plan($fresh, true);
+            $row = self::settingsRow((int) $fresh['id'], true);
+            $start = $row === null ? null : self::resolveStart($row, $startGiven);
+            $plan = self::plan($fresh, true, $start);
             self::requireAllowed($plan, $ymd, $override);
             if ($plan['active'] !== null && (int) ($plan['row']['allow_multiple'] ?? 0) !== 1) {
                 throw new ValidationException(['This project already has a delivery appointment (' . $plan['active']['booking_reference'] . ') for ' . local_date((string) $plan['active']['appointment_date'], 'j F Y') . '. Please reschedule it instead.']);
@@ -423,9 +527,9 @@ final class DeliveryService
             }
             $ref = self::newReference();
             Database::run(
-                'INSERT INTO delivery_appointments (booking_reference, project_id, client_id, appointment_date, booking_source, status, client_notes, internal_notes, created_by, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, \'confirmed\', ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
-                [$ref, $fresh['id'], $fresh['client_id'], $ymd, $source, $clientNotes === '' ? null : $clientNotes, $internal === '' ? null : $internal, $source === 'client_dashboard' || $source === 'public_link' ? null : $actorId],
+                'INSERT INTO delivery_appointments (booking_reference, project_id, client_id, appointment_date, project_start_date, booking_source, status, client_notes, internal_notes, created_by, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, \'confirmed\', ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())',
+                [$ref, $fresh['id'], $fresh['client_id'], $ymd, $start, $source, $clientNotes === '' ? null : $clientNotes, $internal === '' ? null : $internal, $source === 'client_dashboard' || $source === 'public_link' ? null : $actorId],
             );
             $aid = Database::insertId();
             self::log($aid, (int) $fresh['id'], $ymd, 'booked', null, $ymd . ' (' . self::sourceLabel($source) . ')', $actorId, $source === 'public_link' ? 'Public booking link' : null);
@@ -494,7 +598,9 @@ final class DeliveryService
                 throw new ValidationException(['That is already the appointment date. Choose a different date.']);
             }
             $project = Database::one('SELECT * FROM projects WHERE id = ?', [$cur['project_id']]) ?? throw new HttpException(404);
-            $plan = self::plan($project, true);
+            $row = self::settingsRow((int) $project['id'], true);
+            $start = $row === null ? null : ($cur['project_start_date'] !== null ? (string) $cur['project_start_date'] : self::resolveStart($row, null));
+            $plan = self::plan($project, true, $start);
             if (!$override) {
                 // the project's own rules apply to the new date; "already booked" must not stop moving the existing appointment
                 if ($plan['state'] === 'booked') {
@@ -783,7 +889,7 @@ final class DeliveryService
         $w['delivery.default_capacity'] = $int('default_capacity', 0, 50, 'Daily capacity');
         $w['delivery.client_cutoff_days'] = $int('client_cutoff_days', 0, 60, 'Client change cut-off');
         $w['delivery.max_reschedules'] = $int('max_reschedules', 0, 10, 'Client reschedules');
-        $w['delivery.max_days_ahead'] = $int('max_days_ahead', 7, 730, 'Booking window');
+        $w['delivery.max_days_ahead'] = $int('max_days_ahead', 7, 730, 'Furthest start date');
         $mail = trim((string) ($in['notify_email'] ?? ''));
         if ($mail !== '' && !filter_var($mail, FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'The notification address is not a valid email address.';

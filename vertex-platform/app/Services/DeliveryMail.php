@@ -50,6 +50,7 @@ final class DeliveryMail
             'Client' => (string) $a['contact_name'],
             'Project' => (string) $a['project_title'],
             'Project ID' => (string) $a['project_code'],
+            'Project start date' => !empty($a['project_start_date']) ? DeliveryService::nice((string) $a['project_start_date']) : '',
             'Delivery date' => DeliveryService::nice((string) $a['appointment_date']),
             'Booking reference' => (string) $a['booking_reference'],
             'Status' => DeliveryService::STATUSES[$a['status']] ?? (string) $a['status'],
@@ -158,8 +159,8 @@ final class DeliveryMail
         $button = self::link('/projects/' . $project['public_id'] . '/delivery');
         $spec = [
             'subject' => 'Your KIS Delivery Booking Dates Were Updated', 'category' => 'Delivery appointment', 'tone' => 'info', 'heading' => 'Delivery booking dates updated', 'name' => (string) $client['contact_name'],
-            'paragraphs' => [$plan['state'] === 'open' || $plan['state'] === 'booked' || $plan['state'] === 'preparing' ? $plan['message'] : 'The dates for booking your project delivery were updated by our team.', 'An appointment you have already confirmed is not changed by this.'],
-            'details' => ['Project' => (string) $project['title'], 'Project ID' => (string) $project['code'], 'First date you can choose' => $plan['eligible_from'] === null ? '' : DeliveryService::nice($plan['eligible_from'])],
+            'paragraphs' => [$plan['configured'] ? 'The estimated time for your project is ' . $plan['duration'] . '. Your delivery date must be after that time has passed, counted from your project start date.' : 'The dates for booking your project delivery were updated by our team.', 'An appointment you have already confirmed is not changed by this.'],
+            'details' => ['Project' => (string) $project['title'], 'Project ID' => (string) $project['code'], 'Estimated time' => (string) $plan['duration'], 'Project start date (set by our team)' => $plan['start_fixed'] && $plan['start'] !== null ? DeliveryService::nice($plan['start']) : ''],
         ];
         if ($button !== null) {
             $spec['button'] = $button;

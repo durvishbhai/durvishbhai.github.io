@@ -156,7 +156,7 @@ final class DeliveryAdminController extends Controller
         $uid = $this->actorId();
         $project = ProjectPolicy::findById((int) $a['project_id']);
         $r = $this->page('admin/delivery/show', [
-            'title' => 'Delivery appointment ' . $a['booking_reference'], 'a' => $a, 'project' => $project, 'plan' => DeliveryService::plan($project), 'history' => DeliveryService::history((int) $a['id']),
+            'title' => 'Delivery appointment ' . $a['booking_reference'], 'a' => $a, 'project' => $project, 'plan' => DeliveryService::plan($project, false, $a['project_start_date'] !== null ? (string) $a['project_start_date'] : null), 'history' => DeliveryService::history((int) $a['id']),
             'day' => DeliveryService::day((string) $a['appointment_date']), 'canManage' => Gate::can('delivery.manage', $uid) && in_array(ProjectPolicy::level($uid, $project), ['all', 'assigned'], true),
             'canConfigure' => Gate::can('delivery.configure', $uid), 'sources' => DeliveryService::SOURCES, 'statuses' => DeliveryService::STATUSES,
         ]);
@@ -233,7 +233,7 @@ final class DeliveryAdminController extends Controller
     /** A booking for a client who asked by phone or WhatsApp. @param array<string,string> $params */
     public function manual(Request $request, array $params = []): Response
     {
-        $in = ['project' => $request->string('project'), 'date' => $request->string('date'), 'source' => $request->string('source'), 'internal_notes' => $request->string('internal_notes')];
+        $in = ['project' => $request->string('project'), 'date' => $request->string('date'), 'start_date' => $request->string('start_date'), 'source' => $request->string('source'), 'internal_notes' => $request->string('internal_notes')];
 
         return $this->guarded(function () use ($request, $in): Response {
             $project = ProjectPolicy::find($in['project']);
@@ -241,7 +241,7 @@ final class DeliveryAdminController extends Controller
                 throw new ValidationException(['Choose one of your projects.']);
             }
             $source = in_array($in['source'], ['manual', 'admin_reserved'], true) ? $in['source'] : 'manual';
-            $a = DeliveryService::book($project, $in['date'], $source, $this->actorId(), ['internal_notes' => $in['internal_notes'], 'override_eligibility' => $request->string('override') === '1']);
+            $a = DeliveryService::book($project, $in['date'], $source, $this->actorId(), ['internal_notes' => $in['internal_notes'], 'start_date' => $in['start_date'], 'override_eligibility' => $request->string('override') === '1']);
 
             return $this->ok($this->toAppt($a), 'Booked for ' . DeliveryService::nice((string) $a['appointment_date']) . '. The client was emailed.');
         }, '/admin/delivery', $in);

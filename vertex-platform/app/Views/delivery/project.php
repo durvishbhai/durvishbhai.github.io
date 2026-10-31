@@ -14,8 +14,9 @@ $statusClass = ['confirmed' => 'ok', 'completed' => 'ok', 'cancelled' => 'bad'];
     <div class="detail-grid">
         <div><span class="muted">Project</span><br><?= e($project['title']) ?></div>
         <div><span class="muted">Project ID</span><br><?= e($project['code']) ?></div>
-        <div><span class="muted">Preparation time</span><br><?= $row ? e($row['preparation_days']) . ' day(s)' : 'Not set yet' ?></div>
-        <div><span class="muted">First date you can choose</span><br><?= $plan['eligible_from'] ? e(local_date($plan['eligible_from'], 'j F Y')) : '—' ?></div>
+        <div><span class="muted">Estimated time</span><br><?= $row ? e($plan['duration']) : 'Not set yet' ?></div>
+        <div><span class="muted">Project start date</span><br><?= $plan['start'] ? e(local_date($plan['start'], 'j F Y')) . ($plan['start_fixed'] ? '<br><span class="muted">set by our team</span>' : '') : 'Not chosen yet' ?></div>
+        <div><span class="muted">First delivery date you can choose</span><br><?= $plan['eligible_from'] ? e(local_date($plan['eligible_from'], 'j F Y')) : '—' ?></div>
         <div><span class="muted">Appointment date</span><br><?= $appt && $appt['status'] !== 'cancelled' ? e(local_date((string) $appt['appointment_date'], 'j F Y')) : 'Not booked' ?></div>
         <div><span class="muted">Status</span><br><?php if ($appt) : ?><span class="badge badge-d-<?= e($appt['status']) ?>"><?= e(ucfirst((string) $appt['status'])) ?></span><?php else : ?>Not booked<?php endif; ?></div>
     </div>
@@ -48,20 +49,31 @@ $statusClass = ['confirmed' => 'ok', 'completed' => 'ok', 'cancelled' => 'bad'];
 </div>
 <?php endif; ?>
 
+<?php if ($plan['state'] === 'need_start') : ?>
+<div class="panel" id="start"><h2>Step 1 · Choose your project start date</h2>
+    <p class="muted">Our team estimates this project at <strong><?= e($plan['duration']) ?></strong>. Tell us the day the project should start. Your delivery date must then be <strong>after</strong> that estimated time has passed: for example, starting 1 January with an estimate of 2 months, the first delivery date you can choose is 2 March.</p>
+    <form method="get" action="<?= e($base) ?>#calendar" class="form-grid">
+        <div class="field"><label for="sd">Project start date</label><input id="sd" name="start" type="date" required min="<?= e($plan['start_min']) ?>" max="<?= e($plan['start_max']) ?>" value="<?= e($startParam ?? '') ?>"></div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit">Show delivery dates</button></div></form>
+</div>
+<?php endif; ?>
+
 <?php if ($cal !== null) : ?>
-<div class="panel" id="calendar"><h2><?= $mode === 'reschedule' ? 'Choose a new delivery date' : 'Choose your delivery date' ?></h2>
-    <p class="muted"><?= $mode === 'reschedule' ? 'Your current date stays until you confirm a new one.' : e($plan['message']) ?> Dates that are fully booked or unavailable cannot be selected.</p>
-    <?= View::partial('delivery-calendar', ['cal' => $cal, 'base' => $base, 'selected' => $selected, 'query' => $mode === 'reschedule' ? ['mode' => 'reschedule'] : []]) ?>
+<div class="panel" id="calendar"><h2><?= $mode === 'reschedule' ? 'Choose a new delivery date' : 'Step 2 · Choose your delivery date' ?></h2>
+    <p class="muted"><?= $mode === 'reschedule' ? 'Your current date stays until you confirm a new one. ' : '' ?><?= e($plan['message']) ?> Dates before that, and dates that are fully booked or unavailable, cannot be selected.
+        <?php if ($startFromUser && $mode !== 'reschedule') : ?><a href="<?= e($base) ?>#start">Change the start date</a><?php endif; ?></p>
+    <?= View::partial('delivery-calendar', ['cal' => $cal, 'base' => $base, 'selected' => $selected, 'query' => array_filter(['mode' => $mode === 'reschedule' ? 'reschedule' : '', 'start' => $startFromUser && $mode !== 'reschedule' ? (string) $start : ''], static fn ($x): bool => $x !== '')]) ?>
     <?php if ($selected !== '') : ?>
     <div class="review" id="review"><h3>Review your booking</h3>
-        <dl class="detail-list"><dt>Project</dt><dd><?= e($project['title']) ?> (<?= e($project['code']) ?>)</dd><dt>Delivery date</dt><dd><strong><?= e(\Vertex\Services\DeliveryService::nice($selected)) ?></strong></dd>
+        <dl class="detail-list"><dt>Project</dt><dd><?= e($project['title']) ?> (<?= e($project['code']) ?>)</dd>
+            <dt>Project start date</dt><dd><?= e(local_date((string) $plan['start'], 'j F Y')) ?></dd><dt>Estimated time</dt><dd><?= e($plan['duration']) ?></dd>
             <?php if ($mode === 'reschedule' && $appt) : ?><dt>Replaces</dt><dd><?= e(local_date((string) $appt['appointment_date'], 'j F Y')) ?></dd><?php endif; ?></dl>
         <?php if ($staff && !$canManage) : ?><p class="muted">You can view this project's delivery calendar. Booking for clients needs the "manage delivery appointments" permission.</p><?php else : ?>
-        <form method="post" action="<?= e($base) ?>/<?= $staff ? 'manual' : ($mode === 'reschedule' ? 'reschedule' : 'book') ?>" class="form-grid"><?= csrf_field() ?><input type="hidden" name="date" value="<?= e($selected) ?>"><?php if ($staff) : ?><input type="hidden" name="source" value="manual"><?php endif; ?>
+        <form method="post" action="<?= e($base) ?>/<?= $staff ? 'manual' : ($mode === 'reschedule' ? 'reschedule' : 'book') ?>" class="form-grid"><?= csrf_field() ?><input type="hidden" name="date" value="<?= e($selected) ?>"><input type="hidden" name="start_date" value="<?= e((string) $plan['start']) ?>"><?php if ($staff) : ?><input type="hidden" name="source" value="manual"><?php endif; ?>
             <?php if ($mode === 'reschedule' && $appt) : ?><input type="hidden" name="reference" value="<?= e($appt['booking_reference']) ?>"><?php endif; ?>
             <?php if ($mode !== 'reschedule' && !$staff) : ?><div class="field"><label for="cn">Anything we should know? (optional)</label><textarea id="cn" name="client_notes" rows="2" maxlength="500"></textarea></div><?php endif; ?>
             <?php if ($staff) : ?><div class="field"><label for="cin">Internal note (optional)</label><textarea id="cin" name="internal_notes" rows="2" maxlength="2000"></textarea></div><?php endif; ?>
-            <div class="form-actions"><button class="btn btn-primary" type="submit"><?= $staff ? 'Book for the client' : ($mode === 'reschedule' ? 'Confirm new date' : 'Confirm delivery appointment') ?></button></div></form><?php endif; ?>
+            <div class="form-actions"><button class="btn btn-primary" type="submit"><?= $staff ? 'Book for the client' : ($mode === 'reschedule' ? 'Confirm new date' : 'Confirm delivery appointment') ?> · <?= e(local_date($selected, 'j M Y')) ?></button></div></form><?php endif; ?>
     </div>
     <?php endif; ?>
 </div>
@@ -70,18 +82,18 @@ $statusClass = ['confirmed' => 'ok', 'completed' => 'ok', 'cancelled' => 'bad'];
 <?php if ($staff) : ?>
 <div class="panel"><h2>Delivery settings for this project</h2>
     <?php if (!$canConfigure) : ?><p class="muted">Only the Owner and Administrators can change the preparation time.</p><?php endif; ?>
-    <p class="muted">The client can choose a delivery date only after the preparation time is over. Preparation time counts from the start date (today when you first save). Example: start 1 November + 60 days = <?= e(local_date('2026-12-31', 'j F Y')) ?>; set "Earliest selectable date" if you want a later first day (for example 1 January). Changing the time never touches an appointment that is already confirmed.</p>
+    <p class="muted">Set how long the project is estimated to take. The <strong>client chooses the project start date</strong>, and the delivery date must be <strong>after</strong> start + this time (start 1 January + 2 months: the first delivery date is 2 March). If you would rather decide the start yourself, fix it below. Changing the estimate never touches an appointment that is already confirmed.</p>
     <form method="post" action="<?= e($base) ?>/plan" class="form-grid" novalidate><?= csrf_field() ?>
-        <div class="field"><label for="pd">Preparation time (days)</label><input id="pd" name="preparation_days" inputmode="numeric" required value="<?= e($v('preparation_days', (string) ($row['preparation_days'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>><p class="hint">For example 7, 15, 30 or 60.</p></div>
-        <div class="field"><label for="ps">Preparation starts on</label><input id="ps" name="prep_start_date" type="date" value="<?= e($v('prep_start_date', (string) ($row['prep_start_date'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>><p class="hint">Leave empty to use today (or keep the saved date).</p></div>
-        <div class="field"><label>Booking eligibility date</label><input value="<?= e($row ? local_date((string) $row['eligibility_date'], 'j F Y') : 'Calculated when you save') ?>" disabled></div>
+        <div class="field"><label for="pd">Estimated time to complete</label><input id="pd" name="preparation_days" inputmode="numeric" required value="<?= e($v('preparation_days', (string) ($row['preparation_days'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>></div>
+        <div class="field"><label for="pu">Unit</label><select id="pu" name="preparation_unit"<?= $canConfigure ? '' : ' disabled' ?>><?php foreach (\Vertex\Services\DeliveryService::UNITS as $c => $l) : ?><option value="<?= e($c) ?>"<?= $v('preparation_unit', (string) ($row['preparation_unit'] ?? 'days')) === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+        <div class="field"><label for="ps">Fixed project start date (optional)</label><input id="ps" name="fixed_start_date" type="date" value="<?= e($v('fixed_start_date', (string) ($row['fixed_start_date'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>><p class="hint">Leave empty to let the client choose their start date.</p></div>
         <div class="field"><label for="pe">Earliest selectable delivery date (optional)</label><input id="pe" name="earliest_date" type="date" value="<?= e($v('earliest_date', (string) ($row['earliest_date'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>></div>
         <div class="field"><label for="pl">Latest selectable delivery date (optional)</label><input id="pl" name="latest_date" type="date" value="<?= e($v('latest_date', (string) ($row['latest_date'] ?? ''))) ?>"<?= $canConfigure ? '' : ' disabled' ?>></div>
         <div class="field"><label class="check"><input type="checkbox" name="booking_enabled" value="1"<?= !$row || (int) $row['booking_enabled'] === 1 ? ' checked' : '' ?><?= $canConfigure ? '' : ' disabled' ?>> Booking is open for this project</label>
             <?php if ($isOwner) : ?><label class="check"><input type="checkbox" name="allow_multiple" value="1"<?= $row && (int) $row['allow_multiple'] === 1 ? ' checked' : '' ?>> Allow more than one active appointment (Owner only)</label><?php endif; ?></div>
         <?php if ($canConfigure) : ?><div class="form-actions"><button class="btn btn-primary" type="submit">Save delivery settings</button></div><?php endif; ?>
     </form>
-    <p>Status: <strong><?= e(ucfirst(str_replace('_', ' ', $plan['state']))) ?></strong> &middot; first selectable date <?= e(local_date($plan['earliest'], 'j F Y')) ?> &middot; last <?= e(local_date($plan['latest'], 'j F Y')) ?></p>
+    <p>Status: <strong><?= e(ucfirst(str_replace('_', ' ', $plan['state']))) ?></strong><?= $plan['earliest'] ? ' &middot; for the start date shown above, the first delivery date is ' . e(local_date($plan['earliest'], 'j F Y')) : '' ?></p>
 </div>
 
 <?php if ($canConfigure && $row) : ?>
@@ -97,10 +109,11 @@ $statusClass = ['confirmed' => 'ok', 'completed' => 'ok', 'cancelled' => 'bad'];
 <div class="panel"><h2>Book for the client (phone, WhatsApp, in person)</h2>
     <p class="muted">Uses the same daily capacity as online bookings, and the same preparation rules.<?= $canConfigure ? ' As Owner or Administrator you may tick the override to book inside the preparation time.' : '' ?></p>
     <form method="post" action="<?= e($base) ?>/manual" class="form-grid"><?= csrf_field() ?>
+        <div class="field"><label for="msd">Project start date</label><input id="msd" name="start_date" type="date" value="<?= e($v('start_date', (string) ($row['fixed_start_date'] ?? ''))) ?>"><p class="hint">Empty = today<?= $row && !empty($row['fixed_start_date']) ? ' (the team fixed this project\'s start date)' : '' ?>. The delivery date must be after start + the estimated time.</p></div>
         <div class="field"><label for="md">Delivery date</label><input id="md" name="date" type="date" required value="<?= e($v('date')) ?>"></div>
         <div class="field"><label for="ms">Booking type</label><select id="ms" name="source"><option value="manual">Manual / Offline Booking</option><option value="admin_reserved"<?= $v('source') === 'admin_reserved' ? ' selected' : '' ?>>Admin Reserved Slot (uses a reserved slot on that date)</option></select></div>
         <div class="field"><label for="mn">Internal note</label><textarea id="mn" name="internal_notes" rows="2" maxlength="2000"><?= e($v('internal_notes')) ?></textarea></div>
-        <?php if ($canConfigure) : ?><div class="field"><label class="check"><input type="checkbox" name="override" value="1"> Override the preparation time</label></div><?php endif; ?>
+        <?php if ($canConfigure) : ?><div class="field"><label class="check"><input type="checkbox" name="override" value="1"> Override the estimated-time rule</label></div><?php endif; ?>
         <div class="form-actions"><button class="btn btn-primary" type="submit" data-confirm="Book this date for the client and email them?">Book this date</button></div></form>
 </div>
 <?php endif; ?>
