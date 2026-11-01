@@ -2,7 +2,7 @@
 
 Krazy Integrated Solutions (KIS) platform. **This is an engineering report, not legal advice.** Nothing here says the website "is compliant" with any law. The system provides the tools, the draft texts and the evidence trail; the Owner and an Indian lawyer decide what is correct for the business. Every item that needs that decision is listed in section H.
 
-Test status (final full run) is recorded in section F at the end of this file.
+Test status: the full automated suite (1,062 tests, 38,290 assertions) passes. New suites for this work: legal documents, policy acceptance, cookie consent, integrations and services, data deletion, consent forms, accessibility, compliance dashboard. A first full run found two real defects (an undefined variable when staff create a client account, and a stale settings cache); both were fixed and the suite re-run clean. Automated tests do not replace legal review or a manual accessibility audit.
 
 ---
 
