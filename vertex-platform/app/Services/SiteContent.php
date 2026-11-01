@@ -325,6 +325,10 @@ final class SiteContent
         $d = SiteEntities::def($entity);
         $extra = $entity === 'jobs' ? ' AND (deadline IS NULL OR deadline >= ' . Database::connection()->quote(AppTime::today()) . ')' : '';
         $order = $entity === 'faqs' ? 'category, position, id' : ($entity === 'team' ? "FIELD(department, 'leadership','creative','development','operations'), position, id" : ($entity === 'policies' ? 'title' : 'position, id'));
+        if ($entity === 'services') {
+            ServiceAvailability::reconcile();
+            $extra = " AND availability <> 'discontinued'"; // a discontinued service is never advertised
+        }
         try {
             return Database::all("SELECT * FROM {$d['table']} WHERE status = 'published'{$extra} ORDER BY {$order}");
         } catch (\Throwable) {
@@ -336,7 +340,7 @@ final class SiteContent
     public static function publishedBySlug(string $entity, string $slug): ?array
     {
         $d = SiteEntities::def($entity);
-        $extra = $entity === 'jobs' ? ' AND (deadline IS NULL OR deadline >= ' . Database::connection()->quote(AppTime::today()) . ')' : '';
+        $extra = $entity === 'jobs' ? ' AND (deadline IS NULL OR deadline >= ' . Database::connection()->quote(AppTime::today()) . ')' : ($entity === 'services' ? " AND availability <> 'discontinued'" : '');
         $col = $entity === 'policies' ? 'slug' : 'slug';
 
         return preg_match('/^[a-z0-9-]{1,80}$/', $slug) ? Database::one("SELECT * FROM {$d['table']} WHERE {$col} = ? AND status = 'published'{$extra}", [$slug]) : null;

@@ -5,7 +5,7 @@ $h = SiteSections::get('services', 'header'); ?>
 <section class="pub-section"><div class="container">
     <?php if ($services === []) : ?><div class="empty-card"><p><?= st(SiteSections::get('services', 'empty')['body']) ?></p><p><a class="btn btn-primary" href="/contact">Contact us</a></p></div>
     <?php else : ?><div class="service-grid"><?php foreach ($services as $s) : ?>
-        <a class="service-card" href="/services/<?= e($s['slug']) ?>"><span class="service-icon"><?= sicon((string) $s['icon']) ?></span><h2><?= st((string) $s['name']) ?></h2><p><?= st((string) $s['summary']) ?></p>
+        <a class="service-card" href="/services/<?= e($s['slug']) ?>"><span class="service-icon"><?= sicon((string) $s['icon']) ?></span><h2><?= st((string) $s['name']) ?></h2><?php if (\Vertex\Services\ServiceAvailability::badge($s) !== '') : ?><span class="badge badge-d-request svc-badge"><?= e(\Vertex\Services\ServiceAvailability::badge($s)) ?></span><?php endif; ?><p><?= st((string) $s['summary']) ?></p>
             <?php if ((int) $s['show_price'] === 1 && $s['starting_price_minor'] !== null) : ?><p class="price">From <?= e(money((int) $s['starting_price_minor'])) ?></p><?php endif; ?><span class="more">View details <?= sicon('arrow') ?></span></a>
     <?php endforeach; ?></div><?php endif; ?>
 </div></section>

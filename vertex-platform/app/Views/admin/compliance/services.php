@@ -1,0 +1,9 @@
+<?php /** @var list<array<string,mixed>> $rows */ use Vertex\Services\ServiceAvailability; ?>
+<div class="page-head"><div><p class="eyebrow">Compliance &amp; legal</p><h1>Service availability</h1></div><a class="btn btn-ghost" href="/admin/site/services">Edit descriptions &amp; add services (Website)</a></div>
+<p class="muted">Only <strong>active</strong> services can be chosen in the public requirement forms. Suspended and coming-soon services are shown with a clear label; <strong>discontinued services are not advertised at all</strong>. Descriptions and new services are edited under Website → Services.</p>
+<div class="panel"><div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Website status</th><th>Availability</th><th>Note shown to visitors</th><th></th></tr></thead><tbody>
+<?php foreach ($rows as $r) : ?><tr><td><strong><?= e($r['name']) ?></strong></td><td><?= e(ucfirst((string) $r['status'])) ?></td>
+    <td colspan="3"><form method="post" action="/admin/compliance/services/<?= e($r['public_id']) ?>" class="inline-form"><?= csrf_field() ?>
+        <label class="sr-only" for="a<?= e($r['public_id']) ?>">Availability of <?= e($r['name']) ?></label><select id="a<?= e($r['public_id']) ?>" name="availability"><?php foreach (ServiceAvailability::LABELS as $c => $l) : ?><option value="<?= e($c) ?>"<?= $r['availability'] === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select>
+        <label class="sr-only" for="n<?= e($r['public_id']) ?>">Note</label><input id="n<?= e($r['public_id']) ?>" name="note" maxlength="300" value="<?= e((string) $r['availability_note']) ?>" placeholder="optional note">
+        <button class="btn btn-ghost btn-sm" type="submit">Save</button></form></td></tr><?php endforeach; ?></tbody></table></div></div>

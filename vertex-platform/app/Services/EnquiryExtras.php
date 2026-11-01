@@ -35,7 +35,9 @@ final class EnquiryExtras
     {
         $out = [];
         foreach (SiteContent::published('services') as $s) {
-            $out[(string) $s['slug']] = (string) $s['name'];
+            if (($s['availability'] ?? 'active') === 'active') { // suspended, coming-soon and discontinued services cannot be requested
+                $out[(string) $s['slug']] = (string) $s['name'];
+            }
         }
 
         return $out;

@@ -25,7 +25,7 @@ $btn = static fn (string $label, string $url, string $cls): string => $label !==
         <section class="pub-section pub-alt" id="services"><div class="container"><div class="pub-head"><h2><?= st($d['heading']) ?></h2><p class="lead"><?= st($d['intro']) ?></p></div>
             <?php if ($services === []) : ?><p class="empty-state">Our services will be listed here soon.</p><?php else : ?>
             <div class="service-grid"><?php foreach ($services as $s) : ?>
-                <a class="service-card" href="/services/<?= e($s['slug']) ?>"><span class="service-icon"><?= sicon((string) $s['icon']) ?></span><h3><?= st((string) $s['name']) ?></h3><p><?= st((string) $s['summary']) ?></p><span class="more">Learn more <?= sicon('arrow') ?></span></a>
+                <a class="service-card" href="/services/<?= e($s['slug']) ?>"><span class="service-icon"><?= sicon((string) $s['icon']) ?></span><h3><?= st((string) $s['name']) ?></h3><?php if (\Vertex\Services\ServiceAvailability::badge($s) !== '') : ?><span class="badge badge-d-request svc-badge"><?= e(\Vertex\Services\ServiceAvailability::badge($s)) ?></span><?php endif; ?><p><?= st((string) $s['summary']) ?></p><span class="more">Learn more <?= sicon('arrow') ?></span></a>
             <?php endforeach; ?></div>
             <p class="center"><a class="btn btn-ghost" href="/services"><?= st($d['button_label']) ?></a></p><?php endif; ?></div></section>
     <?php elseif ($key === 'why') : ?>

@@ -129,6 +129,7 @@ return static function (Router $router): void {
         $router->get('/' . $doc, [LegalController::class, 'show'], ['nosession']);
     }
     $router->get('/refund-and-cancellation-policy', [LegalController::class, 'refundAlias'], ['nosession']);
+    $router->get('/third-party-services', [LegalController::class, 'thirdParty'], ['nosession']);
     $router->get('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'settings'], ['nosession']);
     // The consent choice is stored in the visitor's own first-party cookie. No session exists on these pages, so there is no CSRF token: the endpoint accepts only requests that come from this site (Origin/Referer check) and is rate limited.
     $router->post('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'save'], ['nosession'], false);
@@ -694,6 +695,12 @@ return static function (Router $router): void {
         $r->post('/compliance/acceptance/{id}/remind', [ComplianceController::class, 'acceptanceRemind'], ['can:compliance.manage']);
         $r->post('/compliance/acceptance/{id}/extend', [ComplianceController::class, 'acceptanceExtend'], ['can:compliance.manage']);
         $r->post('/compliance/acceptance/{id}/record', [ComplianceController::class, 'acceptanceRecord'], ['can:compliance.manage']);
+        $r->get('/compliance/integrations', [ComplianceController::class, 'integrations'], ['can:compliance.manage']);
+        $r->get('/compliance/integrations/{id}', [ComplianceController::class, 'integration'], ['can:compliance.manage']);
+        $r->post('/compliance/integrations/{id}', [ComplianceController::class, 'saveIntegration'], ['can:compliance.manage']);
+        $r->post('/compliance/integrations/{id}/reviewed', [ComplianceController::class, 'reviewIntegration'], ['can:compliance.manage']);
+        $r->get('/compliance/services', [ComplianceController::class, 'services'], ['can:compliance.manage']);
+        $r->post('/compliance/services/{id}', [ComplianceController::class, 'saveService'], ['can:compliance.manage']);
         $r->get('/compliance/settings/{group}', [ComplianceController::class, 'settings'], ['can:compliance.manage']);
         $r->post('/compliance/settings/{group}', [ComplianceController::class, 'saveSettings'], ['can:compliance.manage']);
         $r->get('/delivery', [DeliveryAdminController::class, 'index'], ['can:delivery.view,delivery.view_assigned']);

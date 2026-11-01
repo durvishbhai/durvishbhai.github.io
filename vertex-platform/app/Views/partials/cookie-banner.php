@@ -5,7 +5,7 @@ $desc = \Vertex\Http\Controllers\CookieController::descriptions();
 $scripts = \Vertex\Services\CookieRegister::scripts();
 ?>
 <div id="kis-cookie-banner" class="cookie-banner" role="dialog" aria-labelledby="kis-cb-title" aria-describedby="kis-cb-text" hidden
-     data-version="<?= e((string) CookieConsent::version()) ?>" data-days="<?= e((string) max(1, ComplianceSettings::int('cookie_valid_days'))) ?>" data-scripts="<?= e((string) json_encode($scripts)) ?>">
+     data-version="<?= e((string) CookieConsent::version()) ?>" data-days="<?= e((string) max(1, ComplianceSettings::int('cookie_valid_days'))) ?>" data-scripts="<?= e((string) json_encode($scripts, JSON_UNESCAPED_SLASHES)) ?>">
     <div class="container cookie-inner">
         <div class="cookie-copy"><h2 id="kis-cb-title"><?= e(ComplianceSettings::get('cookie_banner_title')) ?></h2>
             <p id="kis-cb-text"><?= e(ComplianceSettings::get('cookie_banner_text')) ?> <a href="/cookie-policy">Cookie Policy</a></p></div>

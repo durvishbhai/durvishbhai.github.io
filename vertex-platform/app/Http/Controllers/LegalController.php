@@ -78,6 +78,12 @@ final class LegalController extends Controller
     }
 
     /** @param array<string,string> $params */
+    public function thirdParty(Request $request, array $params = []): Response
+    {
+        return $this->render('site/third-party', 'Third-Party Services', ['view' => \Vertex\Services\Integrations::publicView()], false, '/third-party-services');
+    }
+
+    /** @param array<string,string> $params */
     public function refundAlias(Request $request, array $params = []): Response
     {
         return Response::redirect('/refund-policy', 301);

@@ -168,18 +168,8 @@ final class SiteDefaults
             'deliverables' => $deliv, 'use_cases' => $use,
         ];
 
-        return [
-            $s('short-form-video-editing', 'Short-Form Video Editing', 'short', 'Create engaging short-form videos for reels, shorts and other social platforms.', "Edited short videos in the agreed format\nCaptions or on-screen text where requested\nExports for the platforms you name", "Social media campaigns\nProduct and announcement clips\nRepurposing longer videos into short clips"),
-            $s('youtube-long-form-video-editing', 'YouTube and Long-Form Video Editing', 'youtube', 'Turn raw footage into structured, polished videos with an engaging narrative.', "Edited long-form video\nStructure, pacing and transitions agreed with you\nExport in the required format", "YouTube channels\nInterviews, tutorials and presentations\nEvent and promotional videos"),
-            $s('social-media-management', 'Social Media Management', 'social', 'Support your online presence through content planning, publishing coordination and account management.', "Content planning\nPublishing coordination\nAccount management support as agreed", "Businesses starting or tidying up their social presence\nCampaign and announcement publishing"),
-            $s('thumbnail-design', 'Thumbnail Design', 'image', 'Design attention-grabbing thumbnails that communicate the subject clearly.', "Thumbnail images in the agreed size\nSource files only if agreed", "Video channels\nCourse and tutorial series"),
-            $s('poster-and-creative-design', 'Poster and Creative Design', 'poster', 'Create promotional graphics for campaigns, announcements and business communication.', "Poster and promotional graphics\nExports for print or digital use as agreed", "Campaign and event promotion\nAnnouncements and offers"),
-            $s('graphic-design', 'Graphic Design', 'design', 'Develop visual assets that support your brand identity and communication.', "Visual assets for the agreed purpose\nFiles in the formats you need", "Brand and marketing materials\nPresentations and documents"),
-            $s('content-writing', 'Content Writing', 'write', 'Prepare clear, audience-focused content for websites, campaigns and digital platforms.', "Written content for the agreed channel\nRevisions as permitted by the agreed scope", "Website pages\nCampaign copy and articles"),
-            $s('website-development', 'Website Development', 'web', 'Build responsive websites and web-based experiences aligned with business requirements.', "A responsive website built to the agreed requirements\nHandover as agreed", "Business and portfolio websites\nWeb-based tools aligned with your workflow"),
-            $s('ai-solutions', 'AI Solutions', 'spark', 'Explore practical AI-assisted tools and solutions for business workflows.', "An assessment of where AI-assisted tools can help\nImplementation of agreed solutions", "Drafting, summarising and research support\nInternal workflow assistance"),
-            $s('ai-automation', 'AI Automation', 'gear', 'Identify repetitive processes that can be improved through suitable automation.', "Identification of suitable processes\nImplementation of agreed automation", "Repetitive administrative tasks\nConnecting routine steps between tools"),
-        ];
+        // Exactly the services KIS offers today (video editing is suspended and social media management is discontinued, so neither is advertised as available).
+        return array_map(static fn (array $o): array => $s($o['slug'], $o['name'], $o['icon'], $o['summary'], "Deliverables agreed in writing with each client\nHandover as agreed", 'Described when we discuss your requirements'), ServiceAvailability::offered());
     }
 
     /** @return list<array{category:string,question:string,answer:string}> */

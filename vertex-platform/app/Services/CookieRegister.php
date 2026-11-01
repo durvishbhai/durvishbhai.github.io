@@ -27,11 +27,13 @@ final class CookieRegister
         }
     }
 
-    /** Enabling an optional integration asks everyone again: the consent version goes up by one per active optional integration. */
+    /** Enabling or changing an optional service asks everyone again: a counter in the compliance settings that only ever goes up. */
     public static function versionBump(): int
     {
         try {
-            return (int) Database::one("SELECT COALESCE(SUM(consent_epoch), 0) AS n FROM compliance_integrations WHERE is_active = 1 AND cookie_category IN ('preferences','analytics','marketing')")['n'];
+            $r = Database::one("SELECT value_text FROM compliance_settings WHERE setting_key = 'cookie_epoch'");
+
+            return $r === null ? 0 : (int) $r['value_text'];
         } catch (\Throwable) {
             return 0;
         }

@@ -12,7 +12,9 @@ use Vertex\Core\View;
 use Vertex\Http\Controllers\Controller;
 use Vertex\Services\ComplianceSettings;
 use Vertex\Services\HtmlSanitizer;
+use Vertex\Services\Integrations;
 use Vertex\Services\LegalDocuments;
+use Vertex\Services\ServiceAvailability;
 use Vertex\Services\PolicyAcceptance;
 
 /** Compliance & legal management: Owner only (`compliance.manage`, which Administrators do not hold by default). Every action is checked again in the services. */
@@ -243,5 +245,65 @@ final class ComplianceController extends Controller
 
             return $this->ok('/admin/compliance/acceptance/' . $id, 'The acceptance was recorded on the client\'s behalf.');
         }, '/admin/compliance/acceptance/' . $id);
+    }
+
+    // ------------------------------------------------------------------------------------------------ integrations register
+
+    /** @param array<string,string> $params */
+    public function integrations(Request $request, array $params = []): Response
+    {
+        return $this->page('admin/compliance/integrations', ['title' => 'Integrations & third-party services', 'rows' => Integrations::all(), 'warnings' => Integrations::warnings()]);
+    }
+
+    /** @param array<string,string> $params */
+    public function integration(Request $request, array $params = []): Response
+    {
+        $id = ($params['id'] ?? 'new') === 'new' ? null : (int) $params['id'];
+        $row = $id === null ? null : (Integrations::find($id) ?? throw new HttpException(404));
+        $r = $this->page('admin/compliance/integration', ['title' => $row ? $row['name'] : 'Add a service', 'row' => $row]);
+        Session::forget('_old');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function saveIntegration(Request $request, array $params = []): Response
+    {
+        $id = ($params['id'] ?? 'new') === 'new' ? null : (int) $params['id'];
+        $in = array_map(static fn ($v): string => is_scalar($v) ? (string) $v : '', $request->body);
+
+        return $this->guarded(function () use ($id, $in): Response {
+            $new = Integrations::save($this->actorId(), $id, $in);
+
+            return $this->ok('/admin/compliance/integrations', 'Saved. The public Third-Party Services page and the cookie list were updated.' . ($id === null ? '' : ''));
+        }, '/admin/compliance/integrations/' . ($id ?? 'new'), $in);
+    }
+
+    /** @param array<string,string> $params */
+    public function reviewIntegration(Request $request, array $params = []): Response
+    {
+        return $this->guarded(function () use ($params): Response {
+            Integrations::markReviewed($this->actorId(), (int) ($params['id'] ?? 0));
+
+            return $this->ok('/admin/compliance/integrations', 'Marked as reviewed today.');
+        }, '/admin/compliance/integrations');
+    }
+
+    // ------------------------------------------------------------------------------------------------ service availability
+
+    /** @param array<string,string> $params */
+    public function services(Request $request, array $params = []): Response
+    {
+        return $this->page('admin/compliance/services', ['title' => 'Service availability', 'rows' => ServiceAvailability::all()]);
+    }
+
+    /** @param array<string,string> $params */
+    public function saveService(Request $request, array $params = []): Response
+    {
+        return $this->guarded(function () use ($request, $params): Response {
+            ServiceAvailability::set($this->actorId(), (string) ($params['id'] ?? ''), $request->string('availability'), $request->string('note'));
+
+            return $this->ok('/admin/compliance/services', 'Availability updated on the public website.');
+        }, '/admin/compliance/services');
     }
 }

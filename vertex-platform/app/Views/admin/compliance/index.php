@@ -21,6 +21,8 @@ $badge = static fn (string $c, string $t): string => '<span class="badge badge-d
     <?php endforeach; ?></tbody></table></div>
 </div>
 
+<div class="panel"><h2>Integrations &amp; services</h2><ul class="plain-list"><li><a href="/admin/compliance/integrations">Third-party services register</a> (what the public disclosure page and the cookie list show)</li><li><a href="/admin/compliance/services">Service availability</a> (active, suspended, coming soon, discontinued)</li><li><a href="/admin/compliance/settings/cookies">Cookie banner text and consent version</a></li></ul></div>
+
 <div class="panel"><h2>Policy acceptance</h2><p class="muted">Material updates need clients' acceptance. <a href="/admin/compliance/acceptance">See who has accepted, send reminders or move the deadline</a>.</p></div>
 
 <div class="panel"><h2>Settings</h2>
