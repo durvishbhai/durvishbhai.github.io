@@ -18,7 +18,8 @@ $f = static fn (string $k, string $d = ''): string => old($k, $d); ?>
             <div class="field"><label for="document">Profile photo or supporting document <span class="muted">(optional)</span></label><input id="document" type="file" name="document[]"><p class="hint">Up to <?= e($limit) ?>. Allowed: <?= e($types) ?>.</p></div>
             <details class="panel"><summary>Referral Partner Terms (version <?= e($terms['version']) ?>: <?= e($terms['title']) ?>)</summary><p class="prewrap"><?= e($terms['terms']) ?></p></details>
             <label class="check"><input type="checkbox" name="agree" value="1" required><span>I have read and agree to the Referral Partner Terms (version <?= e($terms['version']) ?>).</span></label>
-            <p class="muted">We use these details only to review your application. A full privacy policy will be linked here before launch.</p>
+
+            <?= \Vertex\Core\View::partial('public-form-consent') ?>
             <div class="form-actions"><button class="btn btn-primary" type="submit">Submit application</button></div>
         </form>
     </div>

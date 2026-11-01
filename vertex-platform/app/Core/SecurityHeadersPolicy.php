@@ -16,6 +16,10 @@ final class SecurityHeadersPolicy
         $origins = '';
         try {
             $o = \Vertex\Services\Integrations::scriptOrigins(); // empty unless the Owner enabled an optional script (analytics etc.)
+            if (\Vertex\Services\Turnstile::enabled()) {
+                $o[] = \Vertex\Services\Turnstile::ORIGIN; // the bot check script, its frame and its calls
+            }
+            $o = array_values(array_unique($o));
             $origins = $o === [] ? '' : ' ' . implode(' ', $o);
         } catch (\Throwable) {
         }
@@ -25,7 +29,7 @@ final class SecurityHeadersPolicy
             'Referrer-Policy' => 'strict-origin-when-cross-origin',
             'Permissions-Policy' => 'camera=(), microphone=(), geolocation=(), payment=()',
             'Cross-Origin-Opener-Policy' => 'same-origin',
-            'Content-Security-Policy' => "default-src 'self'; img-src 'self' data:{$origins}; style-src 'self'; script-src 'self'{$origins}; connect-src 'self'{$origins}; "
+            'Content-Security-Policy' => "default-src 'self'; img-src 'self' data:{$origins}; style-src 'self'; script-src 'self'{$origins}; connect-src 'self'{$origins}; frame-src 'self'{$origins}; "
                 . "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
         ];
         if (Config::get('app.env') === 'production') {

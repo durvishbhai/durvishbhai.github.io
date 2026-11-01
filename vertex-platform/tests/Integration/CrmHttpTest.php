@@ -73,7 +73,7 @@ final class CrmHttpTest extends HttpTestCase
         return ['contact_name' => 'Web Visitor', 'email' => 'visitor@web.test', 'phone' => '+91 94000 00004', 'company_name' => 'Visitor Ltd',
             'project_name' => 'Brochure website', 'project_category' => 'customer_portal', 'services' => ['website_development'],
             'problem_statement' => 'I would like a simple brochure website for my small business, please.', 'expected_outcome' => 'A clear site that brings in enquiries.',
-            'budget_range' => 'under_25k', 'consent' => '1', 'website_url' => ''];
+            'budget_range' => 'under_25k', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''];
     }
 
     // ---- public forms -------------------------------------------------------------------------------------------------
@@ -99,12 +99,12 @@ final class CrmHttpTest extends HttpTestCase
     public function testContactAndAppointmentFormsUseTheirOwnSources(): void
     {
         $c = $this->client();
-        $c->post('/contact', ['contact_name' => 'Asha', 'email' => 'asha@web.test', 'inquiry_type' => 'general', 'subject' => 'A website for my shop', 'description' => 'Hello, can you help me with a website?', 'consent' => '1', 'website_url' => ''], '/contact');
+        $c->post('/contact', ['contact_name' => 'Asha', 'email' => 'asha@web.test', 'inquiry_type' => 'general', 'subject' => 'A website for my shop', 'description' => 'Hello, can you help me with a website?', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''], '/contact');
         $this->assertSame('contact_form', Database::one("SELECT source FROM enquiries WHERE email = 'asha@web.test'")['source']);
         Database::run("INSERT INTO appointment_slots (start_time, end_time, weekdays, active, sort_order, created_at, updated_at) VALUES ('10:00:00', '11:00:00', 127, 1, 0, UTC_TIMESTAMP(), UTC_TIMESTAMP())");
         $slot = Database::insertId();
         $date = \Vertex\Services\AppTime::todayPlus(2);
-        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'whatsapp_same' => '1', 'occupation' => 'Designer', 'slot' => (string) $slot, 'meeting_date' => $date, 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'description' => 'Discuss a video project', 'consent' => '1', 'website_url' => ''], '/book-appointment');
+        $c->post('/book-appointment', ['contact_name' => 'Ben', 'email' => 'ben@web.test', 'phone' => '+91 95000 00005', 'whatsapp_same' => '1', 'occupation' => 'Designer', 'slot' => (string) $slot, 'meeting_date' => $date, 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'description' => 'Discuss a video project', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''], '/book-appointment');
         $e = Database::one("SELECT source, preferred_slot FROM enquiries WHERE email = 'ben@web.test'");
         $this->assertSame('appointment_request', $e['source']);
         $this->assertStringContainsString('10:00 AM - 11:00 AM', $e['preferred_slot']);
@@ -139,7 +139,7 @@ final class CrmHttpTest extends HttpTestCase
         $flood = $this->client();
         $statuses = [];
         for ($i = 0; $i < 7; $i++) {
-            $statuses[] = $flood->post('/contact', ['contact_name' => "Flood {$i}", 'email' => "f{$i}@web.test", 'inquiry_type' => 'general', 'subject' => 'Hello there', 'description' => 'Hello hello hello hello', 'consent' => '1', 'website_url' => ''], '/contact')['status'];
+            $statuses[] = $flood->post('/contact', ['contact_name' => "Flood {$i}", 'email' => "f{$i}@web.test", 'inquiry_type' => 'general', 'subject' => 'Hello there', 'description' => 'Hello hello hello hello', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''], '/contact')['status'];
         }
         $this->assertContains(429, $statuses, 'public forms are rate limited per IP');
         $this->assertLessThanOrEqual(6, (int) Database::one("SELECT COUNT(*) c FROM enquiries WHERE email LIKE 'f%@web.test'")['c']);

@@ -18,7 +18,7 @@ final class RouteSweepTest extends HttpTestCase
 {
     /** Routes that are intentionally reachable without signing in. Anything else without `auth` or `can:` fails the test. */
     private const PUBLIC = [
-        '/', '/health', '/offline', '/sw.js', '/manifest.webmanifest', '/request-quote/pdf', '/book-appointment/availability', '/privacy-policy', '/terms-and-conditions', '/refund-policy', '/cancellation-policy', '/payment-policy', '/cookie-policy', '/accessibility-statement', '/security-disclosure', '/refund-and-cancellation-policy', '/legal-business-information', '/cookie-settings', '/data-deletion', '/data-deletion/received', '/data-deletion/verify/{token}', '/data-deletion/status', '/data-deletion/status/{token}', '/third-party-services', '/contact-and-grievance', '/delivery-appointment', '/delivery-appointment/verify', '/delivery-appointment/link/{token}', '/delivery-appointment/book', '/delivery-appointment/exit', '/login', '/login/two-factor', '/register', '/auth/google', '/auth/google/callback', '/auth/google/complete', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
+        '/', '/health', '/offline', '/sw.js', '/manifest.webmanifest', '/request-quote/pdf', '/book-appointment/availability', '/privacy-policy', '/terms-and-conditions', '/refund-policy', '/cancellation-policy', '/payment-policy', '/cookie-policy', '/accessibility-statement', '/security-disclosure', '/refund-and-cancellation-policy', '/legal-business-information', '/cookie-settings', '/unsubscribe/{token}', '/unsubscribe/{token}/one-click', '/data-deletion', '/data-deletion/received', '/data-deletion/verify/{token}', '/data-deletion/status', '/data-deletion/status/{token}', '/third-party-services', '/contact-and-grievance', '/delivery-appointment', '/delivery-appointment/verify', '/delivery-appointment/link/{token}', '/delivery-appointment/book', '/delivery-appointment/exit', '/login', '/login/two-factor', '/register', '/auth/google', '/auth/google/callback', '/auth/google/complete', '/verify-email', '/verify-email/{token}', '/forgot-password', '/reset-password/{token}', '/invite/{token}',
         '/verify', '/verify/{code}', '/pay/{order}', '/pay/{order}/status', '/pay/{order}/checkout', '/pay/{order}/verify', '/request-quote', '/contact', '/book-appointment', '/enquiry/received', '/partners/apply', '/partners/apply/received', '/f/{slug}', '/f/{slug}/thanks',
         '/sitemap.xml', '/robots.txt', '/webhooks/razorpay', '/{slug}', '/{section}/{slug}',
         '/about', '/services', '/services/{slug}', '/our-team', '/our-clients', '/our-partners', '/portfolio', '/portfolio/{slug}', '/careers', '/careers/received', '/careers/{slug}', '/careers/apply', '/hiring', '/hiring/received', '/hiring/apply', '/faq', '/sitemap', '/project-requirements',
@@ -26,7 +26,7 @@ final class RouteSweepTest extends HttpTestCase
     ];
 
     /** Machine-to-machine callbacks that cannot carry a CSRF token. Each one authenticates the caller by a secret signature instead (see Phase12HttpTest). */
-    private const SIGNED_WEBHOOKS = ['/webhooks/razorpay'];
+    private const SIGNED_WEBHOOKS = ['/webhooks/razorpay', '/cookie-settings', '/unsubscribe/{token}/one-click']; // no session/CSRF token by design: the payment webhook is signed, the cookie endpoint checks the Origin and is rate limited, the one-click unsubscribe carries a signed token
 
     /** @var list<array<string,mixed>> */
     private array $routes = [];

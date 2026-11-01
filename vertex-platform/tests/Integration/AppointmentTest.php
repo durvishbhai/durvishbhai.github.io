@@ -54,7 +54,7 @@ final class AppointmentTest extends HttpTestCase
     private function form(int $slot, array $over = []): array
     {
         return $over + ['contact_name' => 'Asha Fictional', 'email' => 'asha@web.test', 'phone' => '+91 90000 11111', 'whatsapp_same' => '1', 'occupation' => 'Shop owner', 'description' => 'I want to discuss a website for my shop.',
-            'slot' => (string) $slot, 'meeting_date' => $this->date(3), 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'consent' => '1', 'website_url' => ''];
+            'slot' => (string) $slot, 'meeting_date' => $this->date(3), 'start_time' => '10:00', 'end_time' => '11:00', 'meeting_type' => 'online', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''];
     }
 
     public function testTheOwnerAddsEditsHidesAndDeletesTimesAndPlaces(): void

@@ -66,7 +66,12 @@ final class DynamicFormController extends Controller
         }
         $raw = is_array($request->body['a'] ?? null) ? $request->body['a'] : [];
         try {
+            \Vertex\Services\Turnstile::require($request);
+            if ((int) $form['create_enquiry'] === 1) {
+                \Vertex\Services\ConsentRules::requireAge($request);
+            }
             $r = FormService::submit($form, $raw, Auth::id(), $token, $ip, $request->string('consent') === '1', $request->string('submit_token'));
+            \Vertex\Services\ConsentRules::record('form:' . $form['slug'], null, $request, Auth::id());
         } catch (ValidationException $e) {
             return $this->back($to, $e->errors, ['a' => $raw]);
         }

@@ -54,7 +54,9 @@ final class PartnerApplyController extends Controller
         }
         $files = self::uploadedFiles($request->files['document'] ?? []);
         try {
+            \Vertex\Services\ConsentRules::publicForm($request);
             $r = PartnerApplicationService::submit(Auth::id(), $in, $files[0] ?? null, $ip);
+            \Vertex\Services\ConsentRules::record('partner', $in['email'] ?? null, $request, Auth::id());
         } catch (ValidationException $e) {
             return $this->back('/partners/apply', $e->errors, array_diff_key($in, ['agree' => 1]));
         }

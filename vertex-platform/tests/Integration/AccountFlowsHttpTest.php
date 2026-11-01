@@ -23,7 +23,7 @@ final class AccountFlowsHttpTest extends HttpTestCase
     {
         return $c->post('/register', $over + [
             'name' => 'Rita Registrant', 'email' => 'rita@x.test', 'phone' => '+91 90000 55555',
-            'password' => self::NEWPW, 'password_confirmation' => self::NEWPW,
+            'password' => self::NEWPW, 'password_confirmation' => self::NEWPW, 'consent' => '1', 'age_confirm' => '1',
         ]);
     }
 

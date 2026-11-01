@@ -37,7 +37,7 @@ final class Phase6HttpTest extends HttpTestCase
     private function applyForm(array $over = []): array
     {
         return $over + ['full_name' => 'Asha Applicant', 'email' => 'asha@apply.test', 'phone' => '+91 98765 11111', 'organization' => 'Asha Consulting',
-            'professional_info' => 'Ten years of introducing small businesses to digital agencies.', 'referral_source' => 'Introduced by a mutual contact.', 'agree' => '1', 'website_url' => ''];
+            'professional_info' => 'Ten years of introducing small businesses to digital agencies.', 'referral_source' => 'Introduced by a mutual contact.', 'agree' => '1', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''];
     }
 
     private function applicationCount(): int

@@ -9,6 +9,7 @@
             <div class="field"><label for="phone">Phone number <span class="muted">(required)</span></label><input id="phone" name="phone" type="tel" required minlength="7" maxlength="20" placeholder="+91 90000 00000" autocomplete="tel" value="<?= e(old('phone')) ?>"></div>
             <div class="field"><label for="password">Password <span class="muted">(12+ characters)</span></label><input id="password" name="password" type="password" required minlength="12" autocomplete="new-password"></div>
             <div class="field"><label for="password_confirmation">Repeat password</label><input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password"></div>
+            <?= \Vertex\Core\View::partial('public-form-consent') ?>
             <button class="btn btn-primary btn-block" type="submit">Create account</button>
         </form>
 <?php if (\Vertex\Services\GoogleAuth::enabled()) : ?>

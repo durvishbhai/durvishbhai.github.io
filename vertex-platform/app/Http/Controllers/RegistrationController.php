@@ -42,6 +42,11 @@ final class RegistrationController extends Controller
 
         // Only these fields are read: a submitted "role"/"status" has no effect.
         return $this->guarded(function () use ($request): Response {
+            \Vertex\Services\ConsentRules::publicForm($request);
+            if (!\Vertex\Services\ConsentRules::privacyTicked($request)) {
+                throw new \Vertex\Core\ValidationException(['Please tick the box to confirm you have read the Privacy Policy and the Terms.']);
+            }
+            \Vertex\Services\ConsentRules::record('signup', $request->string('email'), $request);
             UserService::register([
                 'name' => $request->body['name'] ?? '',
                 'email' => $request->body['email'] ?? '',

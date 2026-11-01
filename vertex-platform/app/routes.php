@@ -141,6 +141,9 @@ return static function (Router $router): void {
     $router->post('/data-deletion/status', [\Vertex\Http\Controllers\DataDeletionController::class, 'lookup']);
     $router->get('/data-deletion/status/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'status']);
     $router->post('/data-deletion/status/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'reply']);
+    $router->get('/unsubscribe/{token}', [\Vertex\Http\Controllers\UnsubscribeController::class, 'show']);
+    $router->post('/unsubscribe/{token}', [\Vertex\Http\Controllers\UnsubscribeController::class, 'confirm']);
+    $router->post('/unsubscribe/{token}/one-click', [\Vertex\Http\Controllers\UnsubscribeController::class, 'oneClick'], ['nosession'], false);
     $router->get('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'settings'], ['nosession']);
     // The consent choice is stored in the visitor's own first-party cookie. No session exists on these pages, so there is no CSRF token: the endpoint accepts only requests that come from this site (Origin/Referer check) and is rate limited.
     $router->post('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'save'], ['nosession'], false);

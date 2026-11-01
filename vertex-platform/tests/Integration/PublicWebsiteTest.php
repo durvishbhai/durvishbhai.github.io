@@ -274,7 +274,7 @@ final class PublicWebsiteTest extends HttpTestCase
     public function testContactFormKeepsItsExtraAnswersForStaffOnly(): void
     {
         $c = $this->client();
-        $r = $c->post('/contact', ['contact_name' => 'Nina Contact', 'email' => 'nina@web.test', 'inquiry_type' => 'partnership', 'subject' => 'Working together', 'description' => 'We would like to talk about a partnership.', 'consent' => '1', 'website_url' => ''], '/contact');
+        $r = $c->post('/contact', ['contact_name' => 'Nina Contact', 'email' => 'nina@web.test', 'inquiry_type' => 'partnership', 'subject' => 'Working together', 'description' => 'We would like to talk about a partnership.', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''], '/contact');
         $this->assertSame(303, $r['status']);
         $e = Database::one("SELECT * FROM enquiries WHERE email = 'nina@web.test'");
         $this->assertSame('contact_form', $e['source']);
@@ -287,7 +287,7 @@ final class PublicWebsiteTest extends HttpTestCase
 
         $bad = $this->client();
         $before = (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'];
-        $bad->post('/contact', ['contact_name' => 'No Type', 'email' => 'nt@web.test', 'inquiry_type' => 'bogus', 'subject' => 'x', 'description' => 'Short but long enough text', 'consent' => '1', 'website_url' => ''], '/contact');
+        $bad->post('/contact', ['contact_name' => 'No Type', 'email' => 'nt@web.test', 'inquiry_type' => 'bogus', 'subject' => 'x', 'description' => 'Short but long enough text', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''], '/contact');
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c'], 'an unknown inquiry type is refused');
     }
 
@@ -297,7 +297,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $c = $this->client();
         $r = $c->upload('/request-quote', [
             'contact_name' => 'Rita Requirements', 'email' => 'rita@web.test', 'project_name' => 'Shop relaunch', 'project_category' => 'customer_portal', 'services' => ['website_development'],
-            'problem_statement' => 'Our current shop is slow and hard to update by ourselves.', 'expected_outcome' => 'A fast shop we can edit.', 'timeline' => 'one_month', 'consent' => '1', 'website_url' => '',
+            'problem_statement' => 'Our current shop is slow and hard to update by ourselves.', 'expected_outcome' => 'A fast shop we can edit.', 'timeline' => 'one_month', 'consent' => '1', 'age_confirm' => '1', 'website_url' => '',
         ], ['attachments[0]' => [$file['tmp_name'], 'brief.png', 'image/png']], '/request-quote');
         $this->assertSame(303, $r['status'], $r['body']);
         $e = Database::one("SELECT * FROM enquiries WHERE email = 'rita@web.test'");
@@ -320,7 +320,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $c = $this->client();
         $c->upload('/request-quote', [
             'contact_name' => 'Evil Eve', 'email' => 'eve@web.test', 'project_name' => 'Anything', 'project_category' => 'customer_portal', 'services' => ['website_development'],
-            'problem_statement' => 'Some perfectly long problem statement here.', 'expected_outcome' => 'Some outcome', 'consent' => '1', 'website_url' => '',
+            'problem_statement' => 'Some perfectly long problem statement here.', 'expected_outcome' => 'Some outcome', 'consent' => '1', 'age_confirm' => '1', 'website_url' => '',
         ], ['attachments[0]' => [$bad['tmp_name'], 'payload.php', 'application/x-php']], '/request-quote');
         $this->assertSame($before, (int) Database::one('SELECT COUNT(*) c FROM enquiries')['c']);
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM enquiry_files')['c']);
@@ -393,11 +393,11 @@ final class PublicWebsiteTest extends HttpTestCase
         $c = $this->client();
         $c->upload('/careers/apply', $base, $this->resumeFile(), '/careers');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'no consent, nothing stored');
-        $c->upload('/careers/apply', ['consent' => '1', 'website_url' => 'http://spam.example'] + $base, $this->resumeFile(), '/careers');
+        $c->upload('/careers/apply', ['consent' => '1', 'age_confirm' => '1', 'website_url' => 'http://spam.example'] + $base, $this->resumeFile(), '/careers');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'honeypot submissions are discarded');
-        $this->assertSame(419, $c->postNoToken('/careers/apply', ['consent' => '1'] + $base)['status']);
+        $this->assertSame(419, $c->postNoToken('/careers/apply', ['consent' => '1', 'age_confirm' => '1'] + $base)['status']);
         $bad = $this->tmp('cv.exe', 'MZ binary');
-        $c->upload('/careers/apply', ['consent' => '1'] + $base, ['resume' => [$bad['tmp_name'], 'cv.exe', 'application/octet-stream']], '/careers');
+        $c->upload('/careers/apply', ['consent' => '1', 'age_confirm' => '1'] + $base, ['resume' => [$bad['tmp_name'], 'cv.exe', 'application/octet-stream']], '/careers');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM site_job_applications')['c'], 'an executable résumé is refused');
     }
 
@@ -443,7 +443,7 @@ final class PublicWebsiteTest extends HttpTestCase
     {
         return $over + ['role' => 'Video Editor', 'full_name' => 'Hira Hiring', 'email' => 'hira@web.test', 'phone' => '+91 98765 43210', 'experience' => '1 to 3 years', 'availability' => 'Within 2 weeks',
             'skills_experience' => 'Premiere Pro and DaVinci Resolve, short-form and YouTube edits.', 'portfolio_url' => 'https://example.com/reel', 'linkedin_url' => 'https://www.linkedin.com/in/hira-hiring',
-            'intro' => 'I would like to edit videos for your team.', 'consent' => '1', 'website_url' => ''];
+            'intro' => 'I would like to edit videos for your team.', 'consent' => '1', 'age_confirm' => '1', 'website_url' => ''];
     }
 
     /** @return array<string,array{0:string,1:string,2:string}> */

@@ -167,6 +167,7 @@ final class PublicFormController extends Controller
         }
         $metas = [];
         try {
+            \Vertex\Services\ConsentRules::publicForm($request); // bot check (when on) and the age confirmation
             $x = match ($source) {
                 'contact_form' => EnquiryExtras::contact($request->body),
                 'website_requirements' => EnquiryExtras::requirements($request->body),
@@ -208,6 +209,7 @@ final class PublicFormController extends Controller
             array_map([FileStore::class, 'discard'], $metas);
             throw $e;
         }
+        \Vertex\Services\ConsentRules::record($source, (string) ($in['email'] ?? ''), $request, \Vertex\Services\Auth::id()); // evidence only for a submission that was accepted
         Session::put('enquiry_ref', $r['reference']);
         Session::put('enquiry_kind', $source);
 

@@ -251,7 +251,9 @@ final class SitePageController extends Controller
         }
         $file = self::uploadedFiles($request->files['resume'] ?? null)[0] ?? null;
         try {
+            \Vertex\Services\ConsentRules::publicForm($request);
             $r = CareerService::apply($in, $file, $request->string('consent') === '1', $ip);
+            \Vertex\Services\ConsentRules::record('careers', $in['email'] ?? null, $request);
         } catch (ValidationException $e) {
             return $this->back($back, $e->errors, $in);
         }

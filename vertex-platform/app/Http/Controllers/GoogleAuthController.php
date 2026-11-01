@@ -86,6 +86,11 @@ final class GoogleAuthController extends Controller
         }
 
         return $this->guarded(function () use ($request, $g): Response {
+            \Vertex\Services\ConsentRules::publicForm($request);
+            if (!\Vertex\Services\ConsentRules::privacyTicked($request)) {
+                throw new ValidationException(['Please tick the box to confirm you have read the Privacy Policy and the Terms.']);
+            }
+            \Vertex\Services\ConsentRules::record('signup_google', (string) ($g['email'] ?? ''), $request);
             try {
                 $made = UserService::completeGoogleSignUp($g, $request->body['phone'] ?? '', $request->body['name'] ?? '', $request->ip());
             } catch (\RuntimeException $e) {
