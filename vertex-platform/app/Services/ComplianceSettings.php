@@ -209,6 +209,7 @@ final class ComplianceSettings
         }
         Database::transaction(function () use ($actorId, $group, $writes): void {
             $changed = [];
+            self::flush(); // compare with what is stored now, never with a cached copy
             foreach ($writes as $k => $v) {
                 if (self::get($k) === $v) {
                     continue;

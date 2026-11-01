@@ -383,7 +383,6 @@ final class UserService
                 }
             } elseif (in_array('client', $roles, true)) {
                 self::ensureClientProfile($id);
-            PolicyAcceptance::recordSignup($id, $ip, null); // signing up means accepting the current terms
             }
             Audit::record('user.created', 'user', $id, [], ['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => 'pending'], [], $actorId);
 
