@@ -77,10 +77,10 @@ $steps = ['Type &amp; Basics' => 'M3 6h18M3 12h18M3 18h18', 'Project Details' =>
             <div class="role-card" data-role-card>
                 <div class="role-head"><strong class="role-title">Role #<?= $n ?></strong><?php if (!$first) : ?><button type="button" class="repeat-del" data-repeat-del aria-label="Remove this role">&times;</button><?php endif; ?></div>
                 <div class="grid-2">
-                    <div class="field"><label>Role name</label><input name="role_name[]" maxlength="60" placeholder="e.g. Admin, Customer, Staff" value="<?= $first ? 'Admin' : '' ?>" data-text-input></div>
-                    <div class="field"><label>Access level</label><select name="role_access[]"><?= $opts(EnquiryExtras::ROLE_ACCESS, $first ? 'full' : 'limited') ?></select></div>
+                    <div class="field"><label>Role name</label><input aria-label="Role name" name="role_name[]" maxlength="60" placeholder="e.g. Admin, Customer, Staff" value="<?= $first ? 'Admin' : '' ?>" data-text-input></div>
+                    <div class="field"><label>Access level</label><select aria-label="Access level" name="role_access[]"><?= $opts(EnquiryExtras::ROLE_ACCESS, $first ? 'full' : 'limited') ?></select></div>
                 </div>
-                <div class="field"><label>Permission template</label><select name="role_permissions[]"><option value="">Select a permission set</option><?= $opts(EnquiryExtras::PERMISSION_SETS, $first ? 'Full system access' : '', false) ?></select></div>
+                <div class="field"><label>Permission template</label><select aria-label="Permission template" name="role_permissions[]"><option value="">Select a permission set</option><?= $opts(EnquiryExtras::PERMISSION_SETS, $first ? 'Full system access' : '', false) ?></select></div>
             </div>
         <?php return (string) ob_get_clean(); }; ?>
         <fieldset class="field" data-repeat data-max="8" data-label="User roles"><legend class="sr-only">User roles</legend>

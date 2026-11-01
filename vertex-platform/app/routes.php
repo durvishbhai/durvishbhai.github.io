@@ -709,6 +709,11 @@ return static function (Router $router): void {
         $r->post('/compliance/acceptance/{id}/remind', [ComplianceController::class, 'acceptanceRemind'], ['can:compliance.manage']);
         $r->post('/compliance/acceptance/{id}/extend', [ComplianceController::class, 'acceptanceExtend'], ['can:compliance.manage']);
         $r->post('/compliance/acceptance/{id}/record', [ComplianceController::class, 'acceptanceRecord'], ['can:compliance.manage']);
+        $r->get('/compliance/checklist', [ComplianceController::class, 'dashboard'], ['can:compliance.manage']);
+        $r->post('/compliance/checklist/{key}', [ComplianceController::class, 'saveItem'], ['can:compliance.manage']);
+        $r->get('/compliance/assets', [ComplianceController::class, 'assets'], ['can:compliance.manage']);
+        $r->get('/compliance/assets/{id}', [ComplianceController::class, 'asset'], ['can:compliance.manage']);
+        $r->post('/compliance/assets/{id}', [ComplianceController::class, 'saveAsset'], ['can:compliance.manage']);
         $r->get('/compliance/integrations', [ComplianceController::class, 'integrations'], ['can:compliance.manage']);
         $r->get('/compliance/integrations/{id}', [ComplianceController::class, 'integration'], ['can:compliance.manage']);
         $r->post('/compliance/integrations/{id}', [ComplianceController::class, 'saveIntegration'], ['can:compliance.manage']);

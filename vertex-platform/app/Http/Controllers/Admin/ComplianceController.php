@@ -10,6 +10,8 @@ use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Core\View;
 use Vertex\Http\Controllers\Controller;
+use Vertex\Services\AssetRegister;
+use Vertex\Services\ComplianceDashboard;
 use Vertex\Services\ComplianceSettings;
 use Vertex\Services\HtmlSanitizer;
 use Vertex\Services\Integrations;
@@ -248,6 +250,58 @@ final class ComplianceController extends Controller
     }
 
     // ------------------------------------------------------------------------------------------------ integrations register
+
+    // ------------------------------------------------------------------------------------------------ checklist dashboard
+
+    /** @param array<string,string> $params */
+    public function dashboard(Request $request, array $params = []): Response
+    {
+        return $this->page('admin/compliance/dashboard', ['title' => 'Compliance checklist', 'items' => ComplianceDashboard::items(), 'counts' => ComplianceDashboard::counts()]);
+    }
+
+    /** @param array<string,string> $params */
+    public function saveItem(Request $request, array $params = []): Response
+    {
+        $in = array_map(static fn ($v): string => is_scalar($v) ? (string) $v : '', $request->body);
+
+        return $this->guarded(function () use ($params, $in): Response {
+            ComplianceDashboard::update($this->actorId(), (string) ($params['key'] ?? ''), $in);
+
+            return $this->ok('/admin/compliance/checklist', 'Saved.');
+        }, '/admin/compliance/checklist', $in);
+    }
+
+    // ------------------------------------------------------------------------------------------------ asset and licence register
+
+    /** @param array<string,string> $params */
+    public function assets(Request $request, array $params = []): Response
+    {
+        return $this->page('admin/compliance/assets', ['title' => 'Asset & licence register', 'rows' => AssetRegister::all(), 'summary' => AssetRegister::summary()]);
+    }
+
+    /** @param array<string,string> $params */
+    public function asset(Request $request, array $params = []): Response
+    {
+        $id = ($params['id'] ?? 'new') === 'new' ? null : (int) $params['id'];
+        $row = $id === null ? null : (AssetRegister::find($id) ?? throw new HttpException(404));
+        $r = $this->page('admin/compliance/asset', ['title' => $row ? $row['name'] : 'Add an asset', 'row' => $row]);
+        Session::forget('_old');
+
+        return $r;
+    }
+
+    /** @param array<string,string> $params */
+    public function saveAsset(Request $request, array $params = []): Response
+    {
+        $id = ($params['id'] ?? 'new') === 'new' ? null : (int) $params['id'];
+        $in = array_map(static fn ($v): string => is_scalar($v) ? (string) $v : '', $request->body);
+
+        return $this->guarded(function () use ($id, $in): Response {
+            AssetRegister::save($this->actorId(), $id, $in);
+
+            return $this->ok('/admin/compliance/assets', 'Saved.');
+        }, '/admin/compliance/assets/' . ($id ?? 'new'), $in);
+    }
 
     /** @param array<string,string> $params */
     public function integrations(Request $request, array $params = []): Response

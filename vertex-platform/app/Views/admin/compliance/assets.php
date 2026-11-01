@@ -1,0 +1,10 @@
+<?php /** @var list<array<string,mixed>> $rows */ /** @var array<string,int> $summary */
+use Vertex\Services\AssetRegister;
+?>
+<div class="page-head"><div><p class="eyebrow">Compliance &amp; legal</p><h1>Asset &amp; licence register</h1></div><div><a class="btn btn-primary" href="/admin/compliance/assets/new">Add an asset</a> <a class="btn btn-ghost" href="/admin/compliance">&larr; Back</a></div></div>
+<p class="muted">The system lists the pictures, icons and fonts it found in the website. Only you know where each came from, so nothing is marked as licensed until you record the source and the licence (or your proof that you own it). Unverified items should be confirmed or replaced.</p>
+<div class="panel"><ul class="plain-list inline-list"><li><strong><?= e((string) $summary['unverified']) ?></strong> licence not confirmed</li><li><strong><?= e((string) $summary['confirmed']) ?></strong> confirmed</li><li><strong><?= e((string) $summary['replace']) ?></strong> to replace</li><li><strong><?= e((string) $summary['uploads']) ?></strong> pictures uploaded through the website editor (their rights are the uploader's responsibility)</li></ul></div>
+<div class="panel"><div class="table-wrap"><table class="table"><caption class="sr-only">Assets and their licences</caption><thead><tr><th scope="col">Asset</th><th scope="col">Kind</th><th scope="col">Source</th><th scope="col">Licence</th><th scope="col">Status</th></tr></thead><tbody>
+<?php foreach ($rows as $r) : ?><tr><td><a href="/admin/compliance/assets/<?= e((string) $r['id']) ?>"><?= e($r['name']) ?></a><br><span class="muted small"><?= e((string) $r['location']) ?></span></td><td><?= e(AssetRegister::KINDS[$r['kind']] ?? $r['kind']) ?></td>
+    <td><?= $r['source'] ? e($r['source']) : '<span class="muted">Not recorded</span>' ?></td><td><?= $r['licence'] ? e($r['licence']) : '<span class="muted">Not recorded</span>' ?></td><td><?= e(AssetRegister::STATUSES[$r['status']]) ?></td></tr>
+<?php endforeach; ?></tbody></table></div></div>

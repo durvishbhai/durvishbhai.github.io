@@ -157,8 +157,8 @@ final class PublicWebsiteTest extends HttpTestCase
 
     public function testClientsAreEditableGroupedByCountryAndOnlyPublishedOnesShow(): void
     {
-        $a = SiteContent::save($this->admin, 'clients', null, ['name' => 'Acme Retail', 'country' => 'India', 'description' => 'Online store']);
-        $b = SiteContent::save($this->admin, 'clients', null, ['name' => 'Borealis Studio', 'country' => 'Canada']);
+        $a = SiteContent::save($this->admin, 'clients', null, ['name' => 'Acme Retail', 'country' => 'India', 'description' => 'Online store', 'permission_confirmed' => '1', 'permission_note' => 'Written permission (fictional)']);
+        $b = SiteContent::save($this->admin, 'clients', null, ['name' => 'Borealis Studio', 'country' => 'Canada', 'permission_confirmed' => '1']);
         SiteContent::save($this->admin, 'clients', null, ['name' => 'Hidden Draft Ltd', 'country' => 'Norway']);
         SiteContent::setStatus($this->admin, 'clients', SiteContent::find('clients', $a['public_id']), 'published');
         SiteContent::setStatus($this->admin, 'clients', SiteContent::find('clients', $b['public_id']), 'published');
@@ -175,7 +175,7 @@ final class PublicWebsiteTest extends HttpTestCase
         // editable from the dashboard
         $admin = $this->loggedIn('admin@x.test');
         $this->assertStringContainsString('Acme Retail', $admin->get('/admin/site/clients')['body']);
-        $admin->post('/admin/site/clients/' . $a['public_id'], ['name' => 'Acme Retail Group', 'country' => 'Japan'], '/admin/site/clients/' . $a['public_id']);
+        $admin->post('/admin/site/clients/' . $a['public_id'], ['name' => 'Acme Retail Group', 'country' => 'Japan', 'permission_confirmed' => '1'], '/admin/site/clients/' . $a['public_id']);
         $this->assertStringContainsString('Acme Retail Group', $c->get('/our-clients')['body']);
         $admin->post('/admin/site/clients/' . $a['public_id'] . '/status', ['action' => 'archive', 'confirm_password' => self::PASSWORD], '/admin/site/clients/' . $a['public_id']);
         $this->assertStringNotContainsString('Acme Retail', $c->get('/our-clients')['body']);

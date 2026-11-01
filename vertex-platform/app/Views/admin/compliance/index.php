@@ -4,6 +4,8 @@ $badge = static fn (string $c, string $t): string => '<span class="badge badge-d
 <div class="page-head"><div><p class="eyebrow">Administration</p><h1>Compliance &amp; legal management</h1></div></div>
 <p class="muted">Owner only. Everything here changes the real public website. Documents are versioned: you work on a draft, preview it, then publish (now or at a set time). Earlier versions are kept and can be restored. These texts are drafts prepared for your business and <strong>must be reviewed by an Indian lawyer</strong> before you rely on them.</p>
 
+<div class="panel"><h2>Compliance checklist</h2><p class="muted">The 20 requirements of the compliance project, each with a status you set, who is responsible, the next action and the facts the system could check. There is no score: a checklist cannot tell you that the website is legally compliant. <a class="btn btn-primary btn-sm" href="/admin/compliance/checklist">Open the checklist</a> <a class="btn btn-ghost btn-sm" href="/admin/compliance/assets">Asset &amp; licence register</a></p></div>
+
 <?php if ($missing !== []) : ?>
 <div class="panel panel-warn"><h2>Facts only you can supply</h2>
     <p>These are empty. The legal documents cannot be published until they are filled in, and nothing has been invented in their place:</p>

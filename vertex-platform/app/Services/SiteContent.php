@@ -231,6 +231,9 @@ final class SiteContent
             if ($entity === 'policies' && preg_match('/\[ADMIN TO COMPLETE/i', (string) $row['body'])) {
                 throw new ValidationException(['This policy still contains an [ADMIN TO COMPLETE] note. Fill in the missing details and delete that line before publishing.']);
             }
+            if (in_array($entity, ['portfolio', 'clients'], true) && (int) ($row['permission_confirmed'] ?? 0) !== 1) {
+                throw new ValidationException(['Tick \'I have the permission to show this publicly\' (and note where it is recorded) before publishing. Client work and logos are shown only with permission.']);
+            }
             if ($entity === 'services' && trim((string) $row['summary']) === '') {
                 throw new ValidationException(['Add a short description before publishing.']);
             }

@@ -52,6 +52,7 @@ final class SiteEntities
                 'fields' => [
                     'name' => self::t('Client or organisation name', 160, true), 'country' => self::t('Country', 80, false, 'For example India, United Arab Emirates, United Kingdom'), 'logo' => ['label' => 'Logo', 'kind' => 'media', 'col' => 'logo_media_id'],
                     'description' => self::t('Short description (optional)', 500), 'website_url' => ['label' => 'Website address', 'kind' => 'url'],
+                    'permission_confirmed' => ['label' => 'I have the permission to show this publicly', 'kind' => 'bool', 'help' => 'Tick only when the client has agreed (in writing, such as a WhatsApp message or email) to be shown. It cannot be published without this.'], 'permission_note' => self::t('Where the permission is recorded (private note)', 255),
                 ]],
             'portfolio' => ['label' => 'Portfolio', 'singular' => 'project', 'table' => 'site_portfolio', 'title' => 'title', 'slug' => true, 'statuses' => ['draft', 'published', 'archived'], 'public' => '/portfolio/', 'edit' => 'cms.edit', 'publish' => 'cms.publish',
                 'help' => 'Only real projects you are authorised to show. Never use confidential client files.',
@@ -59,6 +60,7 @@ final class SiteEntities
                     'title' => self::t('Project name', 160, true), 'category' => self::t('Category', 60), 'summary' => self::t('Short description', 400, true), 'services' => self::t('Services provided (comma-separated)', 400),
                     'cover' => ['label' => 'Cover picture', 'kind' => 'media', 'col' => 'cover_media_id'], 'gallery' => ['label' => 'Gallery', 'kind' => 'gallery', 'col' => 'gallery_json'],
                     'case_study' => self::a('Case study (optional)', 8000, false, 'Paragraphs, ## headings, lists, [links](https://…)'),
+                    'permission_confirmed' => ['label' => 'I have the permission to show this publicly', 'kind' => 'bool', 'help' => 'Tick only when the client has agreed (in writing, such as a WhatsApp message or email) to be shown. It cannot be published without this.'], 'permission_note' => self::t('Where the permission is recorded (private note)', 255),
                 ] + $seo],
             'jobs' => ['label' => 'Openings', 'singular' => 'opening', 'table' => 'site_jobs', 'title' => 'title', 'slug' => true, 'statuses' => ['draft', 'published', 'closed', 'archived'], 'public' => '/careers/', 'edit' => 'cms.edit', 'publish' => 'cms.publish',
                 'help' => 'Only publish openings that are genuinely available. Do not promise selection or payment.',
