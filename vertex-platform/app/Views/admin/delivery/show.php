@@ -8,7 +8,6 @@ $before = $plan['eligible_from'] !== null && (string) $a['appointment_date'] < $
 <div class="panel"><div class="detail-grid">
     <div><span class="muted">Project</span><br><a href="/projects/<?= e($project['public_id']) ?>/delivery"><?= e($a['project_code']) ?></a> · <?= e($a['project_title']) ?></div>
     <div><span class="muted">Client</span><br><?= e($a['company_name'] ?: $a['contact_name']) ?><br><span class="muted"><?= e($a['client_email']) ?></span></div>
-    <div><span class="muted">Project start date</span><br><?= !empty($a['project_start_date']) ? e(local_date((string) $a['project_start_date'], 'l, j F Y')) : '—' ?></div>
     <div><span class="muted">Delivery date</span><br><strong><?= e(local_date((string) $a['appointment_date'], 'l, j F Y')) ?></strong></div>
     <div><span class="muted">Status</span><br><span class="badge badge-d-<?= e($a['status']) ?>"><?= e($statuses[$a['status']] ?? $a['status']) ?></span></div>
     <div><span class="muted">Source</span><br><?= e($sources[$a['booking_source']] ?? $a['booking_source']) ?></div>
@@ -25,7 +24,7 @@ $before = $plan['eligible_from'] !== null && (string) $a['appointment_date'] < $
 <?php if ($canManage && $open) : ?>
 <div class="panel"><h2>Reschedule</h2>
     <form method="post" action="/admin/delivery/appointments/<?= e($a['id']) ?>/reschedule" class="form-grid"><?= csrf_field() ?>
-        <div class="field"><label for="rd">New delivery date</label><input id="rd" name="date" type="date" required value="<?= e(old('date')) ?>"><p class="hint">The new date is checked first (start date + estimated time, blocked dates, capacity). The old date is released only when the move succeeds.</p></div>
+        <div class="field"><label for="rd">New delivery date</label><input id="rd" name="date" type="date" required value="<?= e(old('date')) ?>"><p class="hint">The new date is checked first (estimated time, blocked dates, capacity). The old date is released only when the move succeeds.</p></div>
         <?php if ($canConfigure) : ?><div class="field"><label class="check"><input type="checkbox" name="override" value="1"> Override the estimated-time rule</label></div><?php endif; ?>
         <div class="form-actions"><button class="btn btn-primary" type="submit" data-confirm="Move this appointment and email the client?">Reschedule</button></div></form>
 </div>

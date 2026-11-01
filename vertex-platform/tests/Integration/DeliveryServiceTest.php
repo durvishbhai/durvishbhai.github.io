@@ -95,59 +95,71 @@ final class DeliveryServiceTest extends DatabaseTestCase
         $this->refused(fn () => DeliveryService::book($row, $this->day(5), 'client_dashboard', $this->client), 'not open');
     }
 
-    public function testTheDeliveryDateMustBeAfterTheStartDatePlusTheEstimatedTime(): void
+    public function testTheDeliveryDateMustBeAfterTheEstimatedTime(): void
     {
         $p = $this->proj('Sixty', 60);
-        $this->assertSame('need_start', DeliveryService::plan($p)['state'], 'the client has to choose a start date first');
-        $plan = DeliveryService::plan($p, false, AppTime::today());
-        $this->assertSame('open', $plan['state']);
-        $this->assertSame($this->day(61), $plan['eligible_from'], 'the day AFTER start + 60 days');
-        $this->assertStringContainsString('60 days', $plan['message']);
+        $plan = DeliveryService::plan($p);
+        $this->assertSame('open', $plan['state'], 'the Owner switched the calendar on');
+        $this->assertSame($this->day(61), $plan['eligible_from'], 'the day AFTER 60 days');
+        $this->assertStringContainsString('being prepared', $plan['message']);
+        $this->assertStringContainsString(local_date($this->day(61), 'j F Y'), $plan['message']);
         foreach ([1, 30, 60] as $d) {
             $this->refused(fn () => $this->book($p, $d), 'estimated time');
         }
         $a = $this->book($p, 61);
         $this->assertSame($this->day(61), $a['appointment_date']);
-        $this->assertSame(AppTime::today(), $a['project_start_date'], 'no start date given = today');
         $this->assertSame(0, (int) Database::one("SELECT COUNT(*) c FROM delivery_appointments WHERE appointment_date < ?", [$this->day(61)])['c']);
     }
 
-    public function testAClientWhoStartsLaterCannotChooseADeliveryDateBeforeTheNewEndOfTheEstimate(): void
+    public function testTheEstimateIsCountedFromTheDateTheTeamSets(): void
     {
-        $p = $this->proj('Later start', 7); // 7 days
-        $start = $this->day(10);
-        $this->assertSame($this->day(18), DeliveryService::plan($p, false, $start)['eligible_from'], 'start + 7 days + 1');
-        $this->refused(fn () => $this->book($p, 17, 'client_dashboard', null, ['start_date' => $start]), 'estimated time');
-        $this->refused(fn () => $this->book($p, 10, 'client_dashboard', null, ['start_date' => $start]), 'estimated time');
-        $a = $this->book($p, 18, 'client_dashboard', null, ['start_date' => $start]);
-        $this->assertSame($start, $a['project_start_date']);
-        // moving the appointment uses the same start date
+        $p = $this->proj('Counted', 7);
+        DeliveryService::savePlan($this->owner, $p, ['preparation_days' => '7', 'preparation_unit' => 'days', 'counted_from' => $this->day(10), 'booking_enabled' => '1']);
+        $plan = DeliveryService::plan($p);
+        $this->assertSame($this->day(10), $plan['start']);
+        $this->assertSame($this->day(18), $plan['eligible_from'], 'counted from day 10 + 7 days + 1');
+        $this->refused(fn () => $this->book($p, 17), 'estimated time');
+        $a = $this->book($p, 18);
         $this->refused(fn () => DeliveryService::reschedule($a, $this->day(15), $this->client, false), 'estimated time');
         $this->assertSame($this->day(20), DeliveryService::reschedule($a, $this->day(20), $this->client, false)['appointment_date']);
-        $this->assertSame($start, DeliveryService::appointment((int) $a['id'])['project_start_date']);
+        // saving again without a date keeps the one that was set
+        DeliveryService::savePlan($this->owner, $p, ['preparation_days' => '7', 'booking_enabled' => '1']);
+        $this->assertSame($this->day(10), DeliveryService::plan($p)['start']);
     }
 
-    public function testTheStartDateItselfIsValidated(): void
+    public function testOnlyTheOwnerSwitchesTheCalendarOnForAProject(): void
     {
-        $p = $this->proj('Starts', 3);
-        foreach ([$this->day(-1), 'soon', '2026-02-30', $this->day(5000)] as $bad) {
-            $this->refused(fn () => $this->book($p, 40, 'client_dashboard', null, ['start_date' => $bad]));
-        }
+        $p = $this->makeProject($this->client, 'Switch');
+        $row = ProjectPolicy::find($p['public_id']);
+        ProjectAssignmentService::assign($this->admin, (int) $row['id'], $this->manager, 'member');
+        // an Administrator can set the estimate, but the calendar stays off
+        DeliveryService::savePlan($this->admin, $row, ['preparation_days' => '5', 'booking_enabled' => '1']);
+        $this->assertSame(0, (int) DeliveryService::settingsRow((int) $row['id'])['booking_enabled']);
+        $this->assertSame('disabled', DeliveryService::plan($row)['state']);
+        $this->assertStringContainsString('not open', DeliveryService::plan($row)['message']);
+        $this->refused(fn () => $this->book($row, 20), 'not open');
+        $this->refused(fn () => $this->book($row, 20, 'manual', $this->admin, ['override_eligibility' => true]), 'not open');
+        $this->refused(fn () => $this->book($row, 20, 'manual', $this->manager), 'not open');
         $this->assertSame(0, (int) Database::one('SELECT COUNT(*) c FROM delivery_appointments')['c']);
-    }
-
-    public function testTheTeamCanFixTheStartDateAndTheClientCannotChangeIt(): void
-    {
-        $p = $this->proj('Fixed start', 5);
-        DeliveryService::savePlan($this->owner, $p, ['preparation_days' => '5', 'preparation_unit' => 'days', 'fixed_start_date' => $this->day(20), 'booking_enabled' => '1']);
-        $plan = DeliveryService::plan($p);
-        $this->assertSame('open', $plan['state'], 'no start to choose');
-        $this->assertTrue($plan['start_fixed']);
-        $this->assertSame($this->day(26), $plan['eligible_from']);
-        $this->refused(fn () => $this->book($p, 30, 'client_dashboard', null, ['start_date' => $this->day(2)]), 'set by our team');
-        $this->refused(fn () => $this->book($p, 25), 'estimated time');
-        $a = $this->book($p, 26);
-        $this->assertSame($this->day(20), $a['project_start_date']);
+        // the Owner switches it on; it then works for that project only
+        Mailer::$sent = [];
+        DeliveryService::savePlan($this->owner, $row, ['preparation_days' => '5', 'booking_enabled' => '1']);
+        $this->assertSame('open', DeliveryService::plan($row)['state']);
+        $this->assertContains('Your KIS Delivery Booking Dates Were Updated', array_column(Mailer::$sent, 'subject'), 'the client is told it is open');
+        DeliveryService::savePlan($this->owner, ProjectPolicy::find($this->makeProject($this->client, 'Third')['public_id']), ['preparation_days' => '5']);
+        $third = ProjectPolicy::find((string) Database::one("SELECT public_id FROM projects WHERE title = 'Third'")['public_id']);
+        $this->assertSame('disabled', DeliveryService::plan($third)['state'], 'saving without the switch leaves it off');
+        $this->refused(fn () => $this->book($third, 20), 'not open');
+        $this->book($row, 20);
+        // an Administrator saving again cannot switch it off or on
+        DeliveryService::savePlan($this->admin, $row, ['preparation_days' => '6', 'booking_enabled' => '']);
+        $this->assertSame(1, (int) DeliveryService::settingsRow((int) $row['id'])['booking_enabled']);
+        // switching it off stops new bookings and keeps the confirmed one
+        DeliveryService::cancel(DeliveryService::activeFor((int) $row['id']), $this->admin, true);
+        DeliveryService::savePlan($this->owner, $row, ['preparation_days' => '5', 'booking_enabled' => '']);
+        $this->refused(fn () => $this->book($row, 21), 'not open');
+        $this->assertSame('disabled', DeliveryService::plan($row)['state']);
+        $this->assertSame('cancelled', Database::one('SELECT status s FROM delivery_appointments')['s'], 'earlier appointments are left as they were');
     }
 
     public function testTheEstimateCanBeInDaysWeeksOrMonthsAndAMonthKeepsTheDayOfTheMonth(): void
@@ -179,7 +191,7 @@ final class DeliveryServiceTest extends DatabaseTestCase
         $row = ProjectPolicy::find($this->alpha['public_id']);
         foreach ([['preparation_days' => ''], ['preparation_days' => '-5'], ['preparation_days' => '9999'], ['preparation_days' => 'abc'], ['preparation_days' => '10', 'earliest_date' => 'nope'],
             ['preparation_days' => '10', 'earliest_date' => '2030-05-01', 'latest_date' => '2030-04-01'],
-            ['preparation_days' => '5', 'preparation_unit' => 'fortnights'], ['preparation_days' => '25', 'preparation_unit' => 'months'], ['preparation_days' => '5', 'fixed_start_date' => 'x']] as $bad) {
+            ['preparation_days' => '5', 'preparation_unit' => 'fortnights'], ['preparation_days' => '25', 'preparation_unit' => 'months'], ['preparation_days' => '5', 'counted_from' => 'x']] as $bad) {
             $this->refused(fn () => DeliveryService::savePlan($this->owner, $row, $bad));
         }
         foreach ([$this->manager, $this->support, $this->client] as $u) {
@@ -257,7 +269,7 @@ final class DeliveryServiceTest extends DatabaseTestCase
         $this->book($a, 6);
         $this->book($b, 6, 'client_dashboard', $this->client2);
         DeliveryService::blockDate($this->owner, $this->day(7), 'Holiday');
-        $plan = DeliveryService::plan(ProjectPolicy::find($mine['public_id']), false, AppTime::today());
+        $plan = DeliveryService::plan(ProjectPolicy::find($mine['public_id']));
         $cell = function (int $n) use ($plan): array {
             $cal = DeliveryService::month(substr($this->day($n), 0, 7), $plan);
             foreach ($cal['weeks'] as $w) {

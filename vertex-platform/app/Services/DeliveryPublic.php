@@ -81,8 +81,9 @@ final class DeliveryPublic
             return;
         }
         $m = self::match($code, $name);
-        if ($m === null || DeliveryService::settingsRow((int) $m['project']['id']) === null) {
-            return;
+        $set = $m === null ? null : DeliveryService::settingsRow((int) $m['project']['id']);
+        if ($m === null || $set === null || (int) $set['booking_enabled'] !== 1) {
+            return; // no code for a project whose delivery calendar the Owner has not switched on
         }
         $pid = (int) $m['project']['id'];
         if ((int) Database::one('SELECT COUNT(*) AS c FROM delivery_otps WHERE project_id = ? AND created_at > UTC_TIMESTAMP() - INTERVAL 15 MINUTE', [$pid])['c'] >= 3) {
@@ -156,8 +157,9 @@ final class DeliveryPublic
     public static function createToken(int $actorId, array $project): string
     {
         Gate::authorize('delivery.configure', $actorId);
-        if (DeliveryService::settingsRow((int) $project['id']) === null) {
-            throw new ValidationException(['Set the preparation period of this project first.']);
+        $set = DeliveryService::settingsRow((int) $project['id']);
+        if ($set === null || (int) $set['booking_enabled'] !== 1) {
+            throw new ValidationException(['The delivery calendar of this project is off. The Owner has to switch it on first.']);
         }
         $token = bin2hex(random_bytes(24));
         $days = max(1, (int) Config::get('delivery.token_days', 30));

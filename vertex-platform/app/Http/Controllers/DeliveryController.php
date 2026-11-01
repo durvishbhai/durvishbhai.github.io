@@ -69,8 +69,7 @@ final class DeliveryController extends Controller
     {
         $project = $request->attributes['project'];
         $role = $this->role($project);
-        $startParam = $request->string('start');
-        $plan = DeliveryService::plan($project, false, $startParam);
+        $plan = DeliveryService::plan($project);
         $current = DeliveryService::currentFor((int) $project['id']);
         $appt = $current === null ? null : DeliveryService::appointment((int) $current['id']);
         $mode = $request->string('mode') === 'reschedule' && $appt !== null && $appt['status'] === 'confirmed' ? 'reschedule' : 'book';
@@ -89,7 +88,6 @@ final class DeliveryController extends Controller
         $data = [
             'title' => 'Delivery appointment · ' . $project['title'], 'project' => $project, 'tab' => 'delivery', 'role' => $role, 'plan' => $plan, 'appt' => $appt, 'cal' => $cal, 'mode' => $mode,
             'selected' => $selectedOk ? $selected : '', 'base' => $this->backTo($project), 'sources' => DeliveryService::SOURCES,
-            'start' => $plan['start'], 'startFromUser' => $plan['state'] === 'open' && !$plan['start_fixed'],
         ];
         if ($role === 'client') {
             $data['may'] = $appt !== null && $appt['status'] === 'confirmed' ? ['reschedule' => DeliveryService::clientMay($appt, 'reschedule'), 'cancel' => DeliveryService::clientMay($appt, 'cancel')] : null;
@@ -136,10 +134,10 @@ final class DeliveryController extends Controller
             if (!RateLimiter::hit('delivery_user', (string) $this->actorId())) {
                 throw new HttpException(429);
             }
-            $a = DeliveryService::book($project, $request->string('date'), 'client_dashboard', $this->actorId(), ['client_notes' => $request->string('client_notes'), 'start_date' => $request->string('start_date')]);
+            $a = DeliveryService::book($project, $request->string('date'), 'client_dashboard', $this->actorId(), ['client_notes' => $request->string('client_notes')]);
 
             return $this->ok($to, 'Your delivery appointment is confirmed for ' . DeliveryService::nice((string) $a['appointment_date']) . '. Reference ' . $a['booking_reference'] . '.');
-        }, $to . '?' . http_build_query(['start' => $request->string('start_date'), 'month' => substr($request->string('date'), 0, 7)]));
+        }, $to . '?month=' . urlencode(substr($request->string('date'), 0, 7)));
     }
 
     /** @param array<string,string> $params */
@@ -194,13 +192,13 @@ final class DeliveryController extends Controller
     {
         $project = $request->attributes['project'];
         $to = $this->backTo($project);
-        $in = ['preparation_days' => $request->string('preparation_days'), 'preparation_unit' => $request->string('preparation_unit'), 'fixed_start_date' => $request->string('fixed_start_date'), 'earliest_date' => $request->string('earliest_date'),
+        $in = ['preparation_days' => $request->string('preparation_days'), 'preparation_unit' => $request->string('preparation_unit'), 'counted_from' => $request->string('counted_from'), 'earliest_date' => $request->string('earliest_date'),
             'latest_date' => $request->string('latest_date'), 'booking_enabled' => $request->string('booking_enabled'), 'allow_multiple' => $request->string('allow_multiple')];
 
         return $this->guarded(function () use ($project, $in, $to): Response {
             $r = DeliveryService::savePlan($this->actorId(), $project, $in);
             $p = DeliveryService::plan($project);
-            $msg = 'Delivery settings saved: estimated time ' . $p['duration'] . '. Clients choose their project start date, and the delivery date must be after that time.';
+            $msg = 'Delivery settings saved: estimated time ' . $p['duration'] . '. The calendar is ' . ($p['state'] === 'disabled' ? 'OFF for this project (only the Owner can switch it on).' : 'on: clients can choose a delivery date after that time.');
             if ($r['earlier'] > 0) {
                 $msg .= ' ' . $r['earlier'] . ' confirmed appointment(s) of this project fall before the new first date; they were left unchanged.';
             }
@@ -244,11 +242,11 @@ final class DeliveryController extends Controller
     {
         $project = $request->attributes['project'];
         $to = $this->backTo($project);
-        $in = ['date' => $request->string('date'), 'start_date' => $request->string('start_date'), 'source' => $request->string('source'), 'internal_notes' => $request->string('internal_notes')];
+        $in = ['date' => $request->string('date'), 'source' => $request->string('source'), 'internal_notes' => $request->string('internal_notes')];
 
         return $this->guarded(function () use ($request, $project, $in, $to): Response {
             $source = in_array($in['source'], ['manual', 'admin_reserved'], true) ? $in['source'] : 'manual';
-            $a = DeliveryService::book($project, $in['date'], $source, $this->actorId(), ['internal_notes' => $in['internal_notes'], 'start_date' => $in['start_date'], 'override_eligibility' => $request->string('override') === '1']);
+            $a = DeliveryService::book($project, $in['date'], $source, $this->actorId(), ['internal_notes' => $in['internal_notes'], 'override_eligibility' => $request->string('override') === '1']);
 
             return $this->ok($to, 'Booked for ' . DeliveryService::nice((string) $a['appointment_date']) . '. Reference ' . $a['booking_reference'] . '. The client was emailed.');
         }, $to, $in);
