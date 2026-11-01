@@ -1178,3 +1178,14 @@ code.wrap { word-break: break-all; }
 .legal-body h2 { margin-top: 1.6em; scroll-margin-top: 90px; } .legal-body table { border-collapse: collapse; } .legal-body td, .legal-body th { border: 1px solid var(--line); padding: 6px 10px; }
 mark.legal-missing { background: rgba(255, 217, 138, 0.25); color: var(--c-warn); padding: 0 4px; border-radius: 4px; border: 1px dashed var(--c-warn); }
 :root[data-theme="light"] mark.legal-missing { background: #fff2cc; color: #6b4a00; border-color: #b07a00; }
+
+/* ---- Cookie banner and dialog ---- */
+.cookie-banner { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; background: var(--surface-2); border-top: 1px solid var(--line); box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35); padding: 16px 0 calc(16px + env(safe-area-inset-bottom)); }
+.cookie-banner[hidden] { display: none; }
+.cookie-inner { display: flex; gap: 18px 28px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.cookie-copy { flex: 1 1 420px; } .cookie-copy h2 { font-size: 1.05rem; margin: 0 0 4px; } .cookie-copy p { margin: 0; color: var(--text-dim); font-size: 0.93rem; }
+.cookie-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.cookie-dialog { max-width: min(560px, calc(100vw - 24px)); width: 100%; border: 1px solid var(--line); border-radius: 16px; background: var(--surface-2); color: var(--text); padding: 22px 24px; }
+.cookie-dialog::backdrop { background: rgba(2, 4, 16, 0.65); }
+.cookie-cat { padding: 10px 0; border-bottom: 1px solid var(--line); } .cookie-cat:last-of-type { border-bottom: 0; } .cookie-cat p { margin: 4px 0 0 28px; }
+@media (max-width: 640px) { .cookie-actions .btn { flex: 1 1 100%; } .cookie-banner { max-height: 80vh; overflow: auto; } }

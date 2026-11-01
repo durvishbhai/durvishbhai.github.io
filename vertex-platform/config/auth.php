@@ -24,6 +24,7 @@ return [
         'requirements_pdf_ip' => [20, 3600],
         'push_subscribe_user' => [30, 3600],
         'availability_ip' => [300, 600],
+        'cookie_consent_ip' => [60, 3600],
         'delivery_lookup_ip' => [10, 3600],
         'delivery_verify_ip' => [20, 3600],
         'delivery_book_ip' => [30, 3600],

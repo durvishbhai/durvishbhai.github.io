@@ -63,6 +63,7 @@ final class ComplianceSettings
             'cookie_desc_preferences' => ['group' => 'cookies', 'label' => 'Preferences: description', 'type' => 'textarea', 'default' => 'Remember choices such as your colour theme where this is not essential to the service.'],
             'cookie_desc_analytics' => ['group' => 'cookies', 'label' => 'Analytics: description', 'type' => 'textarea', 'default' => 'Help us understand how the website is used. No analytics service is active at the moment.'],
             'cookie_desc_marketing' => ['group' => 'cookies', 'label' => 'Marketing: description', 'type' => 'textarea', 'default' => 'Used to show relevant advertising and measure campaigns. No marketing or advertising cookie is active at the moment.'],
+            'cookie_version' => ['group' => 'cookies', 'label' => 'Consent version (raise it to ask every visitor again)', 'type' => 'int', 'default' => '1', 'help' => 'Visitors are asked again when this changes, when the banner text is materially changed, or when you enable a new optional integration.'],
             'cookie_valid_days' => ['group' => 'cookies', 'label' => 'Ask again after (days)', 'type' => 'int', 'default' => '180'],
 
             'consent_privacy_text' => ['group' => 'consent', 'label' => 'Privacy acknowledgement (required on forms)', 'type' => 'textarea', 'default' => 'I have read the {{privacy_link}} and I agree that {{brand}} may use the details I enter here to reply to my enquiry and, if we go ahead, to deliver the services I ask for.'],

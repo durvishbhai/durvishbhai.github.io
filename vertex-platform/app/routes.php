@@ -129,6 +129,9 @@ return static function (Router $router): void {
         $router->get('/' . $doc, [LegalController::class, 'show'], ['nosession']);
     }
     $router->get('/refund-and-cancellation-policy', [LegalController::class, 'refundAlias'], ['nosession']);
+    $router->get('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'settings'], ['nosession']);
+    // The consent choice is stored in the visitor's own first-party cookie. No session exists on these pages, so there is no CSRF token: the endpoint accepts only requests that come from this site (Origin/Referer check) and is rate limited.
+    $router->post('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'save'], ['nosession'], false);
     $router->get('/legal-business-information', [LegalController::class, 'business'], ['nosession']);
     $router->get('/contact-and-grievance', [LegalController::class, 'contact'], ['nosession']);
     $router->get('/sitemap.xml', [PublicPageController::class, 'sitemap'], ['nosession']);

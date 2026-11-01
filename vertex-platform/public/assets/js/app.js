@@ -479,7 +479,7 @@
             b.addEventListener('click', function () {
                 var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
                 root.setAttribute('data-theme', next);
-                try { window.localStorage.setItem('kis-theme', next); } catch (e) { /* private mode: the choice lasts for this page only */ }
+                try { (window.KISConsent ? window.KISConsent.store() : window.localStorage).setItem('kis-theme', next); } catch (e) { /* private mode: the choice lasts for this page only */ }
                 paint();
             });
         });

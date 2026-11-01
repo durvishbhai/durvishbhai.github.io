@@ -26,6 +26,7 @@ $pageTitle = !empty($meta['title']) ? (string) $meta['title'] : (isset($title) &
 </head>
 <body class="site">
 <a class="skip-link" href="#main">Skip to content</a>
+<?= \Vertex\Core\View::partial('cookie-banner') /* first in the tab order after the skip link, so keyboard users meet it at once (it is shown fixed at the bottom) */ ?>
 <?= \Vertex\Core\View::partial('site-announce') ?>
 <?= \Vertex\Core\View::partial('site-header') ?>
 <main id="main">
@@ -33,6 +34,7 @@ $pageTitle = !empty($meta['title']) ? (string) $meta['title'] : (isset($title) &
     <?= $content ?>
 </main>
 <?= \Vertex\Core\View::partial('site-footer') ?>
+<script src="<?= e(asset('js/consent.js')) ?>" defer></script>
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </body>
 </html>

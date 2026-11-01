@@ -25,7 +25,7 @@ $desc = (string) ($site['footer_description'] ?? '');
             <?php if (($site['email'] ?? '') !== '') : ?><p class="small"><a href="mailto:<?= e((string) $site['email']) ?>"><?= e((string) $site['email']) ?></a></p><?php endif; ?>
         </div>
         <?php foreach ($cols as $c) : ?>
-            <nav class="footer-col" aria-label="<?= e($c['title']) ?>"><h2><?= e($c['title']) ?></h2><ul><?php foreach ($c['links'] as $l) : ?><li><a href="<?= shref($l['url']) ?>"><?= e($l['label']) ?></a></li><?php endforeach; ?></ul></nav>
+            <nav class="footer-col" aria-label="<?= e($c['title']) ?>"><h2><?= e($c['title']) ?></h2><ul><?php foreach ($c['links'] as $l) : ?><li><a href="<?= shref($l['url']) ?>"<?= $l['url'] === '/cookie-settings' ? ' data-cookie-settings' : '' ?>><?= e($l['label']) ?></a></li><?php endforeach; ?></ul></nav>
         <?php endforeach; ?>
     </div>
     <div class="container footer-bottom">
