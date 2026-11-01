@@ -100,6 +100,7 @@ $p = [
         'cms.edit' => 'Edit draft website content',
         'cms.publish' => 'Publish website content',
         'legal.manage' => 'Edit legal pages and policies',
+        'compliance.manage' => 'Manage compliance & legal: policies and versions, cookie settings, integrations register, deletion requests, acceptance (Owner)',
         'careers.view' => 'View job applications',
         'careers.manage' => 'Review job applications and change their status',
     ],
@@ -277,7 +278,7 @@ $sensitive = [
     'commissions.rules.manage', 'coupons.manage', 'creditnotes.issue', 'forms.manage', 'forms.export', 'agreements.manage', 'agreements.sign_company', 'agreements.upload', 'careers.manage', 'templates.manage', 'automation.manage', 'sla.manage', 'commissions.approve', 'commissions.adjust', 'referrals.decide', 'renewals.approve', 'renewals.confirm_provider', 'renewals.prices', 'billing.configure', 'quotes.record_decision',
     'pricing.manage', 'quotes.send',
     'crm.configure', 'clients.merge', 'clients.invite', 'projects.record_approval',
-    'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override', 'delivery.configure',
+    'revisions.override', 'revisions.policy', 'warranty.manage', 'warranty.override', 'delivery.configure', 'compliance.manage',
 ];
 
 $all = [];
@@ -310,7 +311,7 @@ $roles = [
         'description' => 'Runs day-to-day administration, assigns projects, approves payouts. Cannot change sensitive permission grants or system settings.',
         'level' => 90, 'locked' => false, 'assignable_in_ui' => true, 'phone_required' => false,
         'permissions' => array_values(array_diff($all, [
-            'roles.manage_sensitive', 'roles.create', 'settings.manage', 'backups.manage', 'activity.view_all',
+            'roles.manage_sensitive', 'roles.create', 'settings.manage', 'backups.manage', 'activity.view_all', 'compliance.manage',
             // client/partner-only actions: an Administrator must not act as the client or as a referral partner
             'pricing.respond_change', 'projects.give_feedback', 'enquiries.submit_referral', 'enquiries.view_own', 'clients.view_own',
             'referrals.submit', 'referrals.view_own', 'renewals.view_own', 'quotes.respond',

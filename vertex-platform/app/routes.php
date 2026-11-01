@@ -9,6 +9,8 @@ use Vertex\Http\Controllers\Admin\AppointmentController;
 use Vertex\Http\Controllers\Admin\DeliveryAdminController;
 use Vertex\Http\Controllers\DeliveryController;
 use Vertex\Http\Controllers\PublicDeliveryController;
+use Vertex\Http\Controllers\LegalController;
+use Vertex\Http\Controllers\Admin\ComplianceController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\AutomationController;
@@ -122,9 +124,13 @@ return static function (Router $router): void {
     $router->get('/faq', [SitePageController::class, 'faq'], ['nosession']);
     $router->get('/sitemap', [SitePageController::class, 'sitemap'], ['nosession']);
     $router->get('/project-requirements', [SitePageController::class, 'requirementsAlias'], ['nosession']);
-    foreach (['privacy-policy', 'terms-and-conditions', 'refund-and-cancellation-policy', 'payment-policy', 'cookie-policy'] as $policy) {
-        $router->get('/' . $policy, [SitePageController::class, 'policy'], ['nosession']);
+    // Legal documents (versioned, edited by the Owner under Compliance & legal) and the compliance pages
+    foreach (['privacy-policy', 'terms-and-conditions', 'refund-policy', 'cancellation-policy', 'payment-policy', 'cookie-policy', 'accessibility-statement', 'security-disclosure'] as $doc) {
+        $router->get('/' . $doc, [LegalController::class, 'show'], ['nosession']);
     }
+    $router->get('/refund-and-cancellation-policy', [LegalController::class, 'refundAlias'], ['nosession']);
+    $router->get('/legal-business-information', [LegalController::class, 'business'], ['nosession']);
+    $router->get('/contact-and-grievance', [LegalController::class, 'contact'], ['nosession']);
     $router->get('/sitemap.xml', [PublicPageController::class, 'sitemap'], ['nosession']);
     $router->get('/robots.txt', [PublicPageController::class, 'robots'], ['nosession']);
     // Razorpay calls this with its own signature header: no session, no CSRF token. The handler rejects anything without a valid X-Razorpay-Signature.
@@ -665,6 +671,19 @@ return static function (Router $router): void {
         $r->get('/revision-policies', [RevisionTermsController::class, 'index'], ['can:revisions.policy,revisions.classify,revisions.override']);
         $r->post('/revision-policies', [RevisionTermsController::class, 'save'], ['can:revisions.policy']);
 
+        $r->get('/compliance', [ComplianceController::class, 'index'], ['can:compliance.manage']);
+        $r->get('/compliance/documents/{key}', [ComplianceController::class, 'document'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/save', [ComplianceController::class, 'save'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/preview', [ComplianceController::class, 'preview'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/publish', [ComplianceController::class, 'publish'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/schedule', [ComplianceController::class, 'schedule'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/cancel-schedule', [ComplianceController::class, 'cancelSchedule'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/discard', [ComplianceController::class, 'discard'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/unpublish', [ComplianceController::class, 'unpublish'], ['can:compliance.manage']);
+        $r->get('/compliance/documents/{key}/versions/{no}', [ComplianceController::class, 'version'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/versions/{no}/restore', [ComplianceController::class, 'restore'], ['can:compliance.manage']);
+        $r->get('/compliance/settings/{group}', [ComplianceController::class, 'settings'], ['can:compliance.manage']);
+        $r->post('/compliance/settings/{group}', [ComplianceController::class, 'saveSettings'], ['can:compliance.manage']);
         $r->get('/delivery', [DeliveryAdminController::class, 'index'], ['can:delivery.view,delivery.view_assigned']);
         $r->post('/delivery/manual', [DeliveryAdminController::class, 'manual'], ['can:delivery.manage']);
         $r->get('/delivery/capacity', [DeliveryAdminController::class, 'capacity'], ['can:delivery.configure']);

@@ -75,6 +75,7 @@ $nav = [
     ['/admin/site', 'Website', can('cms.view')],
     ['/admin/cms', 'Pages & media', can('cms.view')],
     ['/admin/appointments', 'Appointments', can('appointments.configure')],
+    ['/admin/compliance', 'Compliance & legal', can('compliance.manage')],
     ['/admin/careers', 'Job applications', can('careers.view') || can('careers.manage')],
     ['/ai', 'AI assistant', can('ai.use') && \Vertex\Services\Settings::feature('ai')],
     ['/admin/settings', 'Integrations & settings', can('settings.view')],
@@ -94,7 +95,7 @@ $groupOf = [
     'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
     'Website' => ['/admin/site', '/admin/cms', '/admin/appointments', '/admin/careers'],
-    'Administration' => ['/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/activity', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
+    'Administration' => ['/admin/compliance', '/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/activity', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
     'Account' => ['/account', '/account#change-password'],
 ];
 $byHref = [];

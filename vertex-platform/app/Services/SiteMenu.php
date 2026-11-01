@@ -56,10 +56,7 @@ final class SiteMenu
         if (SiteContent::hasPublished('team')) {
             $explore[] = ['label' => 'Our Team', 'url' => '/our-team'];
         }
-        $legal = [];
-        foreach (SiteContent::published('policies') as $p) {
-            $legal[] = ['label' => (string) $p['title'], 'url' => '/' . $p['slug']];
-        }
+        $legal = LegalLinks::footer(); // every legal document and compliance page: always linked, never hidden
         $defaults = [
             'footer_explore' => ['Explore', $explore],
             'footer_opportunities' => ['Opportunities', [['label' => 'Our Clients', 'url' => '/our-clients'], ['label' => 'Our Partners', 'url' => '/our-partners'], ...(SiteHiring::isVisible() ? [['label' => 'Careers', 'url' => '/careers']] : []), ['label' => 'Project Requirements', 'url' => '/request-quote']]],
@@ -98,7 +95,7 @@ final class SiteMenu
         foreach ($items as $i) {
             $url = trim((string) ($i['url'] ?? ''));
             $path = trim($url, '/');
-            if (in_array($path, $all, true) && !in_array($path, $policies, true)) {
+            if (in_array($path, $all, true) && !in_array($path, $policies, true) && !LegalDocuments::isDocument($path)) {
                 continue;
             }
             if (in_array($path, ['hiring', 'careers'], true) && !SiteHiring::isVisible()) {

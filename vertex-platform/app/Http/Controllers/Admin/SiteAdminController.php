@@ -32,9 +32,9 @@ final class SiteAdminController extends Controller
         }
         $site = (array) Config::get('site', []);
         $todo = [];
-        foreach (SiteContent::rows('policies') as $p) {
-            if ($p['status'] !== 'published') {
-                $todo[] = ['text' => $p['title'] . ' is a draft: review it and publish it when it is correct.', 'href' => '/admin/site/policies/' . $p['public_id']];
+        foreach (\Vertex\Services\LegalDocuments::documents() as $d) { // policies now live under Compliance & legal (Owner only)
+            if ($d['live'] === null && Gate::can('compliance.manage', $uid)) {
+                $todo[] = ['text' => $d['title'] . ' is not published yet: review and publish it under Compliance & legal.', 'href' => '/admin/compliance/documents/' . $d['doc_key']];
             }
         }
         foreach (['email' => 'a public email address', 'phone' => 'a phone number'] as $k => $what) {

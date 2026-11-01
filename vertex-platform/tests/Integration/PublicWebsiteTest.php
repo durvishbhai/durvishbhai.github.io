@@ -184,37 +184,22 @@ final class PublicWebsiteTest extends HttpTestCase
 
     // ------------------------------------------------------------------------------------------------ policies
 
-    public function testPoliciesStayHiddenUntilCompletedAndEveryChangeIsAVersion(): void
+    public function testPoliciesNowLiveUnderComplianceAndStayHiddenUntilPublished(): void
     {
         $this->seed();
         $c = $this->client();
-        $this->assertSame(404, $c->get('/privacy-policy')['status'], 'a draft policy is not public');
-        $this->assertStringNotContainsString('/privacy-policy', $c->get('/')['body'], 'and is not linked');
-        $this->assertStringNotContainsString('privacy-policy', $c->get('/sitemap.xml')['body']);
-
-        $p = SiteContent::find('policies', (string) Database::one("SELECT public_id FROM site_policies WHERE slug = 'privacy-policy'")['public_id']);
-        $this->assertMatchesRegularExpression('/\[ADMIN TO COMPLETE/i', (string) $p['body'], 'the draft says what is missing');
-        try {
-            SiteContent::setStatus($this->admin, 'policies', $p, 'published');
-            $this->fail('An unfinished policy must not publish.');
-        } catch (\Vertex\Core\ValidationException $e) {
-            $this->assertStringContainsString('ADMIN TO COMPLETE', implode(' ', $e->errors));
-        }
-
-        $before = (int) Database::one('SELECT COUNT(*) c FROM site_policy_versions WHERE policy_id = ?', [$p['id']])['c'];
-        $saved = SiteContent::save($this->admin, 'policies', $p['public_id'], ['title' => 'Privacy Policy', 'effective_date' => '2026-11-01', 'body' => "## What we collect\n\nOnly what you send us in our forms."]);
-        $this->assertSame($before + 1, (int) Database::one('SELECT COUNT(*) c FROM site_policy_versions WHERE policy_id = ?', [$p['id']])['c']);
-        SiteContent::setStatus($this->admin, 'policies', SiteContent::find('policies', $saved['public_id']), 'published');
-
         $page = $c->get('/privacy-policy');
-        $this->assertSame(200, $page['status']);
-        $this->assertStringContainsString('What we collect', $page['body']);
-        $this->assertStringContainsString('/privacy-policy', $c->get('/sitemap.xml')['body']);
-        $this->assertStringContainsString('/privacy-policy', $c->get('/')['body'], 'a published policy is linked in the footer');
+        $this->assertSame(200, $page['status'], 'the page exists and says it is being finalised');
+        $this->assertStringContainsString('being finalised', $page['body']);
+        $this->assertStringNotContainsString('privacy-policy', $c->get('/sitemap.xml')['body'], 'an unpublished document is not in the sitemap');
+        $this->assertStringContainsString('/privacy-policy', $c->get('/')['body'], 'the footer always links the legal documents');
 
-        SiteContent::save($this->admin, 'policies', $p['public_id'], ['title' => 'Privacy Policy', 'effective_date' => '2026-11-01', 'body' => 'Second wording of the policy.']);
-        SiteContent::restorePolicy($this->admin, SiteContent::find('policies', $p['public_id']), 2);
-        $this->assertStringContainsString('What we collect', (string) SiteContent::find('policies', $p['public_id'])['body'], 'an older version can be restored');
+        $owner = $this->makeUser('owner-legal@x.test', ['super_admin']);
+        \Vertex\Services\ComplianceSettings::save($owner, 'business', ['proprietor_name' => 'P Test', 'operator_name' => 'O Test', 'jurisdiction' => 'Testville']);
+        \Vertex\Services\ComplianceSettings::save($owner, 'contact', ['contact_email' => 'hello@x.test', 'whatsapp' => '+91 90000 00001']);
+        \Vertex\Services\LegalDocuments::publish($owner, 'privacy-policy');
+        $this->assertSame(200, $c->get('/privacy-policy')['status']);
+        $this->assertStringContainsString('/privacy-policy', $c->get('/sitemap.xml')['body']);
     }
 
     // ------------------------------------------------------------------------------------------------ admin + permissions

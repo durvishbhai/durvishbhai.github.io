@@ -345,8 +345,10 @@ final class CmsService
                 $out[] = ['loc' => $base . $prefix . $r['slug'], 'lastmod' => substr((string) $r['updated_at'], 0, 10)];
             }
         }
-        foreach (SiteContent::published('policies') as $r) {
-            $out[] = ['loc' => $base . '/' . $r['slug'], 'lastmod' => substr((string) $r['updated_at'], 0, 10)];
+        foreach (LegalDocuments::documents() as $r) { // the live legal documents (drafts are never listed)
+            if ($r['live'] !== null) {
+                $out[] = ['loc' => $base . '/' . $r['doc_key'], 'lastmod' => substr((string) $r['live']['published_at'], 0, 10)];
+            }
         }
         foreach (Database::all("SELECT slug, updated_at FROM cms_pages WHERE archived_at IS NULL AND noindex = 0 AND (status = 'published' OR (status = 'scheduled' AND publish_at <= UTC_TIMESTAMP())) ORDER BY slug") as $p) {
             if ($p['slug'] !== 'home') {
