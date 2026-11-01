@@ -13,6 +13,7 @@ use Vertex\Http\Controllers\Controller;
 use Vertex\Services\ComplianceSettings;
 use Vertex\Services\HtmlSanitizer;
 use Vertex\Services\LegalDocuments;
+use Vertex\Services\PolicyAcceptance;
 
 /** Compliance & legal management: Owner only (`compliance.manage`, which Administrators do not hold by default). Every action is checked again in the services. */
 final class ComplianceController extends Controller
@@ -188,5 +189,59 @@ final class ComplianceController extends Controller
 
             return $this->ok($to, 'Saved. The public website now shows these details.');
         }, $to, array_map('strval', array_filter($request->body, 'is_scalar')));
+    }
+
+    // ------------------------------------------------------------------------------------------------ policy acceptance
+
+    /** @param array<string,string> $params */
+    public function acceptance(Request $request, array $params = []): Response
+    {
+        return $this->page('admin/compliance/acceptance', ['title' => 'Policy acceptance', 'versions' => PolicyAcceptance::overview(), 'restriction' => ComplianceSettings::bool('restriction_enabled')]);
+    }
+
+    /** @param array<string,string> $params */
+    public function acceptanceVersion(Request $request, array $params = []): Response
+    {
+        $id = (int) ($params['id'] ?? 0);
+        $v = \Vertex\Core\Database::one('SELECT v.*, d.title AS doc_title, d.doc_key FROM legal_document_versions v JOIN legal_documents d ON d.id = v.document_id WHERE v.id = ?', [$id]) ?? throw new HttpException(404);
+
+        return $this->page('admin/compliance/acceptance-version', ['title' => $v['doc_title'] . ' · acceptance', 'v' => $v, 'rows' => PolicyAcceptance::clientsFor($id)]);
+    }
+
+    /** @param array<string,string> $params */
+    public function acceptanceRemind(Request $request, array $params = []): Response
+    {
+        $id = (int) ($params['id'] ?? 0);
+
+        return $this->guarded(function () use ($id): Response {
+            $n = PolicyAcceptance::remind($this->actorId(), $id);
+
+            return $this->ok('/admin/compliance/acceptance/' . $id, $n . ' reminder email(s) sent.');
+        }, '/admin/compliance/acceptance/' . $id);
+    }
+
+    /** @param array<string,string> $params */
+    public function acceptanceExtend(Request $request, array $params = []): Response
+    {
+        $id = (int) ($params['id'] ?? 0);
+
+        return $this->guarded(function () use ($request, $id): Response {
+            PolicyAcceptance::extendDeadline($this->actorId(), $id, $request->string('accept_by'));
+
+            return $this->ok('/admin/compliance/acceptance/' . $id, 'The deadline was moved.');
+        }, '/admin/compliance/acceptance/' . $id);
+    }
+
+    /** @param array<string,string> $params */
+    public function acceptanceRecord(Request $request, array $params = []): Response
+    {
+        $id = (int) ($params['id'] ?? 0);
+
+        return $this->guarded(function () use ($request, $id): Response {
+            $this->requireStepUp($request);
+            PolicyAcceptance::recordFor($this->actorId(), (int) $request->string('user'), $id, $request->string('note'));
+
+            return $this->ok('/admin/compliance/acceptance/' . $id, 'The acceptance was recorded on the client\'s behalf.');
+        }, '/admin/compliance/acceptance/' . $id);
     }
 }

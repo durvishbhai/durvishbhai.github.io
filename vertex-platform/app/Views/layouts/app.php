@@ -172,6 +172,8 @@ foreach ($groups as $gname => $items) {
         <div class="container-wide">
             <div class="install-banner" data-install-banner hidden><span><strong>Get the app.</strong> Install <?= e((string) config('app.name')) ?> on your phone for quick access.</span><span class="install-actions"><button type="button" class="btn btn-primary btn-sm" data-install>Install</button><button type="button" class="btn btn-ghost btn-sm" data-banner-dismiss aria-label="Dismiss">&times;</button></span><p class="muted small" data-install-ios hidden>On iPhone: tap the Share button, then <strong>Add to Home Screen</strong>.</p></div>
             <?php if (\Vertex\Services\PushChannel::enabled()) : ?><div class="install-banner" data-push-banner hidden><span><strong>Stay up to date.</strong> Get payment, project and request updates as notifications on this device.</span><span class="install-actions"><button type="button" class="btn btn-primary btn-sm" data-push-enable>Turn on notifications</button><button type="button" class="btn btn-ghost btn-sm" data-banner-dismiss aria-label="Dismiss">&times;</button></span></div><?php endif; ?>
+            <?php $pa = $uid > 0 ? \Vertex\Services\PolicyAcceptance::state($uid) : ['pending' => []]; if ($pa['pending'] !== [] && ($path ?? '') !== '/policy-acceptance') : ?>
+            <div class="alert alert-info" role="status"><p><strong>Updated terms need your review.</strong> <?= $pa['deadline'] ? 'Please accept by ' . e(local_date($pa['deadline'], 'j F Y')) . '.' : '' ?> <a href="/policy-acceptance">Review and accept</a></p></div><?php endif; ?>
             <?= \Vertex\Core\View::partial('flash', ['errors' => $errors ?? [], 'notice' => $notice ?? null]) ?>
             <?= $content ?>
         </div>

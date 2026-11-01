@@ -464,6 +464,10 @@ return static function (Router $router): void {
     $router->post('/projects/{project}/warranty', [WarrantyController::class, 'save'], ['auth', 'can:warranty.manage', 'project']);
     $router->post('/projects/{project}/warranty/suspend', [WarrantyController::class, 'suspend'], ['auth', 'can:warranty.manage', 'project']);
 
+    // A client reviews and accepts materially updated policies (restricted accounts may only reach this, their records and their account)
+    $router->get('/policy-acceptance', [\Vertex\Http\Controllers\PolicyAcceptanceController::class, 'show'], ['auth']);
+    $router->post('/policy-acceptance', [\Vertex\Http\Controllers\PolicyAcceptanceController::class, 'decide'], ['auth']);
+
     // Delivery appointments (per project): clients book, team configures and books for clients
     $router->get('/my/delivery', [DeliveryController::class, 'mine'], ['auth', 'can:delivery.book']);
     $router->get('/projects/{project}/delivery', [DeliveryController::class, 'project'], ['auth', 'project']);
@@ -682,6 +686,11 @@ return static function (Router $router): void {
         $r->post('/compliance/documents/{key}/unpublish', [ComplianceController::class, 'unpublish'], ['can:compliance.manage']);
         $r->get('/compliance/documents/{key}/versions/{no}', [ComplianceController::class, 'version'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/versions/{no}/restore', [ComplianceController::class, 'restore'], ['can:compliance.manage']);
+        $r->get('/compliance/acceptance', [ComplianceController::class, 'acceptance'], ['can:compliance.manage']);
+        $r->get('/compliance/acceptance/{id}', [ComplianceController::class, 'acceptanceVersion'], ['can:compliance.manage']);
+        $r->post('/compliance/acceptance/{id}/remind', [ComplianceController::class, 'acceptanceRemind'], ['can:compliance.manage']);
+        $r->post('/compliance/acceptance/{id}/extend', [ComplianceController::class, 'acceptanceExtend'], ['can:compliance.manage']);
+        $r->post('/compliance/acceptance/{id}/record', [ComplianceController::class, 'acceptanceRecord'], ['can:compliance.manage']);
         $r->get('/compliance/settings/{group}', [ComplianceController::class, 'settings'], ['can:compliance.manage']);
         $r->post('/compliance/settings/{group}', [ComplianceController::class, 'saveSettings'], ['can:compliance.manage']);
         $r->get('/delivery', [DeliveryAdminController::class, 'index'], ['can:delivery.view,delivery.view_assigned']);

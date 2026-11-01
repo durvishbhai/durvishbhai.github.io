@@ -8,6 +8,7 @@ use Vertex\Core\Request;
 use Vertex\Core\Response;
 use Vertex\Core\Session;
 use Vertex\Services\Auth;
+use Vertex\Services\PolicyAcceptance;
 use Vertex\Services\TwoFactorService;
 
 final class RequireAuth implements Middleware
@@ -32,6 +33,16 @@ final class RequireAuth implements Middleware
             Session::flash('notice', 'Your role requires two-factor login. Set it up to continue.');
 
             return Response::redirect('/account/two-factor');
+        }
+
+        // A client who has not accepted a materially updated policy by its deadline (or who refused it) only reaches the acceptance screen, their legal and financial records (read only) and their account.
+        if (PolicyAcceptance::state($id)['restricted']) {
+            PolicyAcceptance::noteRestricted($id);
+            if (!PolicyAcceptance::allowed($request->method, $request->path)) {
+                Session::flash('notice', 'Please review and accept the updated terms to continue.');
+
+                return Response::redirect('/policy-acceptance');
+            }
         }
 
         return $next($request);

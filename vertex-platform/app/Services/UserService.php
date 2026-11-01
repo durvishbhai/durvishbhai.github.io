@@ -69,6 +69,7 @@ final class UserService
             $id = $repo->create($name, $email, password_hash($password, PASSWORD_DEFAULT), $status, ['client'], null, $phone);
             Database::run('UPDATE users SET self_registered = 1 WHERE id = ?', [$id]);
             self::ensureClientProfile($id);
+            PolicyAcceptance::recordSignup($id, $ip, null); // signing up means accepting the current terms
             Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $email, 'roles' => ['client'], 'status' => $status], ['mode' => $mode], $id, $ip);
             if ($mode === 'instant') {
                 return null; // nothing to wait for: the account works at once
@@ -181,6 +182,7 @@ final class UserService
                 $id = $repo->create($name, $g['email'], password_hash(bin2hex(random_bytes(24)), PASSWORD_DEFAULT), $status, ['client'], null, $phone, true);
                 Database::run('UPDATE users SET self_registered = 1, google_sub = ? WHERE id = ?', [$g['sub'], $id]);
                 self::ensureClientProfile($id);
+            PolicyAcceptance::recordSignup($id, $ip, null); // signing up means accepting the current terms
                 Audit::record('user.registered', 'user', $id, [], ['name' => $name, 'email' => $g['email'], 'roles' => ['client'], 'status' => $status], ['mode' => $mode, 'via' => 'google'], $id, $ip);
                 if ($status === 'pending') {
                     $pub = (string) Database::one('SELECT public_id FROM users WHERE id = ?', [$id])['public_id'];
@@ -381,6 +383,7 @@ final class UserService
                 }
             } elseif (in_array('client', $roles, true)) {
                 self::ensureClientProfile($id);
+            PolicyAcceptance::recordSignup($id, $ip, null); // signing up means accepting the current terms
             }
             Audit::record('user.created', 'user', $id, [], ['name' => $name, 'email' => $email, 'phone' => $phone, 'roles' => $roles, 'status' => 'pending'], [], $actorId);
 

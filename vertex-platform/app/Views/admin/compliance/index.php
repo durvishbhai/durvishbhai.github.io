@@ -21,6 +21,8 @@ $badge = static fn (string $c, string $t): string => '<span class="badge badge-d
     <?php endforeach; ?></tbody></table></div>
 </div>
 
+<div class="panel"><h2>Policy acceptance</h2><p class="muted">Material updates need clients' acceptance. <a href="/admin/compliance/acceptance">See who has accepted, send reminders or move the deadline</a>.</p></div>
+
 <div class="panel"><h2>Settings</h2>
     <ul class="plain-list"><?php foreach ($groups as $g => $l) : ?><li><a href="/admin/compliance/settings/<?= e($g) ?>"><?= e($l) ?></a></li><?php endforeach; ?></ul>
     <p class="muted small">The public compliance pages (<a href="/legal-business-information">legal business information</a>, <a href="/contact-and-grievance">contact &amp; grievance</a>) are built from these settings.</p></div>
