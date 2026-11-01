@@ -11,6 +11,7 @@ use Vertex\Http\Controllers\DeliveryController;
 use Vertex\Http\Controllers\PublicDeliveryController;
 use Vertex\Http\Controllers\LegalController;
 use Vertex\Http\Controllers\Admin\ComplianceController;
+use Vertex\Http\Controllers\Admin\DeletionAdminController;
 use Vertex\Http\Controllers\Admin\AuditController;
 use Vertex\Http\Controllers\Admin\RevisionTermsController;
 use Vertex\Http\Controllers\Admin\AutomationController;
@@ -130,6 +131,16 @@ return static function (Router $router): void {
     }
     $router->get('/refund-and-cancellation-policy', [LegalController::class, 'refundAlias'], ['nosession']);
     $router->get('/third-party-services', [LegalController::class, 'thirdParty'], ['nosession']);
+    // Data deletion requests: pages that use a form keep a session (CSRF); the confirmation link only shows a button, so email scanners cannot confirm by opening it.
+    $router->get('/data-deletion', [\Vertex\Http\Controllers\DataDeletionController::class, 'form']);
+    $router->post('/data-deletion', [\Vertex\Http\Controllers\DataDeletionController::class, 'submit']);
+    $router->get('/data-deletion/received', [\Vertex\Http\Controllers\DataDeletionController::class, 'received']);
+    $router->get('/data-deletion/verify/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'verifyForm']);
+    $router->post('/data-deletion/verify/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'verify']);
+    $router->get('/data-deletion/status', [\Vertex\Http\Controllers\DataDeletionController::class, 'lookupForm']);
+    $router->post('/data-deletion/status', [\Vertex\Http\Controllers\DataDeletionController::class, 'lookup']);
+    $router->get('/data-deletion/status/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'status']);
+    $router->post('/data-deletion/status/{token}', [\Vertex\Http\Controllers\DataDeletionController::class, 'reply']);
     $router->get('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'settings'], ['nosession']);
     // The consent choice is stored in the visitor's own first-party cookie. No session exists on these pages, so there is no CSRF token: the endpoint accepts only requests that come from this site (Origin/Referer check) and is rate limited.
     $router->post('/cookie-settings', [\Vertex\Http\Controllers\CookieController::class, 'save'], ['nosession'], false);
@@ -701,6 +712,14 @@ return static function (Router $router): void {
         $r->post('/compliance/integrations/{id}/reviewed', [ComplianceController::class, 'reviewIntegration'], ['can:compliance.manage']);
         $r->get('/compliance/services', [ComplianceController::class, 'services'], ['can:compliance.manage']);
         $r->post('/compliance/services/{id}', [ComplianceController::class, 'saveService'], ['can:compliance.manage']);
+        $r->get('/compliance/deletion', [DeletionAdminController::class, 'index'], ['can:compliance.manage']);
+        $r->get('/compliance/deletion/{id}', [DeletionAdminController::class, 'show'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/verify', [DeletionAdminController::class, 'verify'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/clarify', [DeletionAdminController::class, 'clarify'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/approve', [DeletionAdminController::class, 'approve'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/reject', [DeletionAdminController::class, 'reject'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/note', [DeletionAdminController::class, 'note'], ['can:compliance.manage']);
+        $r->post('/compliance/deletion/{id}/process', [DeletionAdminController::class, 'process'], ['can:compliance.manage']);
         $r->get('/compliance/settings/{group}', [ComplianceController::class, 'settings'], ['can:compliance.manage']);
         $r->post('/compliance/settings/{group}', [ComplianceController::class, 'saveSettings'], ['can:compliance.manage']);
         $r->get('/delivery', [DeliveryAdminController::class, 'index'], ['can:delivery.view,delivery.view_assigned']);
