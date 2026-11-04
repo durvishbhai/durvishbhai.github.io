@@ -124,3 +124,17 @@ Other decisions: whether to turn on Turnstile; whether marketing email will ever
 6. **Email**: the existing SMTP settings are used for all compliance emails. Send the test email to your own address only.
 7. **Cloudflare / DNS**: nothing in this release changes DNS. If Cloudflare proxies the domain, keep SSL mode "Full (strict)", do not cache `/admin`, `/cookie-settings`, `/unsubscribe/*` or `/data-deletion*`, and allow `POST` to them. Add SPF/DKIM/DMARC for the sending domain at your DNS host so that deletion and policy emails reach inboxes.
 8. **Rotate** any password or key that was ever pasted into a chat or document.
+
+---
+
+## J. Verified business facts and publication controls (added after the Owner supplied the facts)
+
+**Recorded (migration 0043, never overwriting a value the Owner already typed):** legal proprietor (Leena Sandip Jawale), operational representative (Durvish Jawale), Udyam Registration Number, Shop Act number, official email, official WhatsApp, grievance email, governing law "India" and place of disputes "Pune, Maharashtra" (both **proposals**), a retention summary that names no number of years. GST: "Not registered for GST"; no GSTIN is stored or shown, and no page claims GST registration.
+**Not invented:** no address, no grievance contact *name*, no retention period (the earlier placeholder of 8 years was removed), no lawyer approval.
+**Internal vs public:** every recorded fact starts as *internal*. A separate approval switch per fact (Compliance & legal → Public disclosure approvals) controls whether it appears on the public Legal Business Information and Contact & Grievance pages and inside published legal documents. Until approved, the public pages keep using the existing public site email/WhatsApp from Integrations & settings, so existing website behaviour is unchanged. A document that needs an unapproved fact cannot be published and says which one.
+**Owner-only editing:** the Udyam Registration Number (URN) and the Shop Act number are edited at Compliance & legal → Business identity, which requires the Owner-only `compliance.manage` permission (Administrators get 403, checked by tests).
+**Lawyer-review gate:** every document that carries legal-review flags (all except the Security Disclosure) stays a draft until the Owner records a lawyer review (name, date) of that exact text. The record is tied to a hash of the text; any later edit voids it. The system keeps the record only; it does not judge the law.
+**Nothing publishes itself:** all eight documents remain drafts; publishing needs the Owner's password; scheduled publication only fires for a version the Owner scheduled.
+**Pending actions:** Compliance & legal → *Pending actions* lists, computed from the real state: Information needed, Approval needed, Requires Legal Review, Needs your verification.
+**Checklist:** privacy policy, terms, refund/cancellation, cookie consent, accessibility, age/children and data deletion start as *Requires legal review*; nothing is Complete.
+**Still missing / to decide:** grievance contact name; business address (optional, none shown); grievance target days (optional); whether to state a retention period; lawyer reviews for every flagged document; your approval of each fact for public display; portfolio permissions, asset licences and other claims (you said you will verify these).
