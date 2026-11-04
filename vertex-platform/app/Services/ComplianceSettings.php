@@ -20,6 +20,7 @@ final class ComplianceSettings
 
     public const GROUPS = [
         'business' => 'Business identity',
+        'disclosure' => 'Public disclosure approvals',
         'contact' => 'Legal contact & grievance',
         'cookies' => 'Cookie banner',
         'consent' => 'Form consent & age',
@@ -42,12 +43,13 @@ final class ComplianceSettings
             'operator_name' => ['group' => 'business', 'label' => 'Operational representative: full name', 'type' => 'text', 'default' => '', 'help' => 'Who manages and operates KIS day to day on the proprietor\'s authority.'],
             'operator_role' => ['group' => 'business', 'label' => 'Operational representative: role', 'type' => 'text', 'default' => 'Authorised operational representative'],
             'udyam_note' => ['group' => 'business', 'label' => 'Udyam statement', 'type' => 'text', 'default' => 'Registered under Swamini Mahila Gruh Udyog, with Krazy Integrated Solutions and The Young Books listed as business units.'],
-            'udyam_number' => ['group' => 'business', 'label' => 'Udyam registration number (publish only if you want it shown)', 'type' => 'text', 'default' => ''],
+            'udyam_number' => ['group' => 'business', 'label' => 'Udyam Registration Number (URN)', 'type' => 'text', 'default' => '', 'help' => 'Only the Owner can edit this. It is internal information and is NOT shown to visitors until you approve it under Public disclosure approvals.'],
             'shop_act_note' => ['group' => 'business', 'label' => 'Shop Act statement', 'type' => 'text', 'default' => 'Registered under Swamini Mahila Gruh Udyog.'],
-            'shop_act_number' => ['group' => 'business', 'label' => 'Shop Act registration number (optional)', 'type' => 'text', 'default' => ''],
+            'shop_act_number' => ['group' => 'business', 'label' => 'Shop Act licence / registration number', 'type' => 'text', 'default' => '', 'help' => 'Only the Owner can edit this. It is internal information and is NOT shown to visitors until you approve it under Public disclosure approvals.'],
             'gst_status' => ['group' => 'business', 'label' => 'GST status', 'type' => 'text', 'default' => 'Not registered for GST'],
             'gstin' => ['group' => 'business', 'label' => 'GSTIN (only once registered)', 'type' => 'text', 'default' => ''],
-            'jurisdiction' => ['group' => 'business', 'label' => 'Courts / place for disputes (to be decided with your lawyer)', 'type' => 'text', 'default' => '', 'help' => 'For example the city whose courts will hear disputes. Required before the Terms can be published. Do not guess.'],
+            'governing_law' => ['group' => 'business', 'label' => 'Governing law (proposed)', 'type' => 'text', 'default' => '', 'help' => 'Proposed: India. Requires Legal Review before the Terms are published.'],
+            'jurisdiction' => ['group' => 'business', 'label' => 'Courts / place for disputes (proposed)', 'type' => 'text', 'default' => '', 'help' => 'Proposed: Pune, Maharashtra. Requires Legal Review: the Terms cannot be published until a lawyer has confirmed this.'],
             'show_address' => ['group' => 'business', 'label' => 'Publish the business address', 'type' => 'bool', 'default' => '0', 'help' => 'Off by default. The address is never shown unless you switch this on AND fill it in.'],
             'public_address' => ['group' => 'business', 'label' => 'Business address (shown only if the switch above is on)', 'type' => 'textarea', 'default' => ''],
 
@@ -56,6 +58,14 @@ final class ComplianceSettings
             'grievance_name' => ['group' => 'contact', 'label' => 'Grievance / privacy contact: name or title', 'type' => 'text', 'default' => ''],
             'grievance_email' => ['group' => 'contact', 'label' => 'Grievance / privacy contact: email', 'type' => 'email', 'default' => ''],
             'grievance_days' => ['group' => 'contact', 'label' => 'We aim to acknowledge grievances within (days)', 'type' => 'int', 'default' => '', 'help' => 'Leave empty if you do not want to state a target.'],
+
+            'approve_proprietor' => ['group' => 'disclosure', 'label' => 'Show the legal proprietor\'s name publicly', 'type' => 'bool', 'default' => '0', 'help' => 'Off = the name stays internal and legal documents that need it cannot be published.'],
+            'approve_operator' => ['group' => 'disclosure', 'label' => 'Show the operational representative\'s name publicly', 'type' => 'bool', 'default' => '0'],
+            'approve_udyam' => ['group' => 'disclosure', 'label' => 'Show the Udyam Registration Number (URN) publicly', 'type' => 'bool', 'default' => '0'],
+            'approve_shop_act' => ['group' => 'disclosure', 'label' => 'Show the Shop Act number publicly', 'type' => 'bool', 'default' => '0'],
+            'approve_email' => ['group' => 'disclosure', 'label' => 'Show the official business email publicly', 'type' => 'bool', 'default' => '0', 'help' => 'Off = the public site email from Integrations & settings is used instead (as before).'],
+            'approve_whatsapp' => ['group' => 'disclosure', 'label' => 'Show the official WhatsApp number publicly', 'type' => 'bool', 'default' => '0', 'help' => 'Off = the public site WhatsApp number from Integrations & settings is used instead (as before).'],
+            'approve_grievance' => ['group' => 'disclosure', 'label' => 'Show the grievance contact publicly', 'type' => 'bool', 'default' => '0'],
 
             'cookie_banner_title' => ['group' => 'cookies', 'label' => 'Banner heading', 'type' => 'text', 'default' => 'Your cookie choices'],
             'cookie_banner_text' => ['group' => 'cookies', 'label' => 'Banner text', 'type' => 'textarea', 'default' => 'We use cookies that are strictly necessary to run this website (sign-in, security and your saved choices). With your permission we may also use optional cookies for preferences, analytics and marketing. We do not use any optional cookies today unless you see them listed under Cookie Settings. You can change your mind at any time.'],
@@ -74,7 +84,7 @@ final class ComplianceSettings
 
             'deletion_intro' => ['group' => 'deletion', 'label' => 'Text at the top of the deletion request page', 'type' => 'textarea', 'default' => 'You can ask us to delete the personal data we hold about you. We first confirm it is really you. Some records, such as invoices, quotations, payment receipts and agreements, must be kept for legal and accounting reasons: we tell you exactly what is deleted, what is anonymised and what must be kept, and why.'],
             'deletion_response_days' => ['group' => 'deletion', 'label' => 'We aim to answer deletion requests within (days)', 'type' => 'int', 'default' => '30'],
-            'retention_years' => ['group' => 'deletion', 'label' => 'Years financial and project records are kept', 'type' => 'int', 'default' => '8', 'help' => 'Placeholder pending legal review: confirm the period your accountant and lawyer require.'],
+            'retention_years' => ['group' => 'deletion', 'label' => 'Years financial and project records are kept (optional)', 'type' => 'int', 'default' => '', 'help' => 'Leave EMPTY unless your accountant or lawyer has confirmed a number. Nothing is invented: when empty, the texts say "the periods required by applicable law".'],
             'retention_summary' => ['group' => 'deletion', 'label' => 'Retention summary shown on the deletion page', 'type' => 'textarea', 'default' => 'Invoices, quotations, payment receipts, signed agreements and the project records needed to support them are kept for the period required by Indian tax, accounting and contract law. Enquiries that did not become orders, optional profile details, notification history and uploaded reference files are deleted or anonymised when you ask.'],
 
             'accessibility_conformance' => ['group' => 'statements', 'label' => 'Accessibility: conformance statement', 'type' => 'textarea', 'default' => 'We aim to meet WCAG 2.2 level AA. We test with a keyboard, with automated checks and by reviewing colour contrast. We have not obtained an independent accessibility audit, and we do not claim certification.'],
@@ -116,6 +126,18 @@ final class ComplianceSettings
         return self::get($key) === '1';
     }
 
+    /** Whether the Owner has approved a fact for public display (nothing is public until it is). @param string $fact proprietor|operator|udyam|shop_act|email|whatsapp|grievance */
+    public static function approved(string $fact): bool
+    {
+        return self::bool('approve_' . $fact);
+    }
+
+    /** A fact for a PUBLIC page: its value only when the Owner approved it, else an empty string. */
+    public static function publicValue(string $key, string $fact): string
+    {
+        return self::approved($fact) ? trim(self::get($key)) : '';
+    }
+
     public static function flush(): void
     {
         self::$cache = null;
@@ -124,14 +146,14 @@ final class ComplianceSettings
     /** The official email: the Owner's legal contact address, else the public site email. */
     public static function email(): string
     {
-        $v = trim(self::get('contact_email'));
+        $v = self::approved('email') ? trim(self::get('contact_email')) : '';
 
         return $v !== '' ? $v : trim((string) Config::get('site.email', ''));
     }
 
     public static function whatsapp(): string
     {
-        $v = trim(self::get('whatsapp'));
+        $v = self::approved('whatsapp') ? trim(self::get('whatsapp')) : '';
 
         return $v !== '' ? $v : trim((string) Config::get('site.whatsapp', ''));
     }

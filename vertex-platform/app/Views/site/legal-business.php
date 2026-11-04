@@ -10,10 +10,10 @@ $row = static function (string $label, string $value): void { if ($value !== '')
         <?php $row('Legal enterprise', $s('legal_enterprise_name')); ?>
         <?php $row('Legal structure', $s('legal_structure')); ?>
         <?php $row('Business units', str_replace(';', ',', $s('business_units'))); ?>
-        <?php $row('Legal proprietor', $s('proprietor_name')); ?>
-        <?php $row('Operational representative', trim($s('operator_name') . ($s('operator_name') !== '' && $s('operator_role') !== '' ? ', ' . $s('operator_role') : ''))); ?>
-        <?php $row('Udyam', $s('udyam_note') . ($s('udyam_number') !== '' ? ' Registration number: ' . $s('udyam_number') . '.' : '')); ?>
-        <?php $row('Shop Act', $s('shop_act_note') . ($s('shop_act_number') !== '' ? ' Registration number: ' . $s('shop_act_number') . '.' : '')); ?>
+        <?php $row('Legal proprietor', \Vertex\Services\ComplianceSettings::publicValue('proprietor_name', 'proprietor')); ?>
+        <?php $op = \Vertex\Services\ComplianceSettings::publicValue('operator_name', 'operator'); $row('Operational representative', trim($op . ($op !== '' && $s('operator_role') !== '' ? ', ' . $s('operator_role') : ''))); ?>
+        <?php $urn = \Vertex\Services\ComplianceSettings::publicValue('udyam_number', 'udyam'); $row('Udyam', $s('udyam_note') . ($urn !== '' ? ' Registration number: ' . $urn . '.' : '')); ?>
+        <?php $sa = \Vertex\Services\ComplianceSettings::publicValue('shop_act_number', 'shop_act'); $row('Shop Act', $s('shop_act_note') . ($sa !== '' ? ' Registration number: ' . $sa . '.' : '')); ?>
         <?php $row('GST', $s('gst_status') . ($s('gstin') !== '' ? ': ' . $s('gstin') : '')); ?>
         <?php $row('Address', $address); ?>
         <?php $row('Business email', $email); ?>

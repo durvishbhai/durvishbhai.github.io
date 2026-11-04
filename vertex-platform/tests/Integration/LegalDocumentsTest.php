@@ -15,6 +15,8 @@ use Vertex\Services\LegalDocuments;
 /** Compliance & legal: versioned documents, publication rules, sanitising, Owner-only access, and what the public sees. */
 final class LegalDocumentsTest extends HttpTestCase
 {
+    use LegalTestSupport;
+
     private int $owner;
     private int $admin;
     private int $client;
@@ -76,9 +78,9 @@ final class LegalDocumentsTest extends HttpTestCase
 
     public function testNothingCanGoLiveWhileTheOwnersOwnFactsAreMissing(): void
     {
-        $this->refused(fn () => LegalDocuments::publish($this->owner, 'privacy-policy'), 'Legal proprietor');
+        $this->refused(fn () => $this->pub('privacy-policy'), 'Legal proprietor');
         $this->facts();
-        LegalDocuments::publish($this->owner, 'privacy-policy');
+        $this->pub('privacy-policy');
         $live = LegalDocuments::live('privacy-policy');
         $this->assertSame(1, (int) $live['version_no']);
         $this->assertNotNull($live['published_at']);
@@ -88,7 +90,7 @@ final class LegalDocumentsTest extends HttpTestCase
     public function testThePublicPageShowsTheFilledInTextAndVersion(): void
     {
         $this->facts();
-        LegalDocuments::publish($this->owner, 'privacy-policy', ['effective_date' => '2026-12-01']);
+        $this->pub('privacy-policy', ['effective_date' => '2026-12-01']);
         $page = $this->client()->get('/privacy-policy');
         $this->assertSame(200, $page['status']);
         $b = $page['body'];
@@ -103,13 +105,13 @@ final class LegalDocumentsTest extends HttpTestCase
     public function testVersionsAreKeptAndRestorableAndMaterialChangesNeedASummary(): void
     {
         $this->facts();
-        LegalDocuments::publish($this->owner, 'cookie-policy');
+        $this->pub('cookie-policy');
         $v1 = LegalDocuments::live('cookie-policy');
         $body = (string) $v1['body_html'];
         LegalDocuments::saveDraft($this->owner, 'cookie-policy', ['title' => 'Cookie Policy', 'body_html' => str_replace('We do not use analytics', 'We do not use any analytics', $body), 'is_material' => '1']);
-        $this->refused(fn () => LegalDocuments::publish($this->owner, 'cookie-policy'), 'summary');
+        $this->refused(fn () => $this->pub('cookie-policy'), 'summary');
         LegalDocuments::saveDraft($this->owner, 'cookie-policy', ['title' => 'Cookie Policy', 'body_html' => str_replace('We do not use analytics', 'We do not use any analytics', $body), 'is_material' => '1', 'change_summary' => 'Clarified analytics wording']);
-        LegalDocuments::publish($this->owner, 'cookie-policy');
+        $this->pub('cookie-policy');
         $this->assertSame(2, (int) LegalDocuments::live('cookie-policy')['version_no']);
         $versions = LegalDocuments::versions('cookie-policy');
         $this->assertSame(['published', 'superseded'], array_column($versions, 'status'));
@@ -119,7 +121,7 @@ final class LegalDocumentsTest extends HttpTestCase
         $draft = Database::one("SELECT v.* FROM legal_document_versions v JOIN legal_documents d ON d.id = v.document_id WHERE v.status = 'draft' AND d.doc_key = 'cookie-policy'");
         $this->assertSame(3, (int) $draft['version_no']);
         $this->assertSame($body, $draft['body_html']);
-        LegalDocuments::publish($this->owner, 'cookie-policy');
+        $this->pub('cookie-policy');
         $this->assertSame(3, (int) LegalDocuments::live('cookie-policy')['version_no']);
         $this->assertGreaterThanOrEqual(5, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action LIKE 'legal.%'")['c']);
     }
@@ -131,7 +133,7 @@ final class LegalDocumentsTest extends HttpTestCase
         $cut = (string) preg_replace('~<h2 id="your-legal-rights">.*?(?=<h2 id="how-refunds-are-paid">)~s', '', (string) $v['body_html']);
         $this->assertNotSame($v['body_html'], $cut);
         LegalDocuments::saveDraft($this->owner, 'refund-policy', ['title' => 'Refund Policy', 'body_html' => $cut]);
-        $this->refused(fn () => LegalDocuments::publish($this->owner, 'refund-policy'), 'Your legal rights');
+        $this->refused(fn () => $this->pub('refund-policy'), 'Your legal rights');
         $this->assertNull(LegalDocuments::live('refund-policy'));
     }
 
@@ -152,8 +154,9 @@ final class LegalDocumentsTest extends HttpTestCase
     public function testScheduledPublicationGoesLiveByItselfAndCanBeCancelled(): void
     {
         $this->facts();
-        LegalDocuments::publish($this->owner, 'payment-policy');
+        $this->pub('payment-policy');
         LegalDocuments::saveDraft($this->owner, 'payment-policy', ['title' => 'Payment Policy', 'body_html' => '<h2>How payments work</h2><p>New text</p><h2>Taxes and invoices</h2><p>x</p><h2>Failed or disputed payments</h2><p>y</p>']);
+        $this->reviewDraft('payment-policy');
         $this->refused(fn () => LegalDocuments::schedule($this->owner, 'payment-policy', gmdate('Y-m-d\TH:i', time() - 3600)), 'future');
         LegalDocuments::schedule($this->owner, 'payment-policy', gmdate('Y-m-d\TH:i', time() + 86400));
         $this->assertSame(1, (int) LegalDocuments::live('payment-policy')['version_no'], 'not live yet');
@@ -170,8 +173,8 @@ final class LegalDocumentsTest extends HttpTestCase
     public function testMandatoryDocumentsCannotBeTakenOfflineOthersCan(): void
     {
         $this->facts();
-        LegalDocuments::publish($this->owner, 'privacy-policy');
-        LegalDocuments::publish($this->owner, 'payment-policy');
+        $this->pub('privacy-policy');
+        $this->pub('payment-policy');
         $this->refused(fn () => LegalDocuments::unpublish($this->owner, 'privacy-policy', 'oops'), 'mandatory');
         $this->assertNotNull(LegalDocuments::live('privacy-policy'));
         $this->refused(fn () => LegalDocuments::unpublish($this->owner, 'payment-policy', ''), 'reason');
@@ -205,6 +208,7 @@ final class LegalDocumentsTest extends HttpTestCase
     public function testTheOwnerWorksThroughTheForms(): void
     {
         $this->facts();
+        $this->approveFacts();
         $o = $this->loggedIn('owner@x.test');
         $page = $o->get('/admin/compliance/documents/security-disclosure');
         $this->assertSame(200, $page['status']);
@@ -233,7 +237,15 @@ final class LegalDocumentsTest extends HttpTestCase
         $o->post('/admin/compliance/settings/contact', ['contact_email' => 'not-an-email', 'whatsapp' => '+91 90000 22222'], '/admin/compliance/settings/contact');
         $this->assertSame('', ComplianceSettings::get('contact_email'), 'a bad email is refused');
         $this->facts();
+        ComplianceSettings::save($this->owner, 'business', ['udyam_number' => 'UDYAM-XX-00-0000000', 'shop_act_number' => 'SHOP-TEST-1']);
+        $hidden = $this->client()->get('/legal-business-information')['body'] . $this->client()->get('/contact-and-grievance')['body'];
+        foreach (['Asha Test Proprietor', 'Ravi Test Operator', 'UDYAM-XX-00-0000000', 'SHOP-TEST-1', 'hello@kis.test', '+91 90000 11111', 'privacy@kis.test'] as $secret) {
+            $this->assertStringNotContainsString($secret, $hidden, $secret . ' stays internal until the Owner approves it');
+        }
+        $this->approveFacts();
         $biz = $this->client()->get('/legal-business-information')['body'];
+        $this->assertStringContainsString('UDYAM-XX-00-0000000', $biz);
+        $this->assertStringContainsString('SHOP-TEST-1', $biz);
         foreach (['operated under Swamini Mahila Gruh Udyog, a sole proprietorship', 'Asha Test Proprietor', 'Ravi Test Operator', 'The Young Books', 'Not registered for GST', 'hello@kis.test'] as $needle) {
             $this->assertStringContainsString($needle, $biz);
         }

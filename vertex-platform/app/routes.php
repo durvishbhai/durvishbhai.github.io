@@ -698,6 +698,7 @@ return static function (Router $router): void {
         $r->post('/compliance/documents/{key}/save', [ComplianceController::class, 'save'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/preview', [ComplianceController::class, 'preview'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/publish', [ComplianceController::class, 'publish'], ['can:compliance.manage']);
+        $r->post('/compliance/documents/{key}/review', [ComplianceController::class, 'review'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/schedule', [ComplianceController::class, 'schedule'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/cancel-schedule', [ComplianceController::class, 'cancelSchedule'], ['can:compliance.manage']);
         $r->post('/compliance/documents/{key}/discard', [ComplianceController::class, 'discard'], ['can:compliance.manage']);

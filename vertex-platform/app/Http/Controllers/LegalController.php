@@ -74,7 +74,7 @@ final class LegalController extends Controller
     {
         $s = static fn (string $k): string => trim(ComplianceSettings::get($k));
 
-        return $this->render('site/legal-contact', 'Contact and Grievance Information', ['email' => ComplianceSettings::email(), 'whatsapp' => ComplianceSettings::whatsapp(), 'gname' => $s('grievance_name'), 'gemail' => $s('grievance_email'), 'gdays' => $s('grievance_days')], false, '/contact-and-grievance');
+        return $this->render('site/legal-contact', 'Contact and Grievance Information', ['email' => ComplianceSettings::email(), 'whatsapp' => ComplianceSettings::whatsapp(), 'gname' => ComplianceSettings::approved('grievance') ? $s('grievance_name') : '', 'gemail' => ComplianceSettings::publicValue('grievance_email', 'grievance'), 'gdays' => $s('grievance_days')], false, '/contact-and-grievance');
     }
 
     /** @param array<string,string> $params */

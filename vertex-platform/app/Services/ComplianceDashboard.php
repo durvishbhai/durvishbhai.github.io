@@ -102,8 +102,11 @@ final class ComplianceDashboard
     private static function businessDetails(): array
     {
         $miss = ComplianceSettings::missingFacts();
+        $unapproved = count(array_filter(PendingActions::all(), static fn (array $p): bool => $p['type'] === 'approve' && str_contains($p['text'], 'NOT shown publicly')));
 
-        return [self::c($miss === [], $miss === [] ? 'The required facts are filled in.' : 'Still empty: ' . implode(', ', $miss) . '.'), self::c(null, 'Registration numbers (Udyam, Shop Act, GST) are shown only if you enter them; none was invented.')];
+        return [self::c($miss === [], $miss === [] ? 'The required facts are filled in.' : 'Still empty: ' . implode(', ', $miss) . '.'),
+            self::c($unapproved === 0, $unapproved . ' recorded fact(s) are not yet approved for public display (they stay internal until you approve them).'),
+            self::c(null, 'The registration numbers were supplied by you; the system cannot verify them against the Udyam or Shop Act registers. Check them against your certificates.')];
     }
 
     private static function assetChecks(): array

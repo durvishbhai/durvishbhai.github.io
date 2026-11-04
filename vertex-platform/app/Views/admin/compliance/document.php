@@ -1,6 +1,6 @@
 <?php
 /** @var array<string,mixed> $doc */ /** @var list<array<string,mixed>> $versions */ /** @var ?array<string,mixed> $work */ /** @var ?array<string,mixed> $live */ /** @var array<string,string> $form */
-/** @var list<string> $blockers */ /** @var array<string,array{label:string,value:string,required:bool}> $tokens */
+/** @var list<string> $blockers */ /** @var list<array<string,mixed>> $reviews */ /** @var bool $reviewed */ /** @var array<string,array{label:string,value:string,required:bool}> $tokens */
 $f = static fn (string $k): string => old($k, $form[$k] ?? '');
 $scheduled = $work !== null && $work['status'] === 'scheduled';
 $base = '/admin/compliance/documents/' . $doc['doc_key'];
@@ -11,6 +11,22 @@ $base = '/admin/compliance/documents/' . $doc['doc_key'];
     <?= $scheduled ? ' · <strong>version ' . e($work['version_no']) . ' is scheduled for ' . e(local_time($work['publish_at'])) . '</strong>' : '' ?></p>
 
 <?php if ($blockers !== []) : ?><div class="panel panel-warn"><h2>Before this can go live</h2><ul><?php foreach ($blockers as $b) : ?><li><?= e($b) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+
+<?php if (($doc['flags'] ?? []) !== []) : ?>
+<div class="panel<?= $reviewed ? '' : ' panel-warn' ?>"><h2>Legal review <span class="badge badge-d-<?= $reviewed ? 'confirmed' : 'cancelled' ?>"><?= $reviewed ? 'Review recorded for this text' : 'Requires Legal Review' ?></span></h2>
+    <p>An Indian lawyer must review these points before this document is published. <strong>The system cannot judge whether the text is lawful</strong>: it only keeps your record that a lawyer reviewed this exact text.</p>
+    <ul><?php foreach ($doc['flags'] as $fl) : ?><li><strong><?= e($fl['clause']) ?>.</strong> <?= e($fl['why']) ?></li><?php endforeach; ?></ul>
+    <?php if ($work !== null && !$scheduled) : ?>
+    <form method="post" action="<?= e($base) ?>/review" class="form-grid" novalidate><?= csrf_field() ?>
+        <div class="field"><label for="lr-n">Lawyer (name and firm)</label><input id="lr-n" name="reviewer" maxlength="160" required value="<?= e(old('reviewer')) ?>"></div>
+        <div class="field"><label for="lr-d">Date of the review</label><input id="lr-d" name="reviewed_on" type="date" required value="<?= e(old('reviewed_on')) ?>"></div>
+        <div class="field"><label for="lr-t">Note (optional, private)</label><input id="lr-t" name="note" maxlength="500" value="<?= e(old('note')) ?>"></div>
+        <div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">Record that this text was reviewed</button></div>
+    </form>
+    <?php endif; ?>
+    <?php if ($reviews !== []) : ?><h3>Recorded reviews</h3><ul class="plain-list"><?php foreach ($reviews as $rv) : ?><li>Version <?= e((string) $rv['version_no']) ?> · <?= e(local_date((string) $rv['reviewed_on'])) ?> · <?= e($rv['reviewer']) ?><?= $rv['note'] ? ' · ' . e($rv['note']) : '' ?></li><?php endforeach; ?></ul><?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php if ($scheduled) : ?>
 <div class="panel"><h2>Scheduled</h2><p>Version <?= e($work['version_no']) ?> goes live automatically at <?= e(local_time($work['publish_at'])) ?>. To edit it, cancel the schedule first.</p>

@@ -14,6 +14,9 @@ use Vertex\Services\SiteSeeder;
  */
 final class PublicWebsiteTest extends HttpTestCase
 {
+    use LegalTestSupport;
+    private int $owner = 0;
+
     use Phase3Fixtures;
 
     protected static function extraEnv(): array
@@ -197,7 +200,7 @@ final class PublicWebsiteTest extends HttpTestCase
         $owner = $this->makeUser('owner-legal@x.test', ['super_admin']);
         \Vertex\Services\ComplianceSettings::save($owner, 'business', ['proprietor_name' => 'P Test', 'operator_name' => 'O Test', 'jurisdiction' => 'Testville']);
         \Vertex\Services\ComplianceSettings::save($owner, 'contact', ['contact_email' => 'hello@x.test', 'whatsapp' => '+91 90000 00001']);
-        \Vertex\Services\LegalDocuments::publish($owner, 'privacy-policy');
+        $this->owner = $owner; $this->pub('privacy-policy');
         $this->assertSame(200, $c->get('/privacy-policy')['status']);
         $this->assertStringContainsString('/privacy-policy', $c->get('/sitemap.xml')['body']);
     }

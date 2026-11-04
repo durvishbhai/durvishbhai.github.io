@@ -1,10 +1,17 @@
-<?php /** @var list<array<string,mixed>> $docs */ /** @var array<string,string> $missing */ /** @var array<string,string> $groups */
+<?php /** @var list<array{type:string,text:string,link:string}> $pending */ /** @var list<array<string,mixed>> $docs */ /** @var array<string,string> $missing */ /** @var array<string,string> $groups */
 $badge = static fn (string $c, string $t): string => '<span class="badge badge-d-' . $c . '">' . e($t) . '</span>';
 ?>
 <div class="page-head"><div><p class="eyebrow">Administration</p><h1>Compliance &amp; legal management</h1></div></div>
 <p class="muted">Owner only. Everything here changes the real public website. Documents are versioned: you work on a draft, preview it, then publish (now or at a set time). Earlier versions are kept and can be restored. These texts are drafts prepared for your business and <strong>must be reviewed by an Indian lawyer</strong> before you rely on them.</p>
 
 <div class="panel"><h2>Compliance checklist</h2><p class="muted">The 20 requirements of the compliance project, each with a status you set, who is responsible, the next action and the facts the system could check. There is no score: a checklist cannot tell you that the website is legally compliant. <a class="btn btn-primary btn-sm" href="/admin/compliance/checklist">Open the checklist</a> <a class="btn btn-ghost btn-sm" href="/admin/compliance/assets">Asset &amp; licence register</a></p></div>
+
+<div class="panel"><h2>Pending actions <span class="muted small">(<?= count($pending) ?>)</span></h2>
+    <p class="muted">Everything still open, worked out from the real state. Nothing is published automatically: a document goes live only when you press Publish, and a fact is shown to visitors only after you approve it.</p>
+    <?php foreach (\Vertex\Services\PendingActions::TYPES as $t => $label) : $rows = array_values(array_filter($pending, static fn (array $p): bool => $p['type'] === $t)); if ($rows === []) { continue; } ?>
+    <h3><?= e($label) ?> <span class="muted small">(<?= count($rows) ?>)</span></h3>
+    <ul class="plain-list"><?php foreach ($rows as $p) : ?><li><?= e($p['text']) ?> <a href="<?= e($p['link']) ?>">Open</a></li><?php endforeach; ?></ul>
+    <?php endforeach; ?></div>
 
 <?php if ($missing !== []) : ?>
 <div class="panel panel-warn"><h2>Facts only you can supply</h2>

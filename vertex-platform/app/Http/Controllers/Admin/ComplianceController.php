@@ -17,6 +17,7 @@ use Vertex\Services\HtmlSanitizer;
 use Vertex\Services\Integrations;
 use Vertex\Services\LegalDocuments;
 use Vertex\Services\ServiceAvailability;
+use Vertex\Services\PendingActions;
 use Vertex\Services\PolicyAcceptance;
 
 /** Compliance & legal management: Owner only (`compliance.manage`, which Administrators do not hold by default). Every action is checked again in the services. */
@@ -25,7 +26,7 @@ final class ComplianceController extends Controller
     /** @param array<string,string> $params */
     public function index(Request $request, array $params = []): Response
     {
-        return $this->page('admin/compliance/index', ['title' => 'Compliance & legal', 'docs' => LegalDocuments::documents(), 'missing' => ComplianceSettings::missingFacts(), 'groups' => ComplianceSettings::GROUPS]);
+        return $this->page('admin/compliance/index', ['title' => 'Compliance & legal', 'docs' => LegalDocuments::documents(), 'missing' => ComplianceSettings::missingFacts(), 'pending' => PendingActions::all(), 'groups' => ComplianceSettings::GROUPS]);
     }
 
     // ------------------------------------------------------------------------------------------------ documents
@@ -49,6 +50,7 @@ final class ComplianceController extends Controller
             'title' => $doc['title'], 'doc' => $doc, 'versions' => $versions, 'work' => $work, 'live' => $live, 'form' => (is_array($old) && $old !== [] ? $old : []) + ['title' => $from['title'] ?? $doc['title'], 'body_html' => $from['body_html'] ?? '', 'change_summary' => $work['change_summary'] ?? '',
                 'is_material' => (string) ($work['is_material'] ?? '0'), 'effective_date' => (string) ($work['effective_date'] ?? ''), 'acceptance_days' => (string) ($work['acceptance_days'] ?? '')],
             'blockers' => $work !== null ? LegalDocuments::blockers($doc, $work) : [], 'tokens' => LegalDocuments::tokenMap(),
+            'reviews' => LegalDocuments::reviews((int) $doc['id']), 'reviewed' => $work !== null && LegalDocuments::reviewFor((int) $doc['id'], (string) $work['body_html']) !== null,
         ]);
         Session::forget('_old');
 
@@ -100,6 +102,18 @@ final class ComplianceController extends Controller
             LegalDocuments::publish($this->actorId(), (string) $params['key'], $in);
 
             return $this->ok($this->to($params), 'Published. The public page now shows this version.');
+        }, $this->to($params), $in);
+    }
+
+    /** The Owner records that an Indian lawyer reviewed the current draft text. @param array<string,string> $params */
+    public function review(Request $request, array $params = []): Response
+    {
+        $in = ['reviewer' => $request->string('reviewer'), 'reviewed_on' => $request->string('reviewed_on'), 'note' => $request->string('note')];
+
+        return $this->guarded(function () use ($params, $in): Response {
+            LegalDocuments::recordReview($this->actorId(), (string) $params['key'], $in['reviewer'], $in['reviewed_on'], $in['note']);
+
+            return $this->ok($this->to($params), 'The legal review is recorded for this exact text. Editing the text again cancels it.');
         }, $this->to($params), $in);
     }
 

@@ -17,6 +17,8 @@ use Vertex\Services\PolicyAcceptance;
 /** Materially updated policies: notice, acceptance, restriction after the deadline or a refusal, reactivation, and the Owner's tools. */
 final class PolicyAcceptanceTest extends HttpTestCase
 {
+    use LegalTestSupport;
+
     private int $owner;
     private int $admin;
     private int $alpha;
@@ -53,10 +55,10 @@ final class PolicyAcceptanceTest extends HttpTestCase
     /** Publishes v1 (not material), then a material v2 that clients must accept. */
     private function materialUpdate(): void
     {
-        LegalDocuments::publish($this->owner, 'terms-and-conditions');
+        $this->pub('terms-and-conditions');
         $v1 = LegalDocuments::live('terms-and-conditions');
         LegalDocuments::saveDraft($this->owner, 'terms-and-conditions', ['title' => 'Terms and Conditions', 'body_html' => str_replace('Limitation of liability', 'Limitation of liability', (string) $v1['body_html']) . '<p>New clause.</p>', 'is_material' => '1', 'change_summary' => 'Added a new clause about X']);
-        LegalDocuments::publish($this->owner, 'terms-and-conditions');
+        $this->pub('terms-and-conditions');
         PolicyAcceptance::reset();
     }
 
@@ -93,10 +95,10 @@ final class PolicyAcceptanceTest extends HttpTestCase
 
     public function testANonMaterialUpdateAsksNobody(): void
     {
-        LegalDocuments::publish($this->owner, 'terms-and-conditions');
+        $this->pub('terms-and-conditions');
         $v1 = LegalDocuments::live('terms-and-conditions');
         LegalDocuments::saveDraft($this->owner, 'terms-and-conditions', ['title' => 'Terms and Conditions', 'body_html' => $v1['body_html'] . '<p>Typo fixed.</p>', 'is_material' => '']);
-        LegalDocuments::publish($this->owner, 'terms-and-conditions');
+        $this->pub('terms-and-conditions');
         PolicyAcceptance::reset();
         $this->assertSame([], PolicyAcceptance::state($this->alpha)['pending']);
         $this->assertSame([], Mailer::$sent);

@@ -29,7 +29,8 @@ final class LegalDocuments
     {
         $s = static fn (string $k): string => trim(ComplianceSettings::get($k));
         $email = ComplianceSettings::email();
-        $grievance = $s('grievance_email') !== '' ? ($s('grievance_name') !== '' ? $s('grievance_name') . ', ' : '') . $s('grievance_email') : $email;
+        $gRaw = $s('grievance_email') !== '' ? ($s('grievance_name') !== '' ? $s('grievance_name') . ', ' : '') . $s('grievance_email') : $email;
+        $grievance = ComplianceSettings::approved('grievance') || $s('grievance_email') === '' ? $gRaw : $email; // an unapproved grievance address is not shown: the official email (or nothing) is used
         $retention = ComplianceSettings::int('retention_years');
         $address = ComplianceSettings::bool('show_address') ? $s('public_address') : '';
         $days = $s('grievance_days');
@@ -41,12 +42,13 @@ final class LegalDocuments
             'structure' => ['label' => 'Legal structure', 'value' => $s('legal_structure'), 'required' => false],
             'business_units' => ['label' => 'Business units', 'value' => $s('business_units'), 'required' => false],
             'business_disclosure' => ['label' => 'Business disclosure', 'value' => ComplianceSettings::disclosure(), 'required' => false],
-            'proprietor' => ['label' => 'Legal proprietor: full name', 'value' => $s('proprietor_name'), 'required' => true],
-            'operator' => ['label' => 'Operational representative: full name', 'value' => $s('operator_name'), 'required' => true],
+            'proprietor' => ['label' => 'Legal proprietor: full name', 'value' => ComplianceSettings::publicValue('proprietor_name', 'proprietor'), 'raw' => $s('proprietor_name'), 'required' => true],
+            'operator' => ['label' => 'Operational representative: full name', 'value' => ComplianceSettings::publicValue('operator_name', 'operator'), 'raw' => $s('operator_name'), 'required' => true],
             'operator_role' => ['label' => 'Operational representative: role', 'value' => $s('operator_role'), 'required' => false],
-            'email' => ['label' => 'Official business email', 'value' => $email, 'required' => true],
-            'whatsapp' => ['label' => 'Official WhatsApp number', 'value' => ComplianceSettings::whatsapp(), 'required' => true],
-            'grievance_contact' => ['label' => 'Grievance / privacy contact', 'value' => $grievance, 'required' => true],
+            'email' => ['label' => 'Official business email', 'value' => $email, 'raw' => $s('contact_email'), 'required' => true],
+            'whatsapp' => ['label' => 'Official WhatsApp number', 'value' => ComplianceSettings::whatsapp(), 'raw' => $s('whatsapp'), 'required' => true],
+            'grievance_contact' => ['label' => 'Grievance / privacy contact', 'value' => $grievance, 'raw' => $gRaw, 'required' => true],
+            'governing_law' => ['label' => 'Governing law', 'value' => $s('governing_law'), 'required' => false],
             'jurisdiction' => ['label' => 'Courts / place for disputes', 'value' => $s('jurisdiction'), 'required' => true],
             'grievance_days' => ['label' => 'Grievance acknowledgement target (days)', 'value' => $days, 'required' => false],
             'gst_status' => ['label' => 'GST status', 'value' => $s('gst_status'), 'required' => false],
@@ -94,7 +96,7 @@ final class LegalDocuments
         $out = [];
         foreach (self::tokensIn($html) as $k) {
             if (isset($map[$k]) && $map[$k]['required'] && $map[$k]['value'] === '') {
-                $out[] = $map[$k]['label'];
+                $out[] = $map[$k]['label'] . (($map[$k]['raw'] ?? '') !== '' && ($map[$k]['raw'] ?? '') !== ($map[$k]['value']) ? ' (it is filled in, but you have not approved it for public display: Compliance & legal → Public disclosure approvals)' : '');
             }
         }
 
@@ -317,6 +319,45 @@ final class LegalDocuments
     }
 
     /** What stops a version from going live (empty list = it can). @return list<string> */
+    /** The recorded lawyer review that matches this exact text, if any. @return array<string,mixed>|null */
+    public static function reviewFor(int $documentId, string $bodyHtml): ?array
+    {
+        return Database::one('SELECT * FROM legal_reviews WHERE document_id = ? AND body_hash = ? ORDER BY id DESC LIMIT 1', [$documentId, hash('sha256', $bodyHtml)]);
+    }
+
+    /**
+     * The Owner records that an Indian lawyer reviewed the CURRENT draft text. The record is tied to a hash of that text: any later edit makes it void, so a document can
+     * never be published in a form the lawyer did not see. The system does not judge the review: it only keeps the Owner's record.
+     */
+    public static function recordReview(int $actorId, string $key, string $reviewer, string $date, string $note): void
+    {
+        self::authorize($actorId);
+        $d = self::document($key) ?? throw new HttpException(404);
+        $v = Database::one("SELECT * FROM legal_document_versions WHERE document_id = ? AND status IN ('draft','scheduled') ORDER BY version_no DESC LIMIT 1", [$d['id']]) ?? throw new ValidationException(['There is no draft to record a review for.']);
+        $reviewer = trim($reviewer);
+        $note = trim($note);
+        if ($reviewer === '' || mb_strlen($reviewer) > 160) {
+            throw new ValidationException(['Enter the name (and firm) of the lawyer who reviewed this text.']);
+        }
+        if (!DeliveryService::validDate($date) || $date > AppTime::today()) {
+            throw new ValidationException(['Enter the date of the review (not in the future).']);
+        }
+        if (mb_strlen($note) > 500) {
+            throw new ValidationException(['The note is too long (500 characters at most).']);
+        }
+        Database::transaction(function () use ($actorId, $d, $v, $reviewer, $date, $note): void {
+            Database::run('INSERT INTO legal_reviews (document_id, version_no, body_hash, reviewer, reviewed_on, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())',
+                [$d['id'], $v['version_no'], hash('sha256', (string) $v['body_html']), $reviewer, $date, $note === '' ? null : $note, $actorId]);
+            Audit::record('legal.review_recorded', 'legal_document', (int) $d['id'], [], [], ['doc' => $d['doc_key'], 'version' => (int) $v['version_no'], 'reviewer' => $reviewer], $actorId);
+        });
+    }
+
+    /** All reviews recorded for a document. @return list<array<string,mixed>> */
+    public static function reviews(int $documentId): array
+    {
+        return Database::all('SELECT * FROM legal_reviews WHERE document_id = ? ORDER BY id DESC', [$documentId]);
+    }
+
     public static function blockers(array $doc, array $version): array
     {
         $b = [];
@@ -327,7 +368,10 @@ final class LegalDocuments
             }
         }
         foreach (self::missingIn((string) $version['body_html']) as $label) {
-            $b[] = 'A fact this document needs is not filled in yet: ' . $label . ' (Compliance & legal → Business identity).';
+            $b[] = 'A fact this document needs is not available yet: ' . $label . '.';
+        }
+        if (($doc['flags'] ?? []) !== [] && self::reviewFor((int) $doc['id'], (string) $version['body_html']) === null) {
+            $b[] = 'Requires Legal Review: this document contains clauses that an Indian lawyer must review. Record the review (lawyer, date) for this exact text before publishing. Editing the text afterwards cancels the review.';
         }
         if ((int) $version['is_material'] === 1 && trim((string) $version['change_summary']) === '') {
             $b[] = 'A material change needs a plain-language summary of what changed (it is sent to clients).';
