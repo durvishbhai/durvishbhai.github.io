@@ -30,6 +30,8 @@ final class VerifiedFactsTest extends HttpTestCase
         \Vertex\Services\PermissionSync::run(true);
         $this->owner = $this->makeUser('owner@x.test', ['super_admin']);
         $this->admin = $this->makeUser('admin@x.test', ['administrator']);
+        \Vertex\Core\Config::set('site.email', ''); // an earlier test in the same process may have set a public site email, which is the fallback
+        \Vertex\Core\Config::set('site.whatsapp', '');
         ComplianceSettings::flush();
         ComplianceSettings::save($this->owner, 'business', ['proprietor_name' => 'Test Proprietor', 'operator_name' => 'Test Operator', 'udyam_number' => 'UDYAM-XX-00-1111111', 'shop_act_number' => 'SA-2222', 'jurisdiction' => 'Testville', 'governing_law' => 'India']);
         ComplianceSettings::save($this->owner, 'contact', ['contact_email' => 'official@kis.test', 'whatsapp' => '+91 90000 33333', 'grievance_email' => 'grievance@kis.test']);
