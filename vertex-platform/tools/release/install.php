@@ -62,6 +62,25 @@ function is_https(): bool
         || (int) ($_SERVER['SERVER_PORT'] ?? 0) === 443;
 }
 
+/** Compares every file of the vertex folder with the checksum list written when the package was built. @return list<string> names of files that are missing or different (['*'] when the list itself is missing) */
+function integrity(string $appRoot): array
+{
+    $list = $appRoot . '/manifest.php';
+    if (!is_file($list)) {
+        return ['*'];
+    }
+    $manifest = (static function (string $f): array { $m = include $f; return is_array($m) ? $m : []; })($list);
+    $bad = [];
+    foreach ($manifest as $rel => $hash) {
+        $f = $appRoot . '/' . $rel;
+        if (!is_file($f) || !hash_equals((string) $hash, (string) hash_file('sha256', $f))) {
+            $bad[] = $rel;
+        }
+    }
+
+    return $bad;
+}
+
 /** @return list<array{0:string,1:bool,2:string,3:bool}> label, ok, detail, blocking */
 function checks(string $appRoot, string $schemaFile, string $envFile): array
 {
@@ -71,6 +90,8 @@ function checks(string $appRoot, string $schemaFile, string $envFile): array
         $rows[] = ['PHP extension ' . $ext, extension_loaded($ext), $blocking ? 'Enable it in hPanel -> PHP Configuration -> Extensions.' : 'Optional' . ($ext === 'zip' ? ' (needed only for backups)' : ' (file uploads)') . '; enable it in PHP Configuration -> Extensions.', $blocking];
     }
     $rows[] = ['Application folder "vertex" found', is_file($appRoot . '/bootstrap.php'), 'Expected at ' . $appRoot . '. Upload the vertex folder into public_html (next to install.php) or next to public_html.', true];
+    $bad = integrity($appRoot);
+    $rows[] = ['Uploaded files are complete and undamaged', $bad === [], $bad === ['*'] ? 'The checksum list (vertex/manifest.php) is missing. Upload the vertex folder again.' : 'These files differ from the package (a damaged or partial upload, or an old file left behind): ' . implode(', ', array_slice($bad, 0, 8)) . (count($bad) > 8 ? ' and ' . (count($bad) - 8) . ' more' : '') . '. Delete the vertex folder and upload the package again, extracting it fresh.', true];
     $rows[] = ['Database file present (vertex/database/schema.sql)', is_file($schemaFile), 'Re-upload the vertex folder completely.', true];
     $rows[] = ['Application folder is writable', is_dir($appRoot) && is_writable($appRoot), 'Set the folder permission to 755 (or 775) so the installer can write .env and storage/.', true];
     $rows[] = ['Web folder is writable (.htaccess)', is_writable(__DIR__), 'Needed to write public_html/.htaccess. If this fails, add the rewrite rules by hand.', false];
@@ -300,7 +321,8 @@ if ($posted && !$alreadyInstalled) {
             session_destroy();
         } catch (Throwable $e) {
             if ($errors === []) {
-                $errors[] = 'Installation stopped: ' . preg_replace('/\s+/', ' ', $e->getMessage());
+                $where = $e instanceof Error ? ' [file ' . str_replace($appRoot, 'vertex', str_replace('\\', '/', $e->getFile())) . ', line ' . $e->getLine() . ']' : '';
+                $errors[] = 'Installation stopped: ' . preg_replace('/\s+/', ' ', $e->getMessage()) . $where;
             }
             // Undo everything this run created so the installer can simply be run again.
             if ($imported && $pdo instanceof PDO) {

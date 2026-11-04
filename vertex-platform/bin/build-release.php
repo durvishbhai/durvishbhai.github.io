@@ -131,6 +131,18 @@ file_put_contents($pkg . '/vertex-database.sql', $sql);
 @mkdir($pkg . '/vertex/database', 0755, true);
 file_put_contents($pkg . '/vertex/database/schema.sql', $sql);
 
+// 4b. Checksum list of every file in the vertex folder: the installer and upgrader refuse to run on a damaged or partial upload and name the files that differ.
+$sums = [];
+$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($pkg . '/vertex', FilesystemIterator::SKIP_DOTS));
+foreach ($it as $f) {
+    $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($pkg . '/vertex/')));
+    if ($f->isFile() && $rel !== 'manifest.php') {
+        $sums[$rel] = hash_file('sha256', $f->getPathname());
+    }
+}
+ksort($sums);
+file_put_contents($pkg . '/vertex/manifest.php', "<?php\n\n// Checksums of every file of this package (written by bin/build-release.php). Used by install.php and upgrade.php to detect a damaged upload.\nreturn " . var_export($sums, true) . ";\n");
+
 // 5. Installer with its own one-time key
 $key = $opt['key'] ?? implode('-', str_split(strtoupper(substr(strtr(base64_encode(random_bytes(24)), ['+' => 'A', '/' => 'B', '=' => '']), 0, 24)), 6));
 $installer = (string) file_get_contents($root . '/tools/release/install.php');

@@ -77,6 +77,25 @@ function repair_server_files(string $appRoot): array
     return $log;
 }
 
+/** Compares every file of the vertex folder with the checksum list written when the package was built. @return list<string> files that are missing or different (['*'] when the list itself is missing) */
+function integrity(string $appRoot): array
+{
+    $list = $appRoot . '/manifest.php';
+    if (!is_file($list)) {
+        return ['*'];
+    }
+    $manifest = (static function (string $f): array { $m = include $f; return is_array($m) ? $m : []; })($list);
+    $bad = [];
+    foreach ($manifest as $rel => $hash) {
+        $f = $appRoot . '/' . $rel;
+        if (!is_file($f) || !hash_equals((string) $hash, (string) hash_file('sha256', $f))) {
+            $bad[] = $rel;
+        }
+    }
+
+    return $bad;
+}
+
 header('X-Robots-Tag: noindex, nofollow');
 header('Cache-Control: no-store');
 header('X-Frame-Options: DENY');
@@ -113,6 +132,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $installed) {
         $errors[] = 'That installation key is not correct.';
     } elseif ($action === 'upgrade' && $unlocked) {
         try {
+            $bad = integrity($appRoot);
+            if ($bad !== []) {
+                $errors[] = $bad === ['*'] ? 'The checksum list (vertex/manifest.php) is missing: upload the vertex folder of the package again.' : 'Some uploaded files differ from the package (a damaged or partial upload, or an old file left behind): ' . implode(', ', array_slice($bad, 0, 8)) . (count($bad) > 8 ? ' and ' . (count($bad) - 8) . ' more' : '') . '. Upload the package again, overwriting everything, then press the button again. Nothing was changed.';
+                throw new \RuntimeException('Files are not intact.');
+            }
             require_once $appRoot . '/bootstrap.php';
             $ran = (new \Vertex\Services\Migrator(VERTEX_ROOT . '/database/migrations'))->migrate();
             $sync = \Vertex\Services\PermissionSync::run(false);
@@ -125,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $installed) {
             $self = @unlink(__FILE__);
             $result['deleted'] = $self;
         } catch (\Throwable $e) {
-            $errors[] = 'The update stopped: ' . $e->getMessage() . ' Nothing further was changed. Fix the cause (or send this message to support) and press the button again; completed steps are not repeated.';
+            $errors[] = $e instanceof \RuntimeException && $errors !== [] ? 'Nothing was changed.' : 'The update stopped: ' . $e->getMessage() . ($e instanceof \Error ? ' [file ' . str_replace($appRoot, 'vertex', str_replace('\\', '/', $e->getFile())) . ', line ' . $e->getLine() . ']' : '') . ' Nothing further was changed. Fix the cause (or send this message to support) and press the button again; completed steps are not repeated.';
         }
     }
 }
