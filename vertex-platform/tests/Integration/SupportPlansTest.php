@@ -304,6 +304,23 @@ final class SupportPlansTest extends HttpTestCase
         $this->assertSame($before, (int) Database::one("SELECT COUNT(*) c FROM invoices WHERE status <> 'void'")['c'], 'no new invoice after a bad coupon');
     }
 
+    public function testTheOwnerSetsThePricesInSettingsAndNewPurchasesUseThem(): void
+    {
+        $o = $this->loggedIn('owner@x.test');
+        $page = $o->get('/admin/settings');
+        foreach (['Monthly bug-support subscription', 'Yearly bug-support subscription', 'Ask clients to choose bug support'] as $needle) {
+            $this->assertStringContainsString($needle, $page['body'], $needle);
+        }
+        $p = $this->finished(7);
+        \Vertex\Services\Settings::save($this->owner, 'support', ['support.plan_monthly_rupees' => '400', 'support.plan_yearly_rupees' => '3000', 'support.plans_enabled' => '1']);
+        \Vertex\Services\Settings::apply();
+        $this->assertSame(40000, SupportPlans::priceMinor('monthly'));
+        $this->assertSame(300000, SupportPlans::priceMinor('yearly'));
+        $this->assertSame(180000, SupportPlans::yearlySavingMinor(), '12 x ₹400 less ₹3,000');
+        $inv = InvoiceService::find(SupportPlans::purchase($this->client, $p, 'monthly')['invoice_public_id']);
+        $this->assertSame(40000, (int) $inv['total_minor']);
+    }
+
     public function testCouponsCanBeCreatedForSubscriptionsFromTheCouponScreens(): void
     {
         $o = $this->loggedIn('owner@x.test');
