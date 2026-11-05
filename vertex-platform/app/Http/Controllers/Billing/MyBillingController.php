@@ -49,6 +49,35 @@ final class MyBillingController extends Controller
         return $this->page('invoices/print', ['title' => $i['reference'], 'i' => $i, 'items' => InvoiceService::items($i), 'bal' => InvoiceService::balance($i), 'payments' => InvoiceService::clientPayments($i), 'back' => '/my/invoices/' . $i['public_id']], 'layouts/print');
     }
 
+    /** The client presses "Pay online": a Razorpay checkout request for the whole balance, then straight to it. @param array<string,string> $params */
+    public function payOnline(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
+        $to = '/my/invoices/' . $i['public_id'];
+
+        return $this->guarded(function () use ($uid, $i): Response {
+            $o = \Vertex\Services\RazorpayGateway::createClientRequest($uid, $i);
+
+            return Response::redirect('/my/pay/' . $o['public_id']);
+        }, $to);
+    }
+
+    /** The client enters a coupon on their own unpaid invoice. @param array<string,string> $params */
+    public function coupon(Request $request, array $params = []): Response
+    {
+        $uid = $this->actorId();
+        $i = InvoiceService::requireOwn($uid, $params['invoice'] ?? '');
+        $to = '/my/invoices/' . $i['public_id'];
+        $code = $request->string('coupon_code');
+
+        return $this->guarded(function () use ($uid, $i, $code, $to): Response {
+            $r = \Vertex\Services\CouponService::applyToInvoice($uid, $i, $code);
+
+            return $this->ok($to, 'Coupon ' . $r['code'] . ' applied: you save ₹' . \Vertex\Services\FieldRules::formatMinor($r['discount_minor']) . '. The new amount to pay is shown below.');
+        }, $to, ['coupon_code' => $code]);
+    }
+
     /** "I have paid": records a claim for staff to verify against the bank. @param array<string,string> $params */
     public function claim(Request $request, array $params = []): Response
     {

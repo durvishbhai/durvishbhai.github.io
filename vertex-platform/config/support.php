@@ -17,5 +17,9 @@ return [
     'warranty_end_day_before' => (bool) Env::get('WARRANTY_END_DAY_BEFORE', false),
     'warranty_expiring_days' => max(1, (int) Env::get('WARRANTY_EXPIRING_DAYS', 30)),
     'client_reopen_days' => max(0, (int) Env::get('TICKET_CLIENT_REOPEN_DAYS', 30)),
+    // Bug support after the free period (Settings → Bug support plans can change these): a subscription, or pay per bug
+    'plans_enabled' => (bool) Env::get('SUPPORT_PLANS_ENABLED', true),
+    'plan_monthly_rupees' => max(1, (int) Env::get('SUPPORT_PLAN_MONTHLY', 350)),
+    'plan_yearly_rupees' => max(1, (int) Env::get('SUPPORT_PLAN_YEARLY', 2000)),
     'sla' => [],
 ];

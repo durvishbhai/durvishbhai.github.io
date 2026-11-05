@@ -133,7 +133,7 @@ final class InvoiceService
         }
         if ($couponCode !== '' && $errors === []) {
             try {
-                $res = CouponService::evaluate($couponCode, (int) $client['id'], (int) $items['subtotal_minor'] - $discount, $project['service_category'] ?? null, isset($in['_invoice_id']) ? (int) $in['_invoice_id'] : null);
+                $res = CouponService::evaluate($couponCode, (int) $client['id'], (int) $items['subtotal_minor'] - $discount, $project['service_category'] ?? null, isset($in['_invoice_id']) ? (int) $in['_invoice_id'] : null, (string) ($in['_coupon_context'] ?? 'project'));
                 $couponId = (int) $res['coupon']['id'];
                 $couponDiscount = $res['discount_minor'];
             } catch (ValidationException $e) {
@@ -156,15 +156,40 @@ final class InvoiceService
         if ($client === null || $client['archived_at'] !== null) {
             throw new ValidationException(['Choose an existing client.']);
         }
+
+        return self::insertDraft($actorId, $client, $in, $quotation, 'standard');
+    }
+
+    /**
+     * A draft made by the SYSTEM for a client's own purchase (a bug-support subscription), issued at once. No staff permission is involved because nobody on the team is
+     * acting: the client chose the plan, the price comes from the settings, and the invoice is audited with no actor.
+     *
+     * @param array<string,mixed> $client a clients row @param array<string,mixed> $in @return array{public_id:string}
+     */
+    public static function createSystem(array $client, array $in, string $purpose): array
+    {
+        $r = self::insertDraft(null, $client, $in, null, $purpose);
+        $i = self::find($r['public_id']) ?? throw new \RuntimeException('The invoice could not be read back.');
+        self::issueNow(null, $i);
+
+        return $r;
+    }
+
+    /** @param array<string,mixed> $client @param array<string,mixed> $in @return array{public_id:string} */
+    private static function insertDraft(?int $actorId, array $client, array $in, ?array $quotation, string $purpose): array
+    {
         $v = self::validated($in, $client);
         $pub = uuid_hex();
 
-        return Database::transaction(function () use ($actorId, $client, $v, $pub, $quotation): array {
+        return Database::transaction(function () use ($actorId, $client, $v, $pub, $quotation, $purpose): array {
             $subtotal = (int) $v['items']['subtotal_minor'];
             Database::run("INSERT INTO invoices (public_id, client_id, project_id, quotation_id, status, title, due_date, subtotal_minor, discount_minor, coupon_id, coupon_code, coupon_discount_minor, total_minor, client_notes, internal_notes, created_by, created_at, updated_at)
                            VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
                 [$pub, $client['id'], $v['project']['id'] ?? null, $quotation['id'] ?? null, $v['title'], $v['due'], $subtotal, $v['discount'], $v['coupon_id'], $v['coupon_code'], $v['coupon_discount'], $subtotal - $v['discount'] - $v['coupon_discount'], $v['client_notes'], $v['internal_notes'], $actorId]);
             $id = Database::insertId();
+            if ($purpose !== 'standard') {
+                Database::run('UPDATE invoices SET purpose = ? WHERE id = ?', [$purpose, $id]);
+            }
             BillingItems::replace('invoice_items', 'invoice_id', $id, $v['items']['items']);
             Audit::record('invoice.drafted', 'invoice', $id, [], ['total_minor' => $subtotal - $v['discount'] - $v['coupon_discount'], 'client_id' => (int) $client['id'], 'quotation_id' => $quotation['id'] ?? null], [], $actorId);
 
@@ -211,6 +236,12 @@ final class InvoiceService
     public static function issue(int $actorId, array $i): void
     {
         Gate::authorize('invoices.issue', $actorId);
+        self::issueNow($actorId, $i);
+    }
+
+    /** Issues a draft. $actorId is null when the system does it on a client's behalf (see createSystem). @param array<string,mixed> $i */
+    private static function issueNow(?int $actorId, array $i): void
+    {
         if (!BusinessProfile::isComplete()) {
             throw new ValidationException(['Set your business details first (Administration → Business details): they are printed on every invoice.']);
         }
@@ -258,6 +289,23 @@ final class InvoiceService
         });
     }
 
+    /** Cancels an unpaid invoice the system made (a replaced subscription invoice). Refuses when money is on it. */
+    public static function voidSystem(int $invoiceId, string $reason): void
+    {
+        Database::transaction(function () use ($invoiceId, $reason): void {
+            $cur = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$invoiceId]);
+            if ($cur === null || $cur['status'] === 'void') {
+                return;
+            }
+            if (Database::one("SELECT 1 AS x FROM client_payments WHERE invoice_id = ? AND status IN ('pending_verification','verified','reversed')", [$invoiceId]) !== null) {
+                throw new ValidationException(['Payments are recorded against this invoice, so it cannot be cancelled.']);
+            }
+            Database::run("UPDATE invoices SET status = 'void', voided_at = UTC_TIMESTAMP(), void_reason = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?", [mb_substr($reason, 0, 255), $invoiceId]);
+            Audit::record('invoice.voided', 'invoice', $invoiceId, ['status' => $cur['status']], ['status' => 'void'], ['reference' => $cur['reference'], 'by' => 'system'], null);
+            CouponService::release($invoiceId, 'invoice voided');
+        });
+    }
+
     /** Recomputes Issued / Partially paid / Paid from the verified payments. Called after every verification, refund and reversal. */
     public static function sync(int $invoiceId): void
     {
@@ -270,6 +318,9 @@ final class InvoiceService
         if ($to !== $i['status']) {
             Database::run('UPDATE invoices SET status = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?', [$to, $invoiceId]);
             Audit::record('invoice.status_changed', 'invoice', $invoiceId, ['status' => $i['status']], ['status' => $to], ['paid_minor' => $paid], null);
+            if (($i['purpose'] ?? 'standard') === 'support_subscription') { // a bug-support subscription starts when its invoice is paid and stops if that payment is undone
+                $to === 'paid' ? SupportPlans::onInvoicePaid($i) : ($i['status'] === 'paid' ? SupportPlans::onInvoiceUnpaid($i) : null);
+            }
             if ($to === 'paid' && $i['client_id']) {
                 $uid = Database::one('SELECT user_id FROM clients WHERE id = ?', [$i['client_id']])['user_id'] ?? null;
                 if ($uid) {

@@ -45,9 +45,9 @@ final class CouponService
                 throw new ValidationException(['A coupon with the code ' . $v['code'] . ' already exists.']);
             }
             Database::run(
-                "INSERT INTO coupons (public_id, code, campaign_id, description, discount_type, percent_bps, amount_minor, max_discount_minor, min_spend_minor, eligible_services, valid_from, valid_until, max_uses, max_uses_per_client, status, created_by, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
-                [$pub, $v['code'], $v['campaign_id'], $v['description'], $v['type'], $v['percent_bps'], $v['amount_minor'], $v['max_discount_minor'], $v['min_spend_minor'], $v['eligible'], $v['valid_from'], $v['valid_until'], $v['max_uses'], $v['max_per_client'], $actorId],
+                "INSERT INTO coupons (public_id, code, campaign_id, description, discount_type, percent_bps, amount_minor, max_discount_minor, min_spend_minor, eligible_services, applies_to, valid_from, valid_until, max_uses, max_uses_per_client, status, created_by, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP())",
+                [$pub, $v['code'], $v['campaign_id'], $v['description'], $v['type'], $v['percent_bps'], $v['amount_minor'], $v['max_discount_minor'], $v['min_spend_minor'], $v['eligible'], $v['applies_to'], $v['valid_from'], $v['valid_until'], $v['max_uses'], $v['max_per_client'], $actorId],
             );
             Audit::record('coupon.created', 'coupon', Database::insertId(), [], ['code' => $v['code'], 'type' => $v['type'], 'percent_bps' => $v['percent_bps'], 'amount_minor' => $v['amount_minor']], [], $actorId);
         });
@@ -62,8 +62,8 @@ final class CouponService
         $v = self::validated($in, $coupon);
         Database::transaction(function () use ($actorId, $coupon, $v): void {
             Database::run(
-                'UPDATE coupons SET campaign_id = ?, description = ?, discount_type = ?, percent_bps = ?, amount_minor = ?, max_discount_minor = ?, min_spend_minor = ?, eligible_services = ?, valid_from = ?, valid_until = ?, max_uses = ?, max_uses_per_client = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
-                [$v['campaign_id'], $v['description'], $v['type'], $v['percent_bps'], $v['amount_minor'], $v['max_discount_minor'], $v['min_spend_minor'], $v['eligible'], $v['valid_from'], $v['valid_until'], $v['max_uses'], $v['max_per_client'], $coupon['id']],
+                'UPDATE coupons SET campaign_id = ?, description = ?, discount_type = ?, percent_bps = ?, amount_minor = ?, max_discount_minor = ?, min_spend_minor = ?, eligible_services = ?, applies_to = ?, valid_from = ?, valid_until = ?, max_uses = ?, max_uses_per_client = ?, updated_at = UTC_TIMESTAMP() WHERE id = ?',
+                [$v['campaign_id'], $v['description'], $v['type'], $v['percent_bps'], $v['amount_minor'], $v['max_discount_minor'], $v['min_spend_minor'], $v['eligible'], $v['applies_to'], $v['valid_from'], $v['valid_until'], $v['max_uses'], $v['max_per_client'], $coupon['id']],
             );
             Audit::record('coupon.updated', 'coupon', (int) $coupon['id'], ['type' => $coupon['discount_type'], 'percent_bps' => $coupon['percent_bps'], 'amount_minor' => $coupon['amount_minor']], ['type' => $v['type'], 'percent_bps' => $v['percent_bps'], 'amount_minor' => $v['amount_minor']], ['code' => $coupon['code']], $actorId);
         });
@@ -127,6 +127,10 @@ final class CouponService
                 $eligible[$s] = $s;
             }
         }
+        $applies = (string) ($in['applies_to'] ?? 'all');
+        if (!in_array($applies, ['all', 'project', 'subscription'], true)) {
+            $errors[] = 'Choose what the coupon applies to.';
+        }
         $maxUses = self::optionalInt($in['max_uses'] ?? '', 'Total uses', $errors);
         $maxPer = self::optionalInt($in['max_uses_per_client'] ?? '', 'Uses per client', $errors);
         $campaign = null;
@@ -143,7 +147,7 @@ final class CouponService
         }
 
         return ['code' => $code, 'type' => $type, 'percent_bps' => $bps, 'amount_minor' => $amount, 'max_discount_minor' => $cap, 'min_spend_minor' => $minSpend, 'valid_from' => $from, 'valid_until' => $until,
-            'eligible' => $eligible === [] ? null : implode(',', $eligible), 'max_uses' => $maxUses, 'max_per_client' => $maxPer, 'campaign_id' => $campaign['id'] ?? null, 'description' => is_string($desc) ? $desc : null];
+            'eligible' => $eligible === [] ? null : implode(',', $eligible), 'applies_to' => $applies, 'max_uses' => $maxUses, 'max_per_client' => $maxPer, 'campaign_id' => $campaign['id'] ?? null, 'description' => is_string($desc) ? $desc : null];
     }
 
     /** @param list<string> $errors */
@@ -169,7 +173,7 @@ final class CouponService
      *
      * @return array{coupon:array<string,mixed>,discount_minor:int}
      */
-    public static function evaluate(string $code, int $clientId, int $spendMinor, ?string $serviceCategory, ?int $ignoreInvoiceId = null): array
+    public static function evaluate(string $code, int $clientId, int $spendMinor, ?string $serviceCategory, ?int $ignoreInvoiceId = null, string $context = 'project'): array
     {
         $code = self::normaliseCode($code);
         $c = Database::one('SELECT * FROM coupons WHERE code = ?', [$code]);
@@ -178,6 +182,12 @@ final class CouponService
         }
         if ($c['status'] !== 'active') {
             throw new ValidationException(["The coupon {$code} is paused."]);
+        }
+        if (($c['applies_to'] ?? 'all') === 'project' && $context === 'subscription') {
+            throw new ValidationException(["The coupon {$code} is for project payments and cannot be used on a bug-support subscription."]);
+        }
+        if (($c['applies_to'] ?? 'all') === 'subscription' && $context !== 'subscription') {
+            throw new ValidationException(["The coupon {$code} is for bug-support subscriptions only."]);
         }
         $today = AppTime::today();
         if ($c['valid_from'] !== null && $today < $c['valid_from']) {
@@ -222,7 +232,7 @@ final class CouponService
     }
 
     /** Called inside the invoice-issue transaction: locks the coupon, re-checks every limit and records the redemption. */
-    public static function redeem(array $invoice, int $actorId): void
+    public static function redeem(array $invoice, ?int $actorId): void
     {
         if ($invoice['coupon_id'] === null) {
             return;
@@ -231,7 +241,7 @@ final class CouponService
         $spend = (int) $invoice['subtotal_minor'] - (int) $invoice['discount_minor'];
         $service = $invoice['project_id'] === null ? null : (Database::one('SELECT service_category FROM projects WHERE id = ?', [$invoice['project_id']])['service_category'] ?? null);
         try {
-            $r = self::evaluate((string) $invoice['coupon_code'], (int) $invoice['client_id'], $spend, $service, (int) $invoice['id']);
+            $r = self::evaluate((string) $invoice['coupon_code'], (int) $invoice['client_id'], $spend, $service, (int) $invoice['id'], ($invoice['purpose'] ?? 'standard') === 'support_subscription' ? 'subscription' : 'project');
         } catch (ValidationException $e) {
             throw new ValidationException([...$e->errors, 'Remove the coupon from the draft (or fix the problem) and issue again.']);
         }
@@ -249,6 +259,49 @@ final class CouponService
         if ($n > 0) {
             Audit::record('coupon.released', 'invoice', $invoiceId, [], [], ['reason' => 'invoice voided'], null);
         }
+    }
+
+    /**
+     * A client enters a coupon on one of their own unpaid invoices (a project payment or a bug-support subscription). The invoice itself is never edited: the discount is
+     * recorded as a credit note and the coupon use is recorded against the invoice. Only before any payment has been made or is waiting for verification, and once.
+     *
+     * @param array<string,mixed> $invoice an invoice row the caller has already proved belongs to the client
+     * @return array{discount_minor:int,code:string}
+     */
+    public static function applyToInvoice(int $userId, array $invoice, string $code): array
+    {
+        $code = self::normaliseCode($code);
+        if ($code === '') {
+            throw new ValidationException(['Enter a coupon code.']);
+        }
+
+        return Database::transaction(function () use ($userId, $invoice, $code): array {
+            $cur = Database::one('SELECT * FROM invoices WHERE id = ? FOR UPDATE', [$invoice['id']]);
+            if ($cur === null || !in_array($cur['status'], ['issued', 'partially_paid'], true)) {
+                throw new ValidationException(['A coupon can only be used on an invoice that is waiting for payment.']);
+            }
+            if (InvoiceService::paidMinor((int) $cur['id']) > 0 || InvoiceService::pendingMinor((int) $cur['id']) > 0) {
+                throw new ValidationException(['A payment has already been made or is being verified on this invoice, so a coupon can no longer be used on it.']);
+            }
+            if ($cur['coupon_id'] !== null || Database::one('SELECT 1 AS x FROM coupon_redemptions WHERE invoice_id = ? AND released_at IS NULL', [$cur['id']]) !== null) {
+                throw new ValidationException(['This invoice already has a coupon.']);
+            }
+            $context = ($cur['purpose'] ?? 'standard') === 'support_subscription' ? 'subscription' : 'project';
+            $spend = (int) $cur['total_minor'] - (int) $cur['credited_minor'];
+            $service = $cur['project_id'] === null ? null : (Database::one('SELECT service_category FROM projects WHERE id = ?', [$cur['project_id']])['service_category'] ?? null);
+            $c = Database::one('SELECT id FROM coupons WHERE code = ? FOR UPDATE', [$code]);
+            $res = self::evaluate($code, (int) $cur['client_id'], $spend, $service, null, $context);
+            $room = CreditNoteService::creditable($cur);
+            $discount = min($res['discount_minor'], $room);
+            if ($discount < 1) {
+                throw new ValidationException(["The coupon {$code} gives no discount on this invoice."]);
+            }
+            CreditNoteService::issueSystem($cur, $discount, 'Coupon ' . $code);
+            Database::run('INSERT INTO coupon_redemptions (coupon_id, invoice_id, client_id, discount_minor, redeemed_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP())', [$res['coupon']['id'], $cur['id'], $cur['client_id'], $discount]);
+            Audit::record('coupon.redeemed', 'coupon', (int) $res['coupon']['id'], [], ['discount_minor' => $discount], ['invoice_id' => (int) $cur['id'], 'code' => $code, 'by' => 'client'], $userId);
+
+            return ['discount_minor' => $discount, 'code' => $code];
+        });
     }
 
     // ------------------------------------------------------------------------------------------------ lists and reports

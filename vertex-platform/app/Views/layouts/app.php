@@ -30,6 +30,8 @@ $nav = [
     ['/receipts', 'Receipts', can('receipts.view_all')],
     ['/quotations', 'Quotations', can('quotes.create') || can('quotes.send') || can('quotes.record_decision')],
     ['/my/invoices', 'My invoices', can('invoices.view_own') && $isClient],
+    ['/my/support', 'Bug support', can('warranty.view_own') && $isClient],
+    ['/support-plans', 'Bug-support plans', can('warranty.view')],
     ['/my/receipts', 'My receipts', can('receipts.view_own') && $isClient],
     ['/my/quotes', 'My quotations', can('quotes.view') && can('quotes.respond') && $isClient],
     ['/approvals', 'Approvals', can('payments.reconcile') || can('invoices.issue') || can('payouts.approve') || can('payouts.record') || can('commissions.approve') || can('referrals.decide') || can('renewals.approve') || can('renewals.confirm_provider') || can('deliverables.review') || can('deliverables.publish') || can('revisions.classify')],
@@ -92,7 +94,7 @@ $groupOf = [
     'Projects & delivery' => ['/projects', '/tasks', '/board', '/deadlines', '/team', '/deliverables', '/qa', '/my/deliverables', '/revisions', '/scope-requests', '/my/scope-requests', '/project-templates', '/admin/revision-policies', '/warranties', '/admin/delivery', '/my/delivery'],
     'Money' => ['/invoices', '/my/invoices', '/receipts', '/my/receipts', '/client-payments', '/commissions', '/payouts', '/renewals', '/my/services'],
     'Partners' => ['/partner', '/partner/referrals', '/referrals/dashboard', '/referrals'],
-    'Support' => ['/support', '/tickets', '/support/dashboard', '/admin/sla'],
+    'Support' => ['/support', '/tickets', '/support/dashboard', '/my/support', '/support-plans', '/admin/sla'],
     'Contracts & forms' => ['/agreements', '/my/agreements', '/forms'],
     'Website' => ['/admin/site', '/admin/cms', '/admin/appointments', '/admin/careers'],
     'Administration' => ['/admin/compliance', '/admin/users', '/admin/roles', '/admin/automation', '/admin/data', '/admin/recycle-bin', '/admin/activity', '/admin/audit', '/admin/payments', '/admin/business', '/admin/manual-upi', '/admin/settings', '/admin/system'],
@@ -179,6 +181,7 @@ foreach ($groups as $gname => $items) {
         </div>
     </main>
 </div>
+<?php $__choices = ($isClient && \Vertex\Services\Gate::can('warranty.view_own', $uid) && !preg_match('#^/(my/support|my/invoices|my/pay|logout)#', $path)) ? \Vertex\Services\SupportPlans::pendingChoices($uid) : []; if ($__choices !== []) : ?><?= \Vertex\Core\View::partial('support-popup', ['choices' => $__choices]) ?><?php endif; ?>
 <script src="<?= e(asset('js/app.js')) ?>" defer></script>
 </body>
 </html>

@@ -74,6 +74,9 @@ final class Settings
             'razorpay.key_secret' => ['group' => 'razorpay', 'label' => 'Key Secret', 'type' => 'secret'],
             'razorpay.webhook_secret' => ['group' => 'razorpay', 'label' => 'Webhook secret', 'type' => 'secret', 'help' => 'The secret you type when you add the webhook in the Razorpay Dashboard.'],
             'razorpay.qr_mode' => ['group' => 'razorpay', 'label' => 'How payment requests are paid', 'type' => 'select', 'options' => ['auto' => 'Automatic (Razorpay UPI QR, else a payment link for the exact amount)', 'link' => 'Payment link for the exact amount only', 'checkout' => 'Razorpay checkout window on the client\'s page (card, UPI, net banking, wallets)'], 'help' => 'Whichever you pick, the amount is exactly what the team entered. The team can also choose per request.'],
+            'support.plans_enabled' => ['group' => 'support', 'label' => 'Ask clients to choose bug support when their free support ends', 'type' => 'bool', 'help' => 'When on, a client whose free support (6 months from final delivery) is over sees a message in the portal until they choose a subscription or pay per bug.'],
+            'support.plan_monthly_rupees' => ['group' => 'support', 'label' => 'Monthly bug-support subscription (₹)', 'type' => 'int', 'help' => 'Every bug, major or minor, fixed while the subscription is active. New purchases use this price; existing invoices keep theirs.'],
+            'support.plan_yearly_rupees' => ['group' => 'support', 'label' => 'Yearly bug-support subscription (₹)', 'type' => 'int', 'help' => 'Twelve months. The saving against twelve monthly payments is shown to the client.'],
             'turnstile.enabled' => ['group' => 'turnstile', 'label' => 'Protect public forms with Cloudflare Turnstile', 'type' => 'bool', 'help' => 'Needs both keys below. When on, visitors see a short check on public forms and the server verifies it with Cloudflare. Create the widget at dash.cloudflare.com → Turnstile and add this website\'s domain.'],
             'turnstile.site_key' => ['group' => 'turnstile', 'label' => 'Turnstile site key (public)', 'type' => 'text'],
             'turnstile.secret_key' => ['group' => 'turnstile', 'label' => 'Turnstile secret key', 'type' => 'secret'],
@@ -95,7 +98,7 @@ final class Settings
     /** @return array<string,string> */
     public static function groups(): array
     {
-        return ['general' => 'General', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'google' => 'Google sign-in', 'delivery' => 'Delivery appointments', 'turnstile' => 'Cloudflare Turnstile (bot check)', 'features' => 'Feature switches'];
+        return ['general' => 'General', 'support' => 'Bug support plans', 'website' => 'Website and company facts', 'email' => 'Email', 'notifications' => 'Notifications', 'storage' => 'Storage', 'ai' => 'AI assistance', 'razorpay' => 'Razorpay payments', 'google' => 'Google sign-in', 'delivery' => 'Delivery appointments', 'turnstile' => 'Cloudflare Turnstile (bot check)', 'features' => 'Feature switches'];
     }
 
     private static function isSecret(string $key): bool

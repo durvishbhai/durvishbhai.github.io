@@ -40,6 +40,8 @@ return [
         'receipt.issued' => ['category' => 'Payment receipt', 'tone' => 'success', 'button' => 'View receipt'],
         'invoice.issued' => ['category' => 'Invoice', 'tone' => 'info', 'button' => 'View invoice'],
         'invoice.paid' => ['category' => 'Invoice paid', 'tone' => 'success', 'button' => 'View invoice'],
+        'support.activated' => ['category' => 'Bug support', 'tone' => 'success', 'button' => 'Open'],
+        'support.choice' => ['category' => 'Bug support', 'tone' => 'info', 'button' => 'Open'],
         'credit_note.issued' => ['category' => 'Credit note', 'tone' => 'info', 'button' => 'View credit note'],
         'project.confirmed' => ['category' => 'Project confirmed', 'tone' => 'success', 'button' => 'View project'],
         'quote.sent' => ['category' => 'Quotation', 'tone' => 'info', 'button' => 'Review quotation'],

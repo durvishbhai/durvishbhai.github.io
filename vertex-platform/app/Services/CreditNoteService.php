@@ -66,6 +66,19 @@ final class CreditNoteService
         Gate::authorize('creditnotes.issue', $actorId);
         $minor = FieldRules::moneyMinor($amount, 'Credit amount', true);
         $reason = (string) FieldRules::line($reason, 'Reason', 10, 255);
+
+        return self::create($actorId, $invoice, $minor, $reason);
+    }
+
+    /** A credit note raised by the system (a coupon a client entered). @param array<string,mixed> $invoice @return array{public_id:string,reference:string} */
+    public static function issueSystem(array $invoice, int $minor, string $reason): array
+    {
+        return self::create(null, $invoice, $minor, mb_substr($reason, 0, 255));
+    }
+
+    /** @param array<string,mixed> $invoice @return array{public_id:string,reference:string} */
+    private static function create(?int $actorId, array $invoice, int $minor, string $reason): array
+    {
         if (!BusinessProfile::isComplete()) {
             throw new ValidationException(['Set your business details first (Administration → Business details).']);
         }

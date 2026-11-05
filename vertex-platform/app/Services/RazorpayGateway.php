@@ -114,6 +114,32 @@ final class RazorpayGateway
     }
 
     /**
+     * The client's own "Pay online" button: a Razorpay checkout request for everything still due on THEIR invoice (no staff action needed). If a request for it is already
+     * open, that one is returned instead of making a second.
+     *
+     * @param array<string,mixed> $invoice an invoice row the caller has proved belongs to $userId
+     * @return array<string,mixed> the stored order row
+     */
+    public static function createClientRequest(int $userId, array $invoice): array
+    {
+        if (!self::enabled()) {
+            throw new ValidationException(['Online payment is not available right now. Please use another way to pay or contact us.']);
+        }
+        $live = self::liveRequests((int) $invoice['id']);
+        if ($live !== []) {
+            return $live[0];
+        }
+        $due = self::requestable($invoice);
+        if ($due < 1) {
+            throw new ValidationException(['There is nothing left to pay on this invoice (or a payment is being verified).']);
+        }
+        $target = ['kind' => 'invoice', 'id' => (int) $invoice['id'], 'client_id' => (int) $invoice['client_id'], 'reference' => (string) $invoice['reference'], 'title' => (string) $invoice['title'],
+            'public_id' => (string) $invoice['public_id'], 'label' => 'invoice', 'callback' => '/my/invoices/' . $invoice['public_id'], 'role' => 'other'];
+
+        return self::issue($userId, $target, $due, $due, '', 'checkout');
+    }
+
+    /**
      * The same, for what is still due on a domain/hosting renewal (for example after the provider raised its price).
      *
      * @param array<string,mixed> $service a renewal service row

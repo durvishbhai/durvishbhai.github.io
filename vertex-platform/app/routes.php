@@ -63,6 +63,8 @@ use Vertex\Http\Controllers\AiController;
 use Vertex\Http\Controllers\PublicPageController;
 use Vertex\Http\Controllers\Billing\ReceiptController;
 use Vertex\Http\Controllers\Client\ClientProjectRequestController;
+use Vertex\Http\Controllers\Client\SupportPlanController;
+use Vertex\Http\Controllers\Admin\SupportPlanAdminController;
 use Vertex\Http\Controllers\SitePageController;
 use Vertex\Http\Controllers\EnquiryFileController;
 use Vertex\Http\Controllers\Admin\SiteAdminController;
@@ -423,6 +425,12 @@ return static function (Router $router): void {
     $router->get('/my/invoices/{invoice}', [MyBillingController::class, 'invoice'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/upi-qr', [MyBillingController::class, 'upiQr'], ['auth', 'can:invoices.view_own']);
     $router->get('/my/invoices/{invoice}/print', [MyBillingController::class, 'print'], ['auth', 'can:invoices.view_own']);
+    $router->post('/my/invoices/{invoice}/pay-online', [MyBillingController::class, 'payOnline'], ['auth', 'can:invoices.view_own']);
+    $router->post('/my/invoices/{invoice}/coupon', [MyBillingController::class, 'coupon'], ['auth', 'can:invoices.view_own']);
+    $router->get('/my/support', [SupportPlanController::class, 'index'], ['auth', 'can:warranty.view_own']);
+    $router->post('/my/support/{project}/subscribe', [SupportPlanController::class, 'subscribe'], ['auth', 'can:warranty.view_own']);
+    $router->post('/my/support/{project}/per-bug', [SupportPlanController::class, 'perBug'], ['auth', 'can:warranty.view_own']);
+    $router->get('/support-plans', [SupportPlanAdminController::class, 'index'], ['auth', 'can:warranty.view']);
     $router->post('/my/invoices/{invoice}/pay', [MyBillingController::class, 'claim'], ['auth', 'can:payments.pay']);
     // Online payments (Razorpay) are asked for by the KIS team only (amount typed by them); the client just sees and pays the request.
     $pr = ['auth', 'can:payments.request'];

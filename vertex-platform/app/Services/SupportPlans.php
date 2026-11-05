@@ -167,7 +167,7 @@ final class SupportPlans
             Database::run("INSERT INTO project_support (project_id, mode, chosen_by, chosen_at, updated_at) VALUES (?, 'per_bug', ?, UTC_TIMESTAMP(), UTC_TIMESTAMP()) ON DUPLICATE KEY UPDATE mode = 'per_bug', chosen_by = VALUES(chosen_by), chosen_at = UTC_TIMESTAMP(), updated_at = UTC_TIMESTAMP()", [$project['id'], $userId]);
             Audit::record('support.per_bug_chosen', 'project', (int) $project['id'], [], ['mode' => 'per_bug'], [], $userId);
         });
-        Notifier::send(self::team((int) $project['id']), 'support.choice', 'Support choice: pay per bug', ($project['client_name'] ?? 'A client') . ' chose to pay for each bug separately on ' . $project['title'] . '.', '/projects/' . $project['public_id'] . '/warranty', null, 'project', (int) $project['id']);
+        Notifier::send(self::team((int) $project['id']), 'support.choice', 'Support choice: pay per bug', ($project['client_name'] ?? 'A client') . ' chose to pay for each bug separately on ' . $project['title'] . '.', '/projects/' . $project['public_id'] . '/warranty', (int) $project['id'], 'project', (int) $project['id'], 'support:' . $project['id'] . ':per_bug:' . bin2hex(random_bytes(3)));
     }
 
     /** @return list<int> user ids of the people who should hear about a project's support */
@@ -250,10 +250,10 @@ final class SupportPlans
         Audit::record('support.subscription_activated', 'project', (int) $p['project_id'], [], ['plan' => $p['plan'], 'starts_on' => $start, 'ends_on' => $end], ['invoice_id' => (int) $invoice['id']], null);
         $uid = Database::one('SELECT user_id FROM clients WHERE id = ?', [$p['client_id']])['user_id'] ?? null;
         if ($uid && $project !== null) {
-            Notifier::send([(int) $uid], 'support.activated', 'Bug support is active', 'Every bug on ' . $project['title'] . ' is covered until ' . local_date($end) . '.', '/my/support', null, 'project', (int) $p['project_id']);
+            Notifier::send([(int) $uid], 'support.activated', 'Bug support is active', 'Every bug on ' . $project['title'] . ' is covered until ' . local_date($end) . '.', '/my/support', (int) $p['project_id'], 'project', (int) $p['project_id'], 'support:' . $p['project_id'] . ':active:' . $p['id']);
         }
         if ($project !== null) {
-            Notifier::send(self::team((int) $p['project_id']), 'support.activated', 'Bug-support subscription started', $project['title'] . ': ' . self::PLANS[(string) $p['plan']] . ' plan until ' . local_date($end) . '.', '/projects/' . $project['public_id'] . '/warranty', null, 'project', (int) $p['project_id']);
+            Notifier::send(self::team((int) $p['project_id']), 'support.activated', 'Bug-support subscription started', $project['title'] . ': ' . self::PLANS[(string) $p['plan']] . ' plan until ' . local_date($end) . '.', '/projects/' . $project['public_id'] . '/warranty', (int) $p['project_id'], 'project', (int) $p['project_id'], 'support:' . $p['project_id'] . ':active-team:' . $p['id']);
         }
     }
 

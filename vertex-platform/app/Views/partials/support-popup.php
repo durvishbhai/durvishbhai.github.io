@@ -10,6 +10,6 @@
             <?= \Vertex\Core\View::partial('support-options', ['project' => $p, 'state' => $c['state']]) ?>
         </div>
         <?php endforeach; ?>
-        <p class="muted small"><a href="/logout" data-logout>Sign out</a> · <a href="/my/support">Open the full page</a></p>
+        <form method="post" action="/logout" class="support-popup-foot"><?= csrf_field() ?><a href="/my/support">Open the full page</a> <button class="btn btn-ghost btn-sm" type="submit">Sign out</button></form>
     </div>
 </div>

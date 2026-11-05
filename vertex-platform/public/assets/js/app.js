@@ -795,3 +795,23 @@
         if (date.value) { load(); }
     })();
 })();
+
+/* The bug-support choice is a modal: focus goes into it, Tab stays inside it, and the page behind does not scroll until the client has chosen. */
+(function () {
+    'use strict';
+    var pop = document.querySelector('[data-support-popup]');
+    if (!pop) { return; }
+    var box = pop.querySelector('.support-popup-box');
+    document.body.classList.add('has-support-popup');
+    Array.prototype.forEach.call(document.querySelectorAll('body > header, body > .portal-shell, body > .shell, body > aside, #main, .portal-main'), function (el) { if (!pop.contains(el)) { el.setAttribute('aria-hidden', 'true'); } });
+    if (box) { box.setAttribute('tabindex', '-1'); box.focus(); }
+    pop.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab') { return; }
+        var f = Array.prototype.filter.call(pop.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select, textarea'), function (n) { return n.offsetParent !== null; });
+        if (f.length === 0) { return; }
+        var first = f[0], last = f[f.length - 1];
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === box)) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+})();
+

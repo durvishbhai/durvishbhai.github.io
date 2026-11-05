@@ -49,7 +49,7 @@ final class CouponController extends Controller
     private function fields(Request $request): array
     {
         $in = [];
-        foreach (['code', 'description', 'discount_type', 'percent', 'max_discount', 'amount', 'min_spend', 'valid_from', 'valid_until', 'max_uses', 'max_uses_per_client', 'campaign'] as $k) {
+        foreach (['code', 'description', 'discount_type', 'percent', 'max_discount', 'amount', 'min_spend', 'valid_from', 'valid_until', 'max_uses', 'max_uses_per_client', 'campaign', 'applies_to'] as $k) {
             $in[$k] = $request->string($k);
         }
         $in['eligible_services'] = is_array($request->body['eligible_services'] ?? null) ? array_values($request->body['eligible_services']) : [];
