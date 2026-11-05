@@ -21,10 +21,24 @@ final class Pdf
     private array $images = [];
     private string $buf = '';
     private float $y;
+    /** @var list<array{from:array{0:float,1:float,2:float},to:array{0:float,1:float,2:float},x0:float,x1:float}> axial colour gradients used by shape() */
+    private array $shadings = [];
+    /** @var (callable(Pdf):void)|null drawn at the start of every page (letterhead artwork, footer bar) */
+    private $decor;
 
-    public function __construct(private string $title = 'Document')
+    /**
+     * @param (callable(Pdf):void)|null $decor called once for every new page, before anything else is drawn on it
+     * @param bool $numbers write "Page n of N" at the bottom of every page (a template can turn it off and draw its own)
+     */
+    public function __construct(private string $title = 'Document', ?callable $decor = null, private bool $numbers = true)
     {
+        $this->decor = $decor;
         $this->newPage();
+    }
+
+    public function pageCount(): int
+    {
+        return count($this->pages) + 1;
     }
 
     public function y(): float
@@ -52,24 +66,27 @@ final class Pdf
         }
         $this->buf = '';
         $this->y = self::H - self::MARGIN;
+        if ($this->decor !== null) {
+            ($this->decor)($this);
+        }
     }
 
     /** Approximate Helvetica advance width in points (digits and common punctuation are exact; letters are close enough for wrapping and right alignment). */
     public static function width(string $text, float $size, bool $bold = false): float
     {
         $text = self::encode($text);
+        // exact Helvetica / Helvetica-Bold advance widths (per 1000 em) for ASCII 32..126; anything else (Windows-1252 accents) counts as 556
+        static $reg = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015,
+            667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333,
+            556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+        static $bld = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975,
+            722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333,
+            556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584];
+        $table = $bold ? $bld : $reg;
         $w = 0.0;
         for ($i = 0, $n = strlen($text); $i < $n; $i++) {
-            $c = $text[$i];
-            $w += match (true) {
-                $c === ' ' => 278,
-                ctype_digit($c) => 556,
-                strpbrk($c, 'ijl.,:;\'|!') !== false => 250,
-                strpbrk($c, 'ft()[]-/\\') !== false => 300,
-                strpbrk($c, 'mwMW%@') !== false => 830,
-                ctype_upper($c) => $bold ? 740 : 680,
-                default => $bold ? 580 : 540,
-            };
+            $o = ord($text[$i]);
+            $w += ($o >= 32 && $o <= 126) ? $table[$o - 32] : 556;
         }
 
         return $w / 1000 * $size;
@@ -127,6 +144,41 @@ final class Pdf
     public function fill(float $x, float $y, float $w, float $h, float|array $gray): void
     {
         $this->buf .= sprintf("%s %.2F %.2F %.2F %.2F re f\n", self::color($gray), $x, $y, $w, $h);
+    }
+
+    /**
+     * A filled free-form shape. $path is a list of segments in PDF coordinates (origin bottom-left): ['M', x, y], ['L', x, y], ['C', x1, y1, x2, y2, x3, y3], ['Z'].
+     * With $gradient the shape is filled with a left-to-right colour blend between x0 and x1 instead of a flat colour.
+     *
+     * @param list<list<string|float>> $path
+     * @param float|array{0:float,1:float,2:float} $color
+     * @param array{from:array{0:float,1:float,2:float},to:array{0:float,1:float,2:float},x0:float,x1:float}|null $gradient
+     */
+    public function shape(array $path, float|array $color = 0.0, ?array $gradient = null): void
+    {
+        $ops = '';
+        foreach ($path as $seg) {
+            $ops .= match ($seg[0]) {
+                'M' => sprintf("%.2F %.2F m\n", $seg[1], $seg[2]),
+                'L' => sprintf("%.2F %.2F l\n", $seg[1], $seg[2]),
+                'C' => sprintf("%.2F %.2F %.2F %.2F %.2F %.2F c\n", $seg[1], $seg[2], $seg[3], $seg[4], $seg[5], $seg[6]),
+                default => "h\n",
+            };
+        }
+        if ($gradient === null) {
+            $this->buf .= self::color($color) . "\n" . $ops . "f\n";
+
+            return;
+        }
+        $this->shadings[] = $gradient;
+        $this->buf .= "q\n" . $ops . sprintf("W n /Sh%d sh Q\n", count($this->shadings));
+    }
+
+    /** A rectangle whose bottom-left corner is rounded (the coloured tab of the quotation / invoice letterhead). @param float|array{0:float,1:float,2:float} $color */
+    public function tab(float $x, float $y, float $w, float $h, float $r, float|array $color): void
+    {
+        $k = 0.5523 * $r;
+        $this->shape([['M', $x + $r, $y], ['L', $x + $w, $y], ['L', $x + $w, $y + $h], ['L', $x, $y + $h], ['L', $x, $y + $r], ['C', $x, $y + $r - $k, $x + $r - $k, $y, $x + $r, $y], ['Z']], $color);
     }
 
     /** An outlined rectangle. @param float|array{0:float,1:float,2:float} $gray */
@@ -215,14 +267,22 @@ final class Pdf
         $objs[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
         $objs[5] = '<< /Title (' . self::escape(self::encode($this->title)) . ') /Producer (Krazy Integrated Solutions) /CreationDate (D:' . gmdate('YmdHis') . 'Z) >>';
         foreach ($pages as $i => $content) {
-            $footer = sprintf("BT /F1 8 Tf 0.45 g %.2F %.2F Td (%s) Tj ET\n", self::W / 2 - 20, 24, self::escape('Page ' . ($i + 1) . ' of ' . $total));
+            $footer = $this->numbers ? sprintf("BT /F1 8 Tf 0.45 g %.2F %.2F Td (%s) Tj ET\n", self::W / 2 - 20, 24, self::escape('Page ' . ($i + 1) . ' of ' . $total)) : ($total > 1 ? sprintf("BT /F1 8 Tf 0.10 0.12 0.25 rg %.2F %.2F Td (%s) Tj ET\n", self::W - 80, 9, self::escape('Page ' . ($i + 1) . ' of ' . $total)) : '');
             $stream = $content . $footer;
             $pageNo = 6 + $i * 2;
             $xo = '';
+            $sh = '';
+            if ($this->shadings !== []) {
+                $sh = ' /Shading <<';
+                foreach ($this->shadings as $k => $g) {
+                    $sh .= sprintf(' /Sh%d << /ShadingType 2 /ColorSpace /DeviceRGB /Coords [%.2F 0 %.2F 0] /Function << /FunctionType 2 /Domain [0 1] /C0 [%.3F %.3F %.3F] /C1 [%.3F %.3F %.3F] /N 1 >> /Extend [true true] >>', $k + 1, $g['x0'], $g['x1'], $g['from'][0], $g['from'][1], $g['from'][2], $g['to'][0], $g['to'][1], $g['to'][2]);
+                }
+                $sh .= ' >>';
+            }
             foreach ($this->images as $k => $_) {
                 $xo .= ' /Im' . ($k + 1) . ' ' . (6 + $total * 2 + $k) . ' 0 R';
             }
-            $objs[$pageNo] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::W . ' ' . self::H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>' . ($xo === '' ? '' : ' /XObject <<' . $xo . ' >>') . ' >> /Contents ' . ($pageNo + 1) . ' 0 R >>';
+            $objs[$pageNo] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' . self::W . ' ' . self::H . '] /Resources << /Font << /F1 3 0 R /F2 4 0 R >>' . ($xo === '' ? '' : ' /XObject <<' . $xo . ' >>') . $sh . ' >> /Contents ' . ($pageNo + 1) . ' 0 R >>';
             $objs[$pageNo + 1] = '<< /Length ' . strlen($stream) . " >>\nstream\n" . $stream . 'endstream';
         }
         foreach ($this->images as $k => $img) {

@@ -11,3 +11,25 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) { meta.setAttribute('content', theme === 'light' ? '#f4f6fc' : '#050818'); }
 })();
+
+/* Installed app only (home-screen / standalone window): the screen is fixed, so pinch-zoom and double-tap zoom are switched off and the page always opens at
+   the true device resolution. In a normal browser tab nothing changes: visitors keep their browser's zoom (needed for accessibility). */
+(function () {
+    'use strict';
+    var standalone = (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || window.matchMedia('(display-mode: minimal-ui)').matches)) || window.navigator.standalone === true;
+    if (!standalone) { return; }
+    document.documentElement.classList.add('pwa-app');
+    var vp = document.querySelector('meta[name="viewport"]');
+    if (vp) { vp.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'); }
+    var stop = function (e) { e.preventDefault(); };
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) { document.addEventListener(t, stop, { passive: false }); }); // iPhone pinch
+    document.addEventListener('touchmove', function (e) { if (e.touches && e.touches.length > 1) { e.preventDefault(); } }, { passive: false }); // two fingers on screen
+    var last = 0;
+    document.addEventListener('touchend', function (e) { // double-tap zoom
+        var now = Date.now();
+        if (now - last < 320 && e.target && !/^(input|textarea|select|button|a|label)$/i.test(e.target.tagName)) { e.preventDefault(); }
+        last = now;
+    }, { passive: false });
+    document.addEventListener('wheel', function (e) { if (e.ctrlKey) { e.preventDefault(); } }, { passive: false }); // desktop installed app: ctrl + wheel
+    document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) { e.preventDefault(); } });
+})();

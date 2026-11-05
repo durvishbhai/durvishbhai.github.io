@@ -112,41 +112,39 @@ final class DocumentPdf
         return $snapshot ? (array) json_decode($snapshot, true) : BusinessProfile::get();
     }
 
+    /** @param array<string,mixed> $c a clients row (contact_name, company_name) @return array{0:string,1:string} the name to print and a smaller second line */
+    private static function issuedTo(array $c): array
+    {
+        $company = trim((string) ($c['company_name'] ?? ''));
+        $contact = trim((string) ($c['contact_name'] ?? ''));
+
+        return $company !== '' ? [$company, $contact] : [$contact, ''];
+    }
+
     /** @param array<string,mixed> $i an invoice row from InvoiceService::find */
     public static function invoice(array $i): string
     {
         $biz = self::biz($i['business_snapshot'] ?? null);
         $client = Database::one('SELECT contact_name, company_name, email FROM clients WHERE id = ?', [$i['client_id']]) ?? [];
         $bal = InvoiceService::balance($i);
-        $pdf = new Pdf('Invoice ' . ($i['reference'] ?? ''));
-        self::head($pdf, $i['status'] === 'draft' ? 'DRAFT INVOICE' : 'INVOICE', (string) ($i['reference'] ?? ''), $biz, $i['status'] === 'void' ? 'VOID' : '');
-        self::meta($pdf, [['BILLED TO', (string) ($client['company_name'] ?: ($client['contact_name'] ?? ''))], ['ISSUE DATE', $i['issue_date'] ? local_date($i['issue_date']) : '-'], ['DUE DATE', $i['due_date'] ? local_date($i['due_date']) : '-'], ['STATUS', ucwords(str_replace('_', ' ', (string) $i['status']))]]);
-        $pdf->paragraph((string) $i['title'], 12, true);
-        $pdf->moveDown(4);
-        self::lines($pdf, InvoiceService::items($i));
-        $rows = [['Subtotal', FieldRules::formatMinor((int) $i['subtotal_minor'])]];
-        if ((int) $i['discount_minor'] > 0) {
-            $rows[] = ['Discount', '-' . FieldRules::formatMinor((int) $i['discount_minor'])];
-        }
-        if ((int) ($i['coupon_discount_minor'] ?? 0) > 0) {
-            $rows[] = ['Coupon ' . $i['coupon_code'], '-' . FieldRules::formatMinor((int) $i['coupon_discount_minor'])];
-        }
-        $rows[] = ['Total', FieldRules::formatMinor((int) $i['total_minor']), true];
+        [$to, $sub] = self::issuedTo($client);
+        $discount = (int) $i['discount_minor'] + (int) ($i['coupon_discount_minor'] ?? 0);
+        $after = [];
         if ((int) ($i['credited_minor'] ?? 0) > 0) {
-            $rows[] = ['Credit notes', '-' . FieldRules::formatMinor((int) $i['credited_minor'])];
+            $after[] = ['Credit notes', '-Rs. ' . FieldRules::formatMinor((int) $i['credited_minor'])];
         }
         if ($i['status'] !== 'draft') {
-            $rows[] = ['Paid', FieldRules::formatMinor($bal['paid'])];
-            $rows[] = ['Balance due', FieldRules::formatMinor($bal['outstanding']), true];
+            $after[] = ['Paid', 'Rs. ' . FieldRules::formatMinor($bal['paid'])];
+            $after[] = ['Balance due', 'Rs. ' . FieldRules::formatMinor($bal['outstanding']), true];
         }
-        self::totals($pdf, $rows);
-        if (!empty($i['client_notes'])) {
-            $pdf->moveDown(4);
-            $pdf->paragraph((string) $i['client_notes'], 9);
-        }
-        self::foot($pdf, $biz, true);
+        $extra = $i['due_date'] ? [['DUE DATE:', local_date($i['due_date'], 'j M Y')]] : [];
 
-        return $pdf->output();
+        return self::template([
+            'title' => 'INVOICE', 'numberLabel' => 'INVOICE NO:', 'number' => (string) ($i['reference'] ?? 'DRAFT'), 'date' => $i['issue_date'] ? local_date($i['issue_date'], 'j M Y') : '-', 'extra' => $extra,
+            'issuedTo' => $to, 'issuedToSub' => $sub, 'subject' => (string) $i['title'], 'badge' => $i['status'] === 'void' ? 'VOID' : ($i['status'] === 'draft' ? 'DRAFT' : ''),
+            'items' => InvoiceService::items($i), 'subtotal' => (int) $i['subtotal_minor'], 'discount' => $discount, 'discountLabel' => (int) ($i['coupon_discount_minor'] ?? 0) > 0 && (int) $i['discount_minor'] === 0 ? 'Coupon ' . $i['coupon_code'] : 'Discount',
+            'total' => (int) $i['total_minor'], 'after' => $after, 'terms' => BusinessProfile::terms('invoice', $biz), 'notes' => trim((string) ($i['client_notes'] ?? '')), 'howToPay' => trim((string) ($biz['payment_instructions'] ?? '')), 'footerNote' => '', 'docName' => 'invoice',
+        ]);
     }
 
     /** @param array<string,mixed> $q a quotation row from QuotationService::find */
@@ -154,17 +152,207 @@ final class DocumentPdf
     {
         $biz = BusinessProfile::get();
         $client = Database::one('SELECT contact_name, company_name FROM clients WHERE id = ?', [$q['client_id']]) ?? [];
-        $pdf = new Pdf('Quotation ' . $q['reference']);
-        self::head($pdf, 'QUOTATION', (string) $q['reference'], $biz);
-        self::meta($pdf, [['PREPARED FOR', (string) ($client['company_name'] ?: ($client['contact_name'] ?? ''))], ['VALID UNTIL', $q['valid_until'] ? local_date($q['valid_until']) : '-'], ['STATUS', ucfirst((string) $q['status'])]]);
-        $pdf->paragraph((string) $q['title'], 12, true);
-        $pdf->moveDown(4);
-        self::lines($pdf, QuotationService::items($q));
-        self::totals($pdf, [['Total', FieldRules::formatMinor((int) $q['total_minor']), true]]);
-        if (!empty($q['client_notes'])) {
-            $pdf->paragraph((string) $q['client_notes'], 9);
+        [$to, $sub] = self::issuedTo($client);
+        $items = QuotationService::items($q);
+        $subtotal = array_sum(array_map(static fn (array $it): int => (int) $it['total_minor'], $items));
+        $total = (int) $q['total_minor'];
+        $stamp = (string) (($q['sent_at'] ?? '') !== '' ? $q['sent_at'] : $q['created_at']);
+
+        return self::template([
+            'title' => 'QUOTATION', 'numberLabel' => 'QUOTATION NO:', 'number' => (string) $q['reference'], 'date' => local_date($stamp, 'j M Y'), 'extra' => $q['valid_until'] ? [['VALID UNTIL:', local_date($q['valid_until'], 'j M Y')]] : [],
+            'issuedTo' => $to, 'issuedToSub' => $sub, 'subject' => (string) $q['title'], 'badge' => in_array($q['status'], ['draft', 'rejected', 'expired'], true) ? strtoupper((string) $q['status']) : '',
+            'items' => $items, 'subtotal' => $subtotal, 'discount' => max(0, $subtotal - $total), 'discountLabel' => 'Discount', 'total' => $total, 'after' => [],
+            'terms' => BusinessProfile::terms('quotation', $biz), 'notes' => trim((string) ($q['client_notes'] ?? '')), 'howToPay' => '', 'footerNote' => '', 'docName' => 'quotation',
+        ]);
+    }
+
+    /** The square KIS logo of the quotation / invoice template (black tile with the KIS mark). @return array{w:int,h:int,data:string}|null */
+    public static function docLogo(): ?array
+    {
+        $public = defined('VERTEX_PUBLIC') ? VERTEX_PUBLIC : VERTEX_ROOT . '/public';
+        $png = is_file($public . '/assets/img/krazy-doc-logo.png') ? (string) file_get_contents($public . '/assets/img/krazy-doc-logo.png') : '';
+        if ($png === '' && is_file($public . '/assets/img.php') && preg_match("/'krazy-doc-logo\\.png' => '([A-Za-z0-9+\\/=]+)'/", (string) file_get_contents($public . '/assets/img.php'), $m)) {
+            $png = (string) base64_decode($m[1], true);
         }
-        self::foot($pdf, $biz);
+
+        return $png === '' ? null : Pdf::imageFromPng($png, [0, 0, 0]);
+    }
+
+    /**
+     * Quotation / invoice in the KIS template: letterhead swoosh and blue tab, logo block, big title, ISSUED TO and number/date, a numbered item table with
+     * PRICE, VALIDITY/QTY and SUBTOTAL, Subtotal / Discount / GRAND TOTAL, the Terms & conditions, and the blue footer bar. Same facts as the on-screen documents.
+     *
+     * @param array{title:string,numberLabel:string,number:string,date:string,extra:list<array{0:string,1:string}>,issuedTo:string,issuedToSub:string,subject:string,badge:string,
+     *   items:list<array<string,mixed>>,subtotal:int,discount:int,discountLabel:string,total:int,after:list<array{0:string,1:string,2?:bool}>,terms:list<string>,
+     *   notes:string,howToPay:string,footerNote:string,docName:string} $d
+     */
+    private static function template(array $d): string
+    {
+        $H = Pdf::H;
+        $W = Pdf::W;
+        $blue = [0.251, 0.498, 0.749];
+        $tab = [0.353, 0.502, 0.816];
+        $ink = [0.04, 0.05, 0.10];
+        $grey = 0.38;
+        $decor = static function (Pdf $p) use ($H, $W, $tab, $d): void {
+            // the letterhead artwork was drawn on a 200 dpi grid: 1 px = 0.36 pt
+            $y = static fn (float $py): float => $H - $py * 0.36;
+            $x = static fn (float $px): float => $px * 0.36;
+            $p->shape([['M', $x(48), $y(128)], ['C', $x(52), $y(70), $x(80), $y(25), $x(125), $y(0)], ['L', $x(548), $y(0)], ['C', $x(470), $y(30), $x(330), $y(55), $x(215), $y(75)], ['C', $x(140), $y(90), $x(80), $y(105), $x(48), $y(128)], ['Z']], 0.0,
+                ['from' => [0.157, 0.122, 0.49], 'to' => [0.353, 0.502, 0.816], 'x0' => $x(48), 'x1' => $x(548)]);
+            $p->shape([['M', $x(50), $y(148)], ['C', $x(95), $y(105), $x(160), $y(88), $x(235), $y(78)], ['C', $x(160), $y(98), $x(100), $y(140), $x(56), $y(212)], ['Z']], 0.0,
+                ['from' => [0.157, 0.122, 0.49], 'to' => [0.30, 0.40, 0.72], 'x0' => $x(50), 'x1' => $x(235)]);
+            $p->tab(327, $H - 20, $W - 327, 20, 14, $tab);
+            $p->fill(0, 0, $W, 26, $tab);
+            $p->text($W / 2, 9.5, 'This is a computer-generated ' . $d['docName'] . ' and does not require a physical signature.', 8.5, false, 'center', [0.08, 0.10, 0.22]);
+        };
+        $pdf = new Pdf($d['title'] . ' ' . $d['number'], $decor, false);
+        $T = static fn (float $top): float => $H - $top; // top-based millimetre-free helper: points from the top edge
+
+        // logo block and name
+        if (($img = self::docLogo()) !== null) {
+            $pdf->image($img, 34, $T(151), 86, 86);
+        } else {
+            $pdf->fill(34, $T(151), 86, 86, [0, 0, 0]);
+        }
+        foreach (['Krazy', 'Integrated', 'Solutions'] as $n => $word) {
+            $pdf->text(125, $T(93 + $n * 24), $word, 24, true, 'left', $ink);
+        }
+        // title (right) and optional badge
+        $pdf->text(587, $T(125), $d['title'], 44, true, 'right', $blue);
+        if ($d['badge'] !== '') {
+            $pdf->text(587, $T(148), $d['badge'], 13, true, 'right', [0.80, 0.15, 0.20]);
+        }
+        // issued to / number / date
+        $pdf->text(38, $T(181), 'ISSUED TO:', 14, true, 'left', $blue);
+        $pdf->text(340, $T(181), $d['numberLabel'], 14, true, 'left', $blue);
+        $pdf->text(340 + Pdf::width($d['numberLabel'], 14, true) + 6, $T(181), $d['number'], 10.5, true, 'left', $ink);
+        $pdf->text(420, $T(207), 'DATE:', 11, false, 'left', $ink);
+        $pdf->text(572, $T(207), $d['date'], 10.5, false, 'right', $ink);
+        $ey = 224.0;
+        foreach ($d['extra'] as [$k, $v]) {
+            $pdf->text(420, $T($ey), $k, 11, false, 'left', $ink);
+            $pdf->text(572, $T($ey), $v, 10.5, false, 'right', $ink);
+            $ey += 16;
+        }
+        $iy = 199.0;
+        foreach (Pdf::wrap($d['issuedTo'], 270, 11, true) as $line) {
+            $pdf->text(38, $T($iy), $line, 11, true, 'left', $ink);
+            $iy += 13;
+        }
+        if ($d['issuedToSub'] !== '') {
+            $pdf->text(38, $T($iy), $d['issuedToSub'], 9, false, 'left', $grey);
+            $iy += 12;
+        }
+        foreach (array_slice(Pdf::wrap($d['subject'], 280, 9), 0, 2) as $line) {
+            $pdf->text(38, $T($iy), $line, 9, false, 'left', $grey);
+            $iy += 11;
+        }
+
+        // table header
+        $head = static function (Pdf $p, float $top) use ($T, $blue): void {
+            $p->text(50, $T($top + 16), 'NO.', 12, true, 'left', $blue);
+            $p->text(92, $T($top + 16), 'ITEM DESCRIPTION', 12, true, 'left', $blue);
+            $p->text(350, $T($top + 16), 'PRICE', 12, true, 'right', $blue);
+            $p->text(361, $T($top + 16), 'VALIDITY/QTY', 12, true, 'left', $blue);
+            $p->text(547, $T($top + 16), 'SUBTOTAL', 12, true, 'right', $blue);
+            $p->rule(34, 561, $T($top + 29), 2.0, 0.0);
+        };
+        $top = 256.0;
+        $head($pdf, $top);
+        $top += 29;
+        $qty = static fn (array $it): string => rtrim(rtrim(number_format(((int) $it['quantity_x100']) / 100, 2, '.', ''), '0'), '.');
+        $items = $d['items'];
+        while (count($items) < 4) {
+            $items[] = null; // the template always shows four numbered lines
+        }
+        foreach ($items as $n => $it) {
+            $lines = $it === null ? [''] : Pdf::wrap((string) $it['description'], 168, 9.5);
+            $h = max(37.0, count($lines) * 12.0 + 16.0);
+            if ($top + $h > 760 && $it !== null) { // keep room for the totals and the terms; continue on a new page
+                $pdf->newPage();
+                $top = 110.0;
+                $head($pdf, $top - 29);
+            }
+            $base = $top + ($h - count($lines) * 12.0) / 2 + 9.5;
+            $pdf->text(53, $T($base), str_pad((string) ($n + 1), 2, '0', STR_PAD_LEFT) . '.', 11, false, 'left', $ink);
+            if ($it !== null) {
+                foreach ($lines as $k => $line) {
+                    $pdf->text(92, $T($base + $k * 12), $line, 9.5, false, 'left', $ink);
+                }
+                $pdf->text(350, $T($base), 'Rs. ' . FieldRules::formatMinor((int) $it['unit_minor']), 9.5, false, 'right', $ink);
+                $pdf->text(411, $T($base), $qty($it), 9.5, false, 'center', $ink);
+                $pdf->text(547, $T($base), 'Rs. ' . FieldRules::formatMinor((int) $it['total_minor']), 9.5, false, 'right', $ink);
+            }
+            $pdf->rule(35, 561, $T($top + $h), 0.6, 0.15);
+            $top += $h;
+        }
+
+        // totals
+        $need = 85 + 20 * count($d['after']);
+        if ($top + $need > 780) {
+            $pdf->newPage();
+            $top = 110.0;
+        }
+        $row = static function (Pdf $p, float $t, string $label, string $value) use ($T, $ink): void {
+            $p->text(398, $T($t), $label, 11, false, 'center', $ink);
+            $p->text(547, $T($t), $value, 10.5, false, 'right', $ink);
+        };
+        $row($pdf, $top + 19, 'Subtotal', 'Rs. ' . FieldRules::formatMinor($d['subtotal']));
+        $row($pdf, $top + 40, $d['discountLabel'], ($d['discount'] > 0 ? '-' : '') . 'Rs. ' . FieldRules::formatMinor($d['discount']));
+        $pdf->rule(24, 552, $T($top + 52), 2.0, 0.0);
+        $pdf->text(325, $T($top + 77), 'GRAND TOTAL', 14, true, 'left', $blue);
+        $pdf->text(547, $T($top + 77), 'Rs. ' . FieldRules::formatMinor($d['total']), 14, true, 'right', $blue);
+        $y = $top + 77;
+        foreach ($d['after'] as $rowAfter) {
+            [$label, $value] = $rowAfter;
+            $bold = $rowAfter[2] ?? false;
+            $y += 20;
+            $pdf->text(325, $T($y), $label, 11, (bool) $bold, 'left', (bool) $bold ? $blue : $ink);
+            $pdf->text(547, $T($y), $value, 11, (bool) $bold, 'right', (bool) $bold ? $blue : $ink);
+        }
+
+        // terms (a line that would run into the footer bar moves to a new page)
+        $room = static function (float $y, float $need) use ($pdf): float {
+            if ($y + $need > 800) {
+                $pdf->newPage();
+
+                return 110.0;
+            }
+
+            return $y;
+        };
+        $y = $room($y + 42, 34);
+        $termsTop = $y;
+        $pdf->text(19, $T($y), 'Terms & conditions', 14, true, 'left', $blue);
+        $y += 16;
+        foreach ($d['terms'] as $term) {
+            foreach (Pdf::wrap($term, 372, 8.5) as $line) {
+                $y = $room($y, 12);
+                $pdf->text(19, $T($y), $line, 8.5, false, 'left', $ink);
+                $y += 12.2;
+            }
+            $y += 3.4;
+        }
+        // payment instructions and notes sit in the free column beside the terms (on the first page of the terms)
+        $ry = $termsTop;
+        foreach ([['How to pay', $d['howToPay']], ['Notes', $d['notes']]] as [$label, $text]) {
+            if ($text === '') {
+                continue;
+            }
+            $pdf->text(405, $T($ry), $label, 11, true, 'left', $blue);
+            $ry += 14;
+            foreach (preg_split('/\R/', $text) ?: [] as $para) {
+                foreach (Pdf::wrap($para, 168, 8.5) as $line) {
+                    if ($ry > 806) {
+                        break 3;
+                    }
+                    $pdf->text(405, $T($ry), $line, 8.5, false, 'left', $ink);
+                    $ry += 11.5;
+                }
+            }
+            $ry += 10;
+        }
 
         return $pdf->output();
     }

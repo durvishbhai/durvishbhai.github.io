@@ -1,7 +1,7 @@
 /* Two jobs. (1) Offline page: pages, forms and anything about a person are NEVER stored; the worker keeps one small "You are offline" page and its styles and
  * shows it when a page cannot be loaded because the device has no connection. (2) Notifications: shows the push messages the server sends to this device and opens
  * the right page when one is tapped. */
-const CACHE = 'kis-offline-v2';
+const CACHE = 'kis-offline-v3';
 
 self.addEventListener('push', (event) => {
   let d = {};

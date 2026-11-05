@@ -1121,6 +1121,15 @@ body { padding-bottom: env(safe-area-inset-bottom); }
     html { -webkit-tap-highlight-color: transparent; }
 }
 
+/* Installed app: fixed scale. No pinch or double-tap zoom, no bounce zoom, inputs at 16px so the phone never zooms into a focused field, content never wider than the screen. */
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    html, body { touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: none; }
+    input, select, textarea { font-size: 16px; }
+}
+html.pwa-app, html.pwa-app body { touch-action: pan-x pan-y; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; overscroll-behavior-y: none; max-width: 100vw; overflow-x: hidden; }
+html.pwa-app input, html.pwa-app select, html.pwa-app textarea { font-size: 16px; }
+html.pwa-app img, html.pwa-app table { max-width: 100%; }
+
 /* Appointments */
 .field[hidden] { display: none; }
 .slot-row { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -1191,3 +1200,51 @@ mark.legal-missing { background: rgba(255, 217, 138, 0.25); color: var(--c-warn)
 .cookie-dialog::backdrop { background: rgba(2, 4, 16, 0.65); }
 .cookie-cat { padding: 10px 0; border-bottom: 1px solid var(--line); } .cookie-cat:last-of-type { border-bottom: 0; } .cookie-cat p { margin: 4px 0 0 28px; }
 @media (max-width: 640px) { .cookie-actions .btn { flex: 1 1 100%; } .cookie-banner { max-height: 80vh; overflow: auto; } }
+
+
+/* ---- Quotation / invoice sheet in the KIS template design (on-screen and print) ---- */
+.kd-sheet { position: relative; box-sizing: border-box; width: 210mm; min-height: 297mm; margin: 0 auto 24px; padding: 20mm 11mm 24mm 12mm; background: #fff; color: #0a0d1a; font-family: var(--font); line-height: 1.4; overflow: hidden; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.25); }
+.kd-sheet h1, .kd-sheet h2, .kd-sheet p, .kd-sheet ul, .kd-sheet dl, .kd-sheet dd { margin: 0; }
+.kd-swoosh { position: absolute; left: 0; top: 0; width: 70mm; height: auto; }
+.kd-tab { position: absolute; right: 0; top: 0; width: 46%; height: 7mm; background: #5a80d0; border-bottom-left-radius: 5mm; }
+.kd-head { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 8mm; margin-top: 8mm; }
+.kd-brand { display: flex; align-items: center; gap: 4mm; }
+.kd-brand img { width: 30mm; height: 30mm; display: block; }
+.kd-brand p { font-size: 24px; font-weight: 800; line-height: 1.02; }
+.kd-title { text-align: right; }
+.kd-title h1 { color: #2f6dae; font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: 0; }
+.kd-badge { color: #cc2633; font-weight: 800; font-size: 16px; margin-top: 2mm; }
+.kd-meta { display: flex; justify-content: space-between; gap: 8mm; margin-top: 12mm; }
+.kd-meta h2 { color: #2f6dae; font-size: 17px; font-weight: 800; }
+.kd-no h2 span { color: #0a0d1a; font-size: 13px; }
+.kd-to { max-width: 90mm; }
+.kd-to p { font-size: 14px; margin-top: 1mm; }
+.kd-small { color: #555; font-size: 12px !important; }
+.kd-no dl { display: grid; grid-template-columns: auto auto; gap: 1mm 4mm; justify-content: end; margin-top: 3mm; font-size: 14px; }
+.kd-no dd { text-align: right; }
+.kd-table { width: 100%; border-collapse: collapse; margin-top: 12mm; font-size: 13px; }
+.kd-table th { color: #2f6dae; font-weight: 800; font-size: 14px; text-align: left; padding: 0 2mm 3mm; border-bottom: 2px solid #000; }
+.kd-table td { padding: 3.2mm 2mm; border-bottom: 1px solid #222; height: 13mm; vertical-align: middle; }
+.kd-table .kd-no-col { width: 14mm; padding-left: 4mm; }
+.kd-r { text-align: right !important; white-space: nowrap; }
+.kd-c { text-align: center !important; }
+.kd-totals { margin: 3mm 0 0 auto; width: 100%; }
+.kd-totals dl { display: grid; grid-template-columns: 1fr auto; gap: 2mm 0; width: 62%; margin-left: 38%; font-size: 14px; padding: 3mm 2mm 4mm; border-bottom: 2px solid #000; }
+.kd-totals dd { text-align: right; }
+.kd-sheet .kd-grand { display: flex; justify-content: space-between; width: 62%; margin-left: 38%; padding: 3mm 2mm 0; color: #2f6dae; font-weight: 800; font-size: 18px; }
+.kd-totals .kd-after { border: 0; padding-top: 2mm; font-size: 14px; }
+.kd-totals .kd-after .kd-strong { color: #2f6dae; font-weight: 800; }
+.kd-foot { display: flex; gap: 8mm; margin-top: 10mm; }
+.kd-terms { flex: 1 1 62%; }
+.kd-side { flex: 1 1 34%; font-size: 12px; }
+.kd-foot h2 { color: #2f6dae; font-size: 17px; font-weight: 800; margin-bottom: 2mm; }
+.kd-side h2 { font-size: 14px; margin-top: 2mm; }
+.kd-terms ul { list-style: none; padding: 0; font-size: 12px; }
+.kd-terms li { margin: 0 0 1.4mm; }
+.kd-bar { position: absolute; left: 0; right: 0; bottom: 0; background: #5a80d0; color: #14193a; text-align: center; font-size: 12px; padding: 2.6mm 4mm; }
+@media (max-width: 800px) { .kd-sheet { width: 100%; min-height: 0; padding: 18px 14px 56px; } .kd-title h1 { font-size: 34px; } .kd-head, .kd-meta, .kd-foot { flex-wrap: wrap; } .kd-brand img { width: 64px; height: 64px; } .kd-table { font-size: 12px; } .kd-totals dl, .kd-grand { width: 100%; margin-left: 0; } }
+@media print {
+    @page { size: A4; margin: 0; }
+    body.print-doc { background: #fff; }
+    .kd-sheet { width: 210mm; min-height: 297mm; margin: 0; box-shadow: none; page-break-after: always; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

@@ -56,7 +56,7 @@ final class BillingSettingsController extends Controller
     public function saveBusiness(Request $request, array $params = []): Response
     {
         $in = [];
-        foreach (['trade_name', 'legal_name', 'address', 'email', 'phone', 'website', 'tax_statement', 'payment_instructions', 'invoice_footer'] as $k) {
+        foreach (['trade_name', 'legal_name', 'address', 'email', 'phone', 'website', 'tax_statement', 'payment_instructions', 'invoice_footer', 'quotation_terms', 'invoice_terms'] as $k) {
             $in[$k] = $request->string($k);
         }
 

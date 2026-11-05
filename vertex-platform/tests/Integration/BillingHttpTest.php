@@ -157,10 +157,10 @@ final class BillingHttpTest extends HttpTestCase
             $this->assertStringNotContainsString('<script>alert(1)', $r['body']);
             $this->assertStringNotContainsString('<img src=x', $r['body']);
             $this->assertStringContainsString('&lt;script&gt;', $r['body']);
-            $this->assertStringContainsString('Tax is not applicable.', $r['body']);
-            $this->assertStringContainsString('Vertex Integrated Solutions', $r['body']);
+            $this->assertStringContainsString('GST not applicable.', $r['body'], 'the KIS template terms');
+            $this->assertStringContainsString('Terms &amp; conditions', $r['body']);
+            $this->assertStringContainsString('Krazy', $r['body']);
             $this->assertStringNotContainsString('STAFF-ONLY-NOTE', $r['body']);
-            $this->assertStringNotContainsString('GST', $r['body']);
         }
         $this->assertSame(404, $this->loggedIn('bravo@client.test')->get('/my/invoices/' . $d['public_id'] . '/print')['status']);
     }
@@ -194,6 +194,6 @@ final class BillingHttpTest extends HttpTestCase
         $a->post('/admin/business', $form + ['confirm_password' => self::PASSWORD], '/admin/business');
         $this->assertSame('New Trade Name', BusinessProfile::get()['trade_name']);
         $inv = $this->issued('After rename');
-        $this->assertStringContainsString('New Trade Name', $this->loggedIn('admin@x.test')->get('/invoices/' . $inv['public_id'] . '/print')['body']);
+        $this->assertStringContainsString('Pay by UPI', $this->loggedIn('admin@x.test')->get('/invoices/' . $inv['public_id'] . '/print')['body'], 'the payment instructions of the business details are printed under How to pay');
     }
 }
