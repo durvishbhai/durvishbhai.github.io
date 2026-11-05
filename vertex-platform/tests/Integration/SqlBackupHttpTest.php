@@ -30,7 +30,7 @@ final class SqlBackupHttpTest extends HttpTestCase
         $o = $this->loggedIn('owner@x.test');
         $page = $o->get('/admin/backup');
         $this->assertSame(200, $page['status']);
-        $this->assertStringContainsString('Download backup (.sql)', $page['body']);
+        $this->assertStringContainsString('Download database backup (.sql)', $page['body']);
 
         // wrong password: no file, a friendly error, nothing audited
         $r = $o->post('/admin/backup/sql', ['confirm_password' => 'wrong-password'], '/admin/backup');

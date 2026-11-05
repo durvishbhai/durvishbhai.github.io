@@ -66,7 +66,7 @@ $nav = [
     ['/admin/automation', 'Workflow rules', can('automation.manage')],
     ['/admin/sla', 'Support SLA', can('sla.manage')],
     ['/admin/data', 'Import & export', can('data.export') || can('data.import')],
-    ['/admin/backup', 'Backup (.sql)', can('backups.manage')],
+    ['/admin/backup', 'Backup & restore', can('backups.manage')],
     ['/admin/recycle-bin', 'Recycle bin', can('recycle.view')],
     ['/admin/activity', 'Account activity', can('activity.view_all')],
     ['/admin/audit', 'Audit log', can('audit.view')],

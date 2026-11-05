@@ -672,6 +672,9 @@ return static function (Router $router): void {
         $r->post('/recycle-bin/restore', [RecycleBinController::class, 'restore'], ['can:recycle.restore']);
         $r->get('/backup', [BackupController::class, 'index'], ['can:backups.manage']);
         $r->post('/backup/sql', [BackupController::class, 'download'], ['can:backups.manage']);
+        $r->post('/backup/files', [BackupController::class, 'downloadFiles'], ['can:backups.manage']);
+        $r->post('/backup/restore-sql', [BackupController::class, 'restoreSql'], ['can:backups.manage']);
+        $r->post('/backup/restore-files', [BackupController::class, 'restoreFiles'], ['can:backups.manage']);
         $r->get('/data', [DataController::class, 'index'], ['can:data.export,data.import']);
         $r->get('/data/export/{type}', [DataController::class, 'export'], ['can:data.export']);
         $r->get('/data/template/{type}', [DataController::class, 'template'], ['can:data.import']);

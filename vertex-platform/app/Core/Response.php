@@ -11,6 +11,9 @@ final class Response
         public int $status = 200,
         public string $body = '',
         public array $headers = [],
+        /** a file sent in chunks instead of held in memory (large backups); removed afterwards when $deleteFile is true */
+        public ?string $file = null,
+        public bool $deleteFile = false,
     ) {
     }
 
@@ -45,6 +48,20 @@ final class Response
         ]);
     }
 
+    /** A download streamed straight from disk (no memory spike for big files). The file is deleted after it was sent when $deleteAfter is true. */
+    public static function streamDownload(string $path, string $name, string $mime, bool $deleteAfter = false): self
+    {
+        $safe = (string) preg_replace('/[^A-Za-z0-9._ -]/', '_', $name);
+
+        return new self(200, '', [
+            'Content-Type' => 'application/octet-stream',
+            'Content-Disposition' => "attachment; filename=\"{$safe}\"; filename*=UTF-8''" . rawurlencode($name),
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+            'Content-Length' => (string) filesize($path),
+        ], $path, $deleteAfter);
+    }
+
     public function withHeader(string $name, string $value): self
     {
         $this->headers[$name] = $value;
@@ -60,6 +77,22 @@ final class Response
             foreach ($this->headers as $name => $value) {
                 header($name . ': ' . $value);
             }
+        }
+        if ($this->file !== null) {
+            ignore_user_abort(true);
+            $in = @fopen($this->file, 'rb');
+            if ($in !== false) {
+                while (!feof($in)) {
+                    echo (string) fread($in, 1048576);
+                    flush();
+                }
+                fclose($in);
+            }
+            if ($this->deleteFile) {
+                @unlink($this->file);
+            }
+
+            return;
         }
         echo $this->body;
     }

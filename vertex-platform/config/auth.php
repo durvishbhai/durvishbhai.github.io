@@ -59,6 +59,8 @@ return [
         'receipt_verify_ip' => [40, 600],
         'checkout_order_user' => [60, 3600],
         'backup_download_user' => [10, 3600],
+        'backup_files_user' => [10, 3600],
+        'backup_restore_user' => [5, 3600],
         'cms_upload_user' => [60, 3600],
         'career_ip' => [5, 3600],
     ],

@@ -109,6 +109,358 @@ final class BackupService
         return ['path' => $path, 'tables' => count($info['tables']), 'rows' => array_sum($info['tables']), 'bytes' => (int) filesize($path)];
     }
 
+    // ------------------------------------------------------------------------------------------------ Administration -> Backup
+
+    /** The biggest file this server accepts in an upload form (PHP's own limits; there is no application cap for backups). */
+    public static function uploadLimit(): int
+    {
+        $bytes = static function (string $v): int {
+            $v = trim($v);
+            $n = (int) $v;
+            return match (strtolower(substr($v, -1))) {
+                'g' => $n * 1024 ** 3,
+                'm' => $n * 1024 ** 2,
+                'k' => $n * 1024,
+                default => $n,
+            };
+        };
+        $lim = array_filter([$bytes((string) ini_get('upload_max_filesize')), $bytes((string) ini_get('post_max_size'))], static fn (int $b): bool => $b > 0);
+
+        return $lim === [] ? 0 : min($lim);
+    }
+
+    private static function cacheDir(): string
+    {
+        $dir = dirname(rtrim((string) Config::get('uploads.root', VERTEX_ROOT . '/storage/uploads'), '/')) . '/cache';
+        if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
+            throw new \RuntimeException('The temporary folder is not writable.');
+        }
+
+        return $dir;
+    }
+
+    /**
+     * Every uploaded file as one .zip: the private upload store (deliverables, payment proofs, enquiry attachments) and the website pictures, each with a SHA-256 in
+     * manifest.json. Invoices, quotations, receipts and agreements are not files: they are produced from the database, so they are inside the .sql backup.
+     *
+     * @return array{path:string,files:int,bytes:int}
+     */
+    public static function filesZip(): array
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new \RuntimeException('The PHP zip extension is required (enable it in your hosting control panel).');
+        }
+        $path = self::cacheDir() . '/files-' . bin2hex(random_bytes(12)) . '.zip';
+        try {
+            $manifest = ['format' => self::FORMAT, 'type' => 'files', 'created_at' => gmdate('c'), 'app' => (string) Config::get('app.name', 'Krazy'), 'uploads' => []];
+            $n = self::addUploads($path, $manifest);
+            $zip = new \ZipArchive();
+            if ($zip->open($path, \ZipArchive::CREATE) !== true) {
+                throw new \RuntimeException('Cannot finish the archive.');
+            }
+            $zip->addFromString('manifest.json', json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
+            $zip->close();
+        } catch (\Throwable $e) {
+            @unlink($path);
+            throw $e;
+        }
+        @chmod($path, 0600);
+
+        return ['path' => $path, 'files' => $n, 'bytes' => (int) filesize($path)];
+    }
+
+    private const BAD_EXTENSIONS = ['php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'pht', 'phps', 'phar', 'pl', 'py', 'cgi', 'sh', 'asp', 'aspx', 'jsp', 'htaccess', 'htpasswd', 'ini', 'exe', 'bat', 'cmd', 'com', 'js', 'mjs', 'html', 'htm', 'svg', 'xml'];
+
+    /** @return array{0:string,1:string}|null [target root, relative path inside it] for a safe archive path, or null when it must be refused */
+    private static function uploadTarget(string $rel): ?array
+    {
+        if ($rel === '' || strlen($rel) > 240 || str_contains($rel, "\0") || str_contains($rel, '\\') || str_starts_with($rel, '/')) {
+            return null;
+        }
+        $segments = explode('/', $rel);
+        foreach ($segments as $seg) {
+            if (!preg_match('/^[A-Za-z0-9_\-][A-Za-z0-9_\-.]*$/', $seg) || str_contains($seg, '..')) {
+                return null;
+            }
+        }
+        $ext = strtolower((string) pathinfo((string) end($segments), PATHINFO_EXTENSION));
+        if (in_array($ext, self::BAD_EXTENSIONS, true) || preg_match('/\.(php|phtml|phar)/i', $rel)) {
+            return null;
+        }
+        if ($segments[0] === 'website-media') {
+            if (count($segments) < 2 || !in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                return null;
+            }
+            $public = (defined('VERTEX_PUBLIC') ? (string) VERTEX_PUBLIC : VERTEX_ROOT . '/public') . '/uploads/cms';
+
+            return [$public, implode('/', array_slice($segments, 1))];
+        }
+
+        return [rtrim(FileStore::root(), '/'), $rel];
+    }
+
+    /**
+     * Puts the files of a files backup back (a full .zip backup made by backup:create works too). Every path is checked, every file is verified against its checksum
+     * before it replaces anything, website pictures must really be images, and nothing outside the two upload folders can be written. Files that are not in the
+     * archive are left alone.
+     *
+     * @return array{restored:int,unchanged:int,problems:list<string>}
+     */
+    public static function restoreFiles(string $file): array
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new \RuntimeException('The PHP zip extension is required (enable it in your hosting control panel).');
+        }
+        clearstatcache(true, $file);
+        $zip = new \ZipArchive();
+        if (!is_file($file) || (int) filesize($file) === 0 || $zip->open($file) !== true) { // a 0-byte file is not an archive (and ZipArchive deprecates opening one)
+            throw new \RuntimeException('This is not a valid .zip file.');
+        }
+        $raw = $zip->getFromName('manifest.json');
+        $manifest = $raw === false ? null : json_decode($raw, true);
+        if (!is_array($manifest) || (int) ($manifest['format'] ?? 0) !== self::FORMAT || !isset($manifest['uploads']) || !is_array($manifest['uploads'])) {
+            $zip->close();
+            throw new \RuntimeException('This .zip is not a backup made by this system (manifest.json is missing or unreadable).');
+        }
+        $total = 0;
+        foreach ($manifest['uploads'] as $rel => $hash) {
+            $st = $zip->statName('uploads/' . $rel);
+            $total += $st === false ? 0 : (int) $st['size'];
+        }
+        if (count($manifest['uploads']) > 200000 || $total > 6 * 1024 ** 3) {
+            $zip->close();
+            throw new \RuntimeException('The archive is larger than the restore limit (200,000 files or 6 GB).');
+        }
+        $restored = 0;
+        $same = 0;
+        $problems = [];
+        foreach ($manifest['uploads'] as $rel => $hash) {
+            $rel = (string) $rel;
+            $t = self::uploadTarget($rel);
+            if ($t === null || !preg_match('/^[a-f0-9]{64}$/', (string) $hash)) {
+                $problems[] = 'Refused an unsafe or unexpected file: ' . mb_substr($rel, 0, 80);
+                continue;
+            }
+            [$root, $sub] = $t;
+            $target = $root . '/' . $sub;
+            if (is_file($target) && hash_equals((string) $hash, (string) hash_file('sha256', $target))) {
+                $same++;
+                continue;
+            }
+            $in = $zip->getStream('uploads/' . $rel);
+            if ($in === false) {
+                $problems[] = 'Missing in the archive: ' . $rel;
+                continue;
+            }
+            if (!is_dir(dirname($target)) && !@mkdir(dirname($target), 0750, true) && !is_dir(dirname($target))) {
+                fclose($in);
+                $problems[] = 'Cannot create the folder for ' . $rel;
+                continue;
+            }
+            $part = $target . '.part-' . bin2hex(random_bytes(4));
+            $out = fopen($part, 'wb');
+            if ($out === false) {
+                fclose($in);
+                $problems[] = 'Cannot write ' . $rel;
+                continue;
+            }
+            stream_copy_to_stream($in, $out);
+            fclose($in);
+            fclose($out);
+            $ok = hash_equals((string) $hash, (string) hash_file('sha256', $part));
+            if ($ok && $root !== rtrim(FileStore::root(), '/') && @getimagesize($part) === false) {
+                $ok = false; // a website picture must really be an image
+            }
+            if (!$ok) {
+                @unlink($part);
+                $problems[] = 'Damaged or not an image, skipped: ' . $rel;
+                continue;
+            }
+            @chmod($part, 0640);
+            if (!rename($part, $target)) {
+                @unlink($part);
+                $problems[] = 'Cannot place ' . $rel;
+                continue;
+            }
+            $restored++;
+        }
+        $zip->close();
+
+        return ['restored' => $restored, 'unchanged' => $same, 'problems' => $problems];
+    }
+
+    /**
+     * Reads a backup .sql made by this system and checks every line BEFORE anything is touched: the header, the end marker, and that each statement is one of the few
+     * kinds a backup contains (SET, DROP TABLE IF EXISTS, CREATE TABLE, INSERT ... VALUES). Anything else (GRANT, CREATE USER, DROP DATABASE, LOAD DATA, ...) refuses the file.
+     *
+     * @return array{statements:int,tables:list<string>}
+     */
+    public static function inspectSql(string $file): array
+    {
+        $in = is_file($file) ? fopen($file, 'rb') : false;
+        if ($in === false) {
+            throw new \RuntimeException('The file cannot be read.');
+        }
+        $first = true;
+        $n = 0;
+        $line = 0;
+        $tables = [];
+        $end = false;
+        try {
+            while (($l = fgets($in)) !== false) {
+                $line++;
+                $l = rtrim($l, "\r\n");
+                if ($first) {
+                    $first = false;
+                    if (!preg_match('/^-- Krazy backup, format ' . self::FORMAT . ',/', $l)) {
+                        throw new \RuntimeException('This is not a backup made by this system (the first line is not the Krazy backup header). Files exported from phpMyAdmin can be imported there instead.');
+                    }
+                    continue;
+                }
+                if ($l === '' || (str_starts_with($l, '--') && $l !== '-- END OF BACKUP')) {
+                    continue;
+                }
+                if ($l === '-- END OF BACKUP') {
+                    $end = true;
+                    continue;
+                }
+                if ($end) {
+                    throw new \RuntimeException("Unexpected content after the end of the backup (line {$line}).");
+                }
+                if (preg_match('/^SET (NAMES utf8mb4|time_zone = \'\+00:00\'|FOREIGN_KEY_CHECKS = [01]|UNIQUE_CHECKS = [01]);$/', $l)) {
+                    continue;
+                }
+                if (preg_match('/^DROP TABLE IF EXISTS `([A-Za-z0-9_]{1,64})`;$/', $l, $m)) {
+                    $tables[$m[1]] = true;
+                    $n++;
+                    continue;
+                }
+                if (preg_match('/^CREATE TABLE `([A-Za-z0-9_]{1,64})` \(.*;$/', $l) || preg_match('/^INSERT INTO `[A-Za-z0-9_]{1,64}` \(`[^`]+`.*\) VALUES \(.*\);$/', $l)) {
+                    $n++;
+                    continue;
+                }
+                throw new \RuntimeException("The file contains a statement a backup never contains (line {$line}). Nothing was changed.");
+            }
+        } finally {
+            fclose($in);
+        }
+        if ($line < 3 || !$end) {
+            throw new \RuntimeException('The backup is incomplete (its end marker is missing): it was probably cut off while it was saved. Nothing was changed.');
+        }
+        if (!isset($tables['users']) || !isset($tables['schema_migrations'])) {
+            throw new \RuntimeException('The backup does not contain the core tables (users, schema_migrations). Nothing was changed.');
+        }
+
+        return ['statements' => $n, 'tables' => array_keys($tables)];
+    }
+
+    /** True when the line holds exactly one statement: outside quoted text the only semicolon is the last character. */
+    private static function oneStatement(string $line): bool
+    {
+        $bare = preg_replace("/'(?:[^'\\\\]|\\\\.|'')*'/s", "''", $line);
+        $bare = preg_replace('/`[^`]*`/', '``', (string) $bare);
+
+        return $bare !== null && substr_count($bare, ';') === 1 && str_ends_with($bare, ';');
+    }
+
+    /** Executes an inspected backup on its own connection: stacked statements are switched off, so one line can only ever run as one statement. */
+    private static function applySql(string $file): void
+    {
+        $c = (array) Config::get('database');
+        $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s', $c['host'], $c['port'], $c['database'], $c['charset']), (string) $c['username'], (string) $c['password'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::MYSQL_ATTR_MULTI_STATEMENTS => false,
+        ]);
+        $pdo->exec("SET NAMES utf8mb4");
+        $pdo->exec("SET time_zone = '+00:00'");
+        $pdo->exec("SET sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'");
+        $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+        $keep = [];
+        foreach (self::inspectSql($file)['tables'] as $t) {
+            $keep[$t] = true;
+        }
+        // tables that exist now but are not part of the backup (the site was upgraded after it was made) are removed, so the restored database is exactly the backup
+        foreach ($pdo->query("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'")->fetchAll(PDO::FETCH_COLUMN) as $t) {
+            if (!isset($keep[(string) $t])) {
+                $pdo->exec('DROP TABLE IF EXISTS `' . str_replace('`', '``', (string) $t) . '`');
+            }
+        }
+        $in = fopen($file, 'rb');
+        try {
+            while (($l = fgets($in)) !== false) {
+                $l = rtrim($l, "\r\n");
+                if ($l === '' || str_starts_with($l, '--')) {
+                    continue;
+                }
+                $pdo->exec($l);
+            }
+        } finally {
+            fclose($in);
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+        }
+    }
+
+    /**
+     * Replaces the whole database with a backup .sql. Safety: the file is fully checked first; a copy of the CURRENT database is saved in storage/backups before anything
+     * changes; if the restore fails half way, that copy is put back. Afterwards pending migrations and permissions are brought up to date.
+     *
+     * @return array{statements:int,tables:int,safety_copy:string,migrations:list<string>,rolled_back:bool}
+     */
+    public static function restoreSql(string $file): array
+    {
+        @set_time_limit(0);
+        @ignore_user_abort(true);
+        $info = self::inspectSql($file);
+        $lock = fopen(self::cacheDir() . '/restore.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
+            throw new \RuntimeException('Another restore is running. Wait for it to finish.');
+        }
+        try {
+            $dir = self::dir();
+            if (!is_dir($dir) && !@mkdir($dir, 0750, true) && !is_dir($dir)) {
+                throw new \RuntimeException('The backup folder cannot be created, so no safety copy can be kept. Nothing was changed.');
+            }
+            $dump = self::sqlDump();
+            $safety = $dir . '/pre-restore-' . gmdate('Ymd-His') . '.sql';
+            if (!@rename($dump['path'], $safety) && !(@copy($dump['path'], $safety) && @unlink($dump['path']))) {
+                @unlink($dump['path']);
+                throw new \RuntimeException('The safety copy of the current data could not be saved. Nothing was changed.');
+            }
+            @chmod($safety, 0600);
+            $old = glob($dir . '/pre-restore-*.sql') ?: [];
+            rsort($old);
+            foreach (array_slice($old, 5) as $f) {
+                @unlink($f);
+            }
+            $rolled = false;
+            try {
+                self::applySql($file);
+            } catch (\Throwable $e) {
+                \Vertex\Core\Logger::error('SQL restore failed, putting the previous data back', ['error' => $e->getMessage()]);
+                try {
+                    self::applySql($safety);
+                    $rolled = true;
+                } catch (\Throwable $e2) {
+                    \Vertex\Core\Logger::error('Rolling back the SQL restore failed', ['error' => $e2->getMessage()]);
+                    throw new \RuntimeException('The restore failed and the previous data could not be put back automatically. Your safety copy is saved as ' . basename($safety) . ' in vertex/storage/backups: import it with phpMyAdmin.');
+                }
+                throw new \RuntimeException('The restore failed (' . $e->getMessage() . '). Your previous data was put back unchanged.');
+            }
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+        Database::disconnect();
+        $migrations = [];
+        try {
+            $migrations = (new Migrator(VERTEX_ROOT . '/database/migrations'))->migrate();
+            PermissionSync::run(false);
+        } catch (\Throwable $e) {
+            \Vertex\Core\Logger::error('Post-restore migration failed', ['error' => $e->getMessage()]);
+        }
+
+        return ['statements' => $info['statements'], 'tables' => count($info['tables']), 'safety_copy' => basename($safety), 'migrations' => $migrations, 'rolled_back' => false];
+    }
+
     /** @return array{tables:array<string,int>,migrations:list<string>} */
     private static function dumpDatabase(string $file): array
     {
@@ -196,7 +548,7 @@ final class BackupService
         $n = 0;
         foreach (array_chunk($files, 150, true) as $chunk) {
             $zip = new \ZipArchive();
-            if ($zip->open($zipPath) !== true) {
+            if ($zip->open($zipPath, \ZipArchive::CREATE) !== true) {
                 throw new \RuntimeException('Cannot reopen the backup archive.');
             }
             foreach ($chunk as $rel => $path) {
