@@ -312,8 +312,8 @@ final class SupportPlansTest extends HttpTestCase
             $this->assertStringContainsString($needle, $page['body'], $needle);
         }
         $p = $this->finished(7);
-        \Vertex\Services\Settings::save($this->owner, 'support', ['support.plan_monthly_rupees' => '400', 'support.plan_yearly_rupees' => '3000', 'support.plans_enabled' => '1']);
-        \Vertex\Services\Settings::apply();
+        \Vertex\Services\Settings::save($this->owner, 'support', ['support__plan_monthly_rupees' => '400', 'support__plan_yearly_rupees' => '3000', 'support__plans_enabled' => '1']);
+        \Vertex\Services\Settings::reload();
         $this->assertSame(40000, SupportPlans::priceMinor('monthly'));
         $this->assertSame(300000, SupportPlans::priceMinor('yearly'));
         $this->assertSame(180000, SupportPlans::yearlySavingMinor(), '12 x ₹400 less ₹3,000');
