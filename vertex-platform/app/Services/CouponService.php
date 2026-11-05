@@ -127,7 +127,7 @@ final class CouponService
                 $eligible[$s] = $s;
             }
         }
-        $applies = (string) ($in['applies_to'] ?? 'all');
+        $applies = trim((string) ($in['applies_to'] ?? '')) ?: 'all'; // an older form without the field means "everywhere"
         if (!in_array($applies, ['all', 'project', 'subscription'], true)) {
             $errors[] = 'Choose what the coupon applies to.';
         }
