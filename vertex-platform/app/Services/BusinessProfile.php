@@ -50,6 +50,18 @@ final class BusinessProfile
         return $kind === 'invoice' ? self::INVOICE_TERMS : self::QUOTATION_TERMS;
     }
 
+    /**
+     * Adds the two terms columns when the database does not have them yet (a site updated by replacing files, without running the upgrade page). Idempotent and
+     * harmless when the upgrade page runs later: migration 0044 uses the same IF NOT EXISTS.
+     */
+    private static function ensureTermsColumns(): void
+    {
+        $have = Database::all("SHOW COLUMNS FROM business_profile WHERE Field IN ('quotation_terms', 'invoice_terms')");
+        if (count($have) < 2) {
+            Database::run('ALTER TABLE business_profile ADD COLUMN IF NOT EXISTS quotation_terms TEXT NULL, ADD COLUMN IF NOT EXISTS invoice_terms TEXT NULL');
+        }
+    }
+
     /** @return array<string,mixed> */
     public static function get(): array
     {
@@ -96,6 +108,7 @@ final class BusinessProfile
         if ($errors !== []) {
             throw new ValidationException($errors);
         }
+        self::ensureTermsColumns(); // DDL commits implicitly, so it runs before the transaction
         Database::transaction(function () use ($actorId, $row): void {
             $before = self::get();
             Database::run('UPDATE business_profile SET trade_name = ?, legal_name = ?, address = ?, email = ?, phone = ?, website = ?, tax_statement = ?, payment_instructions = ?, invoice_footer = ?, quotation_terms = ?, invoice_terms = ?, updated_by = ?, updated_at = UTC_TIMESTAMP() WHERE id = 1',

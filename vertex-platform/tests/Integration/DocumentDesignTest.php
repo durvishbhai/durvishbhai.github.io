@@ -97,6 +97,17 @@ final class DocumentDesignTest extends HttpTestCase
         $this->assertSame(1, (int) Database::one("SELECT COUNT(*) c FROM audit_logs WHERE action = 'billing.profile_changed'")['c']);
     }
 
+    public function testASiteUpdatedByReplacingFilesAddsTheColumnsByItself(): void
+    {
+        Database::run('ALTER TABLE business_profile DROP COLUMN quotation_terms, DROP COLUMN invoice_terms');
+        $this->assertSame(BusinessProfile::QUOTATION_TERMS, BusinessProfile::terms('quotation', BusinessProfile::get()), 'documents work before the columns exist');
+        BusinessProfile::save($this->admin, ['trade_name' => 'KIS', 'tax_statement' => 'Tax is not applicable.', 'invoice_terms' => 'Pay on time.']);
+        $this->assertSame(['Pay on time.'], BusinessProfile::terms('invoice', BusinessProfile::get()));
+        // the migration is safe to run afterwards
+        Database::run('ALTER TABLE business_profile ADD COLUMN IF NOT EXISTS quotation_terms TEXT NULL, ADD COLUMN IF NOT EXISTS invoice_terms TEXT NULL');
+        $this->assertSame(['Pay on time.'], BusinessProfile::terms('invoice', BusinessProfile::get()));
+    }
+
     public function testTheInvoicePrintPageUsesTheTemplate(): void
     {
         $this->assertFileExists(dirname(__DIR__, 2) . '/public/assets/img/krazy-doc-logo.png');
