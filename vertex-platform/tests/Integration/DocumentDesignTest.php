@@ -124,9 +124,13 @@ final class DocumentDesignTest extends HttpTestCase
         $js = (string) file_get_contents(dirname(__DIR__, 2) . '/public/assets/js/theme.js');
         $this->assertMatchesRegularExpression('/@media \(display-mode: standalone\)[^{]*\{[^}]*touch-action: pan-x pan-y/s', $css);
         $this->assertStringContainsString('html.pwa-app', $css);
-        foreach (['gesturestart', 'user-scalable=no', "classList.add('pwa-app')", 'touches.length > 1', 'e.ctrlKey'] as $needle) {
+        foreach (['gesturestart', 'user-scalable=no', "classList.add('pwa-app')"] as $needle) {
             $this->assertStringContainsString($needle, $js);
         }
+        // scrolling must never be slowed or blocked by the zoom lock: no non-passive touch or wheel listener, and no overflow that makes html/body a scroll container
+        $this->assertDoesNotMatchRegularExpression("/addEventListener\\('(touchmove|touchstart|touchend|wheel)'/", $js);
+        $this->assertDoesNotMatchRegularExpression('/html\\.pwa-app[^{]*\\{[^}]*overflow(-x)?:\\s*(hidden|auto|scroll)/', $css);
+        $this->assertDoesNotMatchRegularExpression('/body\\.has-support-popup\\s*\\{[^}]*overflow/', $css, 'the popup must not lock the body: it scrolls inside itself');
         $this->assertStringContainsString('display-mode: standalone', $js, 'the lock applies only inside the installed app');
         foreach (['layouts/public.php', 'layouts/app.php', 'layouts/bare.php'] as $layout) {
             $html = (string) file_get_contents(dirname(__DIR__, 2) . '/app/Views/' . $layout);

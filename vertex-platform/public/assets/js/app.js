@@ -802,7 +802,6 @@
     var pop = document.querySelector('[data-support-popup]');
     if (!pop) { return; }
     var box = pop.querySelector('.support-popup-box');
-    document.body.classList.add('has-support-popup');
     Array.prototype.forEach.call(document.querySelectorAll('body > header, body > .portal-shell, body > .shell, body > aside, #main, .portal-main'), function (el) { if (!pop.contains(el)) { el.setAttribute('aria-hidden', 'true'); } });
     if (box) { box.setAttribute('tabindex', '-1'); box.focus(); }
     pop.addEventListener('keydown', function (e) {

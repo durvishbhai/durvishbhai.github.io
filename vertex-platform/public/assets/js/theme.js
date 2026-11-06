@@ -21,15 +21,9 @@
     document.documentElement.classList.add('pwa-app');
     var vp = document.querySelector('meta[name="viewport"]');
     if (vp) { vp.setAttribute('content', 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'); }
+    // iPhone: a pinch fires gesture events, which can be cancelled. (No touchmove / touchend handler on purpose: a non-passive touch listener makes the browser wait for
+    // script before every scroll movement, and touch-action in the stylesheet already blocks pinch and double-tap zoom everywhere else.)
     var stop = function (e) { e.preventDefault(); };
-    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) { document.addEventListener(t, stop, { passive: false }); }); // iPhone pinch
-    document.addEventListener('touchmove', function (e) { if (e.touches && e.touches.length > 1) { e.preventDefault(); } }, { passive: false }); // two fingers on screen
-    var last = 0;
-    document.addEventListener('touchend', function (e) { // double-tap zoom
-        var now = Date.now();
-        if (now - last < 320 && e.target && !/^(input|textarea|select|button|a|label)$/i.test(e.target.tagName)) { e.preventDefault(); }
-        last = now;
-    }, { passive: false });
-    document.addEventListener('wheel', function (e) { if (e.ctrlKey) { e.preventDefault(); } }, { passive: false }); // desktop installed app: ctrl + wheel
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (t) { document.addEventListener(t, stop, { passive: false }); });
     document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=' || e.key === '0')) { e.preventDefault(); } });
 })();
