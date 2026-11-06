@@ -1,0 +1,1 @@
+<button class="theme-toggle" type="button" data-theme-toggle aria-label="Switch to light theme" title="Switch theme"><span class="i-moon" aria-hidden="true">&#9790;</span><span class="i-sun" aria-hidden="true">&#9728;</span></button>

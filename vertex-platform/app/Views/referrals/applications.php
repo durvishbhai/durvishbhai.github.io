@@ -1,0 +1,11 @@
+<?php /** @var list<array<string,mixed>> $rows */ /** @var int $total */ /** @var int $page */ /** @var int $perPage */ /** @var array<string,mixed> $filters */ /** @var array<string,mixed> $qs */ use Vertex\Core\View; ?>
+<div class="page-head"><div><p class="eyebrow">Referral partners</p><h1>Partner applications</h1></div><div class="action-row"><a class="btn btn-ghost" href="/referrals/dashboard">Dashboard</a><a class="btn btn-ghost" href="/referrals/terms">Terms</a></div></div>
+<form method="get" action="/referrals/applications" class="toolbar" role="search"><div class="field"><label for="q">Search</label><input id="q" name="q" type="search" maxlength="100" value="<?= e($filters['q']) ?>"></div>
+    <div class="field"><label for="s">Status</label><select id="s" name="status"><option value="">All</option><?php foreach (config('referrals.application_statuses') as $c => $l) : ?><option value="<?= e($c) ?>"<?= $filters['status'] === $c ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label for="from">From</label><input id="from" name="from" type="date" value="<?= e($filters['from']) ?>"></div><div class="field"><label for="to">To</label><input id="to" name="to" type="date" value="<?= e($filters['to']) ?>"></div>
+    <div class="field"><button class="btn btn-ghost" type="submit">Filter</button></div></form>
+<div class="table-wrap"><table class="table"><thead><tr><th>Application</th><th>Applicant</th><th>Organisation</th><th>Status</th><th>Received</th></tr></thead><tbody>
+    <?php foreach ($rows as $r) : ?><tr><td><a href="/referrals/applications/<?= e($r['public_id']) ?>"><strong><?= e($r['reference']) ?></strong></a></td><td><?= e($r['full_name']) ?><br><span class="muted"><?= e($r['email']) ?></span></td><td><?= e($r['organization'] ?? '—') ?></td>
+        <td><?= View::partial('pbadge', ['kind' => 'application', 's' => $r['status']]) ?></td><td><?= e(local_time($r['created_at'], 'd M Y')) ?></td></tr><?php endforeach; ?>
+    <?php if ($rows === []) : ?><tr><td colspan="5" class="muted">No applications match.</td></tr><?php endif; ?></tbody></table></div>
+<?= View::partial('pagination', ['page' => $page, 'perPage' => $perPage, 'total' => $total, 'filters' => $qs]) ?>

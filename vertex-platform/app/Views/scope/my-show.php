@@ -1,0 +1,6 @@
+<?php /** @var array<string,mixed> $s */ $lab = ['submitted' => 'Received', 'assessing' => 'Being looked at', 'quoted' => 'We sent you a proposal', 'declined' => 'Declined', 'withdrawn' => 'Withdrawn']; ?>
+<div class="page-head"><div><p class="eyebrow"><a href="/my/scope-requests">My scope requests</a></p><h1><?= e($s['reference']) ?></h1><p class="muted"><?= e($s['project_code']) ?> · <?= e($lab[$s['status']] ?? $s['status']) ?></p></div></div>
+<div class="panel"><p class="prewrap"><?= e($s['description']) ?></p></div>
+<?php if ($s['status'] === 'quoted' && $s['change_public_id']) : ?><div class="alert alert-info"><p>We have prepared a proposal with the cost and any change to your delivery date. <a href="/changes/<?= e($s['change_public_id']) ?>">Review and answer it</a>.</p></div><?php endif; ?>
+<?php if ($s['status'] === 'declined' && $s['assessment_note']) : ?><div class="panel"><h2>Our answer</h2><p class="prewrap"><?= e($s['assessment_note']) ?></p></div><?php endif; ?>
+<?php if (in_array($s['status'], ['submitted', 'assessing'], true)) : ?><form method="post" action="/my/scope-requests/<?= e($s['public_id']) ?>/withdraw" data-confirm="Withdraw this request?"><?= csrf_field() ?><button class="btn btn-ghost" type="submit">Withdraw request</button></form><?php endif; ?>

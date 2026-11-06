@@ -1,0 +1,5 @@
+<?php /** @var list<array<string,mixed>> $rows */ $labels = ['sent' => 'Waiting for your answer', 'accepted' => 'Accepted', 'rejected' => 'Declined', 'expired' => 'Expired', 'withdrawn' => 'Withdrawn']; ?>
+<div class="page-head"><div><p class="eyebrow">My account</p><h1>My quotations</h1></div></div>
+<?php if ($rows === []) : ?><div class="panel"><p>You have no quotations.</p></div><?php else : ?>
+<div class="table-wrap"><table class="table"><thead><tr><th>Quotation</th><th class="num">Total</th><th>Valid until</th><th>Status</th></tr></thead><tbody>
+    <?php foreach ($rows as $r) : ?><tr><td><a href="/my/quotes/<?= e($r['public_id']) ?>"><strong><?= e($r['reference']) ?></strong></a><br><span class="muted"><?= e($r['title']) ?></span></td><td class="num"><?= e(money($r['total_minor'])) ?></td><td><?= $r['valid_until'] ? e(local_date($r['valid_until'])) : '—' ?></td><td><span class="badge badge-bq-<?= e($r['status']) ?>"><?= e($labels[$r['status']] ?? $r['status']) ?></span></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>

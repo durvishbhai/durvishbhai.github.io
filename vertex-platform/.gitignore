@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+!.env.testing.example
+/vendor/
+/storage/logs/*
+/storage/sessions/*
+/storage/cache/*
+/storage/uploads/*
+!/storage/*/.gitkeep
+.phpunit.cache/
+.phpunit.result.cache
+/storage/backups/*
+!/storage/backups/.gitkeep
+/public/uploads/*
+!/public/uploads/.gitkeep
